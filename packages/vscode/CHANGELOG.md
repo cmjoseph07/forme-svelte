@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.8] - 2026-03-16
+
+### Changed
+- Single preview panel that follows the active editor instead of one panel per file
+- Auto-open now switches the existing panel to the new file without stealing focus
+
+### Fixed
+- Stale inspector/tree selection cleared immediately on file switch
+
 ## [0.7.7] - 2026-03-13
 
 ### Changed

@@ -92,13 +92,13 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('forme.openPreview', () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
-      FormePreviewPanel.createOrShow(context, editor.document.uri, false, store);
+      FormePreviewPanel.createOrShow(context, editor.document.uri, false, store, false);
     }),
 
     vscode.commands.registerCommand('forme.openPreviewToSide', () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) return;
-      FormePreviewPanel.createOrShow(context, editor.document.uri, true, store);
+      FormePreviewPanel.createOrShow(context, editor.document.uri, true, store, false);
     }),
   );
 
@@ -131,7 +131,6 @@ function maybeAutoOpen(
     .get<boolean>('autoOpen', false);
   if (!autoOpen) return;
   if (!detectFormeFile(editor.document)) return;
-  // Don't reveal an existing panel — it steals focus from the editor the user just clicked
-  if (FormePreviewPanel.has(editor.document.uri)) return;
-  FormePreviewPanel.createOrShow(context, editor.document.uri, true, store);
+  // Always update the preview for the current file (single panel now follows the editor)
+  FormePreviewPanel.createOrShow(context, editor.document.uri, true, store, true);
 }

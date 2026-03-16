@@ -7,7 +7,7 @@ import type { LayoutStore, SelectionEvent } from './layout-store.js';
 const DEBOUNCE_MS = 400;
 
 export class FormePreviewPanel {
-  private static panels = new Map<string, FormePreviewPanel>();
+  private static currentPanel: FormePreviewPanel | undefined;
 
   private static readonly _onDataContent = new vscode.EventEmitter<string | null>();
   static readonly onDataContent = FormePreviewPanel._onDataContent.event;
@@ -16,6 +16,7 @@ export class FormePreviewPanel {
   private fileUri: vscode.Uri;
   private store: LayoutStore;
   private disposables: vscode.Disposable[] = [];
+  private fileDisposables: vscode.Disposable[] = [];
   private debounceTimer: ReturnType<typeof setTimeout> | undefined;
   private statusBarItem: vscode.StatusBarItem;
   private isReady = false;
@@ -25,27 +26,34 @@ export class FormePreviewPanel {
   private dataFileWatcher: vscode.FileSystemWatcher | null = null;
   private writingDataFile = false;
 
-  static has(fileUri: vscode.Uri): boolean {
-    return FormePreviewPanel.panels.has(fileUri.toString());
-  }
-
   static createOrShow(
     context: vscode.ExtensionContext,
     fileUri: vscode.Uri,
     toSide: boolean,
     store: LayoutStore,
+    isAutoOpen = false,
   ) {
-    const key = fileUri.toString();
-    const existing = FormePreviewPanel.panels.get(key);
-    if (existing) {
-      existing.panel.reveal();
+    // If panel exists, switch to new file or just reveal
+    if (FormePreviewPanel.currentPanel) {
+      const isSameFile = FormePreviewPanel.currentPanel.fileUri.toString() === fileUri.toString();
+
+      if (!isSameFile) {
+        // Just switch files, don't reveal (panel is already visible)
+        FormePreviewPanel.currentPanel.switchToFile(fileUri);
+      } else if (!isAutoOpen) {
+        // Only reveal for manual commands on the same file
+        FormePreviewPanel.currentPanel.panel.reveal(undefined, false);
+      }
+      // For auto-open on same file, do nothing (no reveal needed)
       return;
     }
 
+    // Create new panel
+    const viewColumn = toSide ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
     const panel = vscode.window.createWebviewPanel(
       'formePreview',
-      `Forme: ${vscode.workspace.asRelativePath(fileUri)}`,
-      toSide ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active,
+      `Forme Preview`,
+      { viewColumn, preserveFocus: isAutoOpen },
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -53,50 +61,47 @@ export class FormePreviewPanel {
       },
     );
 
-    const instance = new FormePreviewPanel(context, panel, fileUri, store);
-    FormePreviewPanel.panels.set(key, instance);
+    FormePreviewPanel.currentPanel = new FormePreviewPanel(context, panel, fileUri, store);
   }
 
   static highlightElement(sel: SelectionEvent | null): void {
-    for (const instance of FormePreviewPanel.panels.values()) {
-      if (instance.isReady) {
-        instance.panel.webview.postMessage({
-          type: 'highlightElement',
-          path: sel?.path ?? null,
-          pageIdx: sel?.pageIdx ?? -1,
-        });
-      }
+    if (FormePreviewPanel.currentPanel?.isReady) {
+      FormePreviewPanel.currentPanel.panel.webview.postMessage({
+        type: 'highlightElement',
+        path: sel?.path ?? null,
+        pageIdx: sel?.pageIdx ?? -1,
+      });
     }
   }
 
   static updateData(data: unknown, context: vscode.ExtensionContext, raw?: string): void {
-    for (const instance of FormePreviewPanel.panels.values()) {
-      context.workspaceState.update(
-        `forme.data.${instance.fileUri.toString()}`,
-        data,
+    const instance = FormePreviewPanel.currentPanel;
+    if (!instance) return;
+
+    context.workspaceState.update(
+      `forme.data.${instance.fileUri.toString()}`,
+      data,
+    );
+
+    // Write back to companion data file using the raw string to preserve formatting
+    if (instance.dataFilePath && raw) {
+      const uri = vscode.Uri.file(instance.dataFilePath);
+      instance.writingDataFile = true;
+      vscode.workspace.fs.writeFile(uri, Buffer.from(raw, 'utf-8')).then(
+        () => { setTimeout(() => { instance.writingDataFile = false; }, 500); },
+        () => { instance.writingDataFile = false; },
       );
-      // Write back to companion data file using the raw string to preserve formatting
-      if (instance.dataFilePath && raw) {
-        const uri = vscode.Uri.file(instance.dataFilePath);
-        instance.writingDataFile = true;
-        vscode.workspace.fs.writeFile(uri, Buffer.from(raw, 'utf-8')).then(
-          () => { setTimeout(() => { instance.writingDataFile = false; }, 500); },
-          () => { instance.writingDataFile = false; },
-        );
-      }
-      instance.render();
     }
+    instance.render();
   }
 
   static hoverElement(sel: SelectionEvent | null): void {
-    for (const instance of FormePreviewPanel.panels.values()) {
-      if (instance.isReady) {
-        instance.panel.webview.postMessage({
-          type: 'hoverElement',
-          path: sel?.path ?? null,
-          pageIdx: sel?.pageIdx ?? -1,
-        });
-      }
+    if (FormePreviewPanel.currentPanel?.isReady) {
+      FormePreviewPanel.currentPanel.panel.webview.postMessage({
+        type: 'hoverElement',
+        path: sel?.path ?? null,
+        pageIdx: sel?.pageIdx ?? -1,
+      });
     }
   }
 
@@ -127,31 +132,83 @@ export class FormePreviewPanel {
       this.disposables,
     );
 
-    // Listen for document changes (debounced, uses editor buffer)
-    vscode.workspace.onDidChangeTextDocument(
-      (e) => {
-        if (e.document.uri.toString() === fileUri.toString()) {
-          this.scheduleRender(e.document.getText());
-        }
-      },
-      undefined,
-      this.disposables,
-    );
-
-    // Listen for saves (immediate render from disk)
-    vscode.workspace.onDidSaveTextDocument(
-      (doc) => {
-        if (doc.uri.toString() === fileUri.toString()) {
-          if (this.debounceTimer) clearTimeout(this.debounceTimer);
-          this.render();
-        }
-      },
-      undefined,
-      this.disposables,
-    );
+    // Setup file-specific listeners
+    this.setupFileListeners();
 
     // Cleanup
     panel.onDidDispose(() => this.dispose(), undefined, this.disposables);
+
+    // Update panel title
+    this.updatePanelTitle();
+  }
+
+  private async switchToFile(newFileUri: vscode.Uri) {
+    // Cancel any pending renders
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = undefined;
+    }
+
+    // Clear current state
+    this.store.setSelection(null);
+    this.pendingRender = false;
+    this.lastPdf = null;
+
+    // Dispose file-specific listeners
+    this.disposeFileListeners();
+
+    // Clear the webview while switching
+    this.panel.webview.postMessage({ type: 'clear' });
+
+    // Update file URI
+    this.fileUri = newFileUri;
+
+    // Update panel title
+    this.updatePanelTitle();
+
+    // Setup new file listeners
+    this.setupFileListeners();
+
+    // Send new data state and render
+    await this.sendDataState();
+    this.render();
+  }
+
+  private updatePanelTitle() {
+    this.panel.title = `Forme: ${vscode.workspace.asRelativePath(this.fileUri)}`;
+  }
+
+  private setupFileListeners() {
+    // Listen for document changes (debounced, uses editor buffer)
+    const changeListener = vscode.workspace.onDidChangeTextDocument((e) => {
+      if (e.document.uri.toString() === this.fileUri.toString()) {
+        this.scheduleRender(e.document.getText());
+      }
+    });
+    this.fileDisposables.push(changeListener);
+
+    // Listen for saves (immediate render from disk)
+    const saveListener = vscode.workspace.onDidSaveTextDocument((doc) => {
+      if (doc.uri.toString() === this.fileUri.toString()) {
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        this.render();
+      }
+    });
+    this.fileDisposables.push(saveListener);
+  }
+
+  private disposeFileListeners() {
+    // Dispose all file-specific listeners
+    for (const d of this.fileDisposables) {
+      d.dispose();
+    }
+    this.fileDisposables = [];
+
+    // Dispose data file watcher
+    if (this.dataFileWatcher) {
+      this.dataFileWatcher.dispose();
+      this.dataFileWatcher = null;
+    }
   }
 
   private async loadWebview() {
@@ -306,7 +363,7 @@ export class FormePreviewPanel {
     };
 
     this.dataFileWatcher.onDidChange(onDataFileChange);
-    this.disposables.push(this.dataFileWatcher);
+    this.fileDisposables.push(this.dataFileWatcher);
   }
 
   private scheduleRender(source?: string) {
@@ -419,11 +476,22 @@ export class FormePreviewPanel {
   }
 
   private dispose() {
-    const key = this.fileUri.toString();
-    FormePreviewPanel.panels.delete(key);
-    this.statusBarItem.dispose();
+    FormePreviewPanel.currentPanel = undefined;
+
+    // Cancel pending renders
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
+
+    // Dispose file-specific listeners
+    this.disposeFileListeners();
+
+    // Dispose general listeners
     for (const d of this.disposables) {
       d.dispose();
     }
+
+    // Dispose status bar
+    this.statusBarItem.dispose();
   }
 }
