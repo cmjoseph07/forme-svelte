@@ -6,7 +6,7 @@ import urllib.error
 from io import BytesIO
 from unittest.mock import MagicMock, patch
 
-from forme import Forme, FormeError
+from formepdf import Forme, FormeError
 
 
 def _mock_response(body, status=200, content_type="application/json"):
@@ -47,7 +47,7 @@ def _mock_http_error(status, body):
 class TestRender(unittest.TestCase):
     """Tests for Forme.render()."""
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_returns_pdf_bytes(self, mock_urlopen):
         pdf_bytes = b"%PDF-1.7 fake pdf content"
         mock_urlopen.return_value = _mock_response(
@@ -59,7 +59,7 @@ class TestRender(unittest.TestCase):
 
         self.assertEqual(result, pdf_bytes)
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_sends_correct_headers_and_body(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             b"%PDF", content_type="application/pdf"
@@ -77,7 +77,7 @@ class TestRender(unittest.TestCase):
         body = json.loads(req.data)
         self.assertEqual(body, {"customer": "Acme"})
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_with_s3_returns_url(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             {"url": "https://s3.example.com/invoice.pdf"},
@@ -96,7 +96,7 @@ class TestRender(unittest.TestCase):
         self.assertEqual(body["s3"]["bucket"], "my-bucket")
         self.assertEqual(body["customer"], "Acme")
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_raises_on_404(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             404, {"error": "Template not found"}
@@ -109,7 +109,7 @@ class TestRender(unittest.TestCase):
         self.assertEqual(ctx.exception.status, 404)
         self.assertEqual(ctx.exception.message, "Template not found")
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_raises_on_429(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             429, {"error": "Rate limit exceeded"}
@@ -121,7 +121,7 @@ class TestRender(unittest.TestCase):
 
         self.assertEqual(ctx.exception.status, 429)
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_raises_on_500(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             500, {"message": "Internal server error"}
@@ -138,7 +138,7 @@ class TestRender(unittest.TestCase):
 class TestRenderAsync(unittest.TestCase):
     """Tests for Forme.render_async()."""
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_async_returns_job(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             {"jobId": "job-123", "status": "pending"}
@@ -150,7 +150,7 @@ class TestRenderAsync(unittest.TestCase):
         self.assertEqual(result["jobId"], "job-123")
         self.assertEqual(result["status"], "pending")
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_async_sends_webhook_url(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             {"jobId": "job-456", "status": "pending"}
@@ -165,7 +165,7 @@ class TestRenderAsync(unittest.TestCase):
         self.assertEqual(body["webhookUrl"], "https://hook.example.com")
         self.assertEqual(body["x"], 1)
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_render_async_raises_on_error(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             500, {"error": "Render failed"}
@@ -181,7 +181,7 @@ class TestRenderAsync(unittest.TestCase):
 class TestGetJob(unittest.TestCase):
     """Tests for Forme.get_job()."""
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_get_job_returns_result(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response({
             "id": "job-123",
@@ -196,7 +196,7 @@ class TestGetJob(unittest.TestCase):
         self.assertEqual(result["status"], "complete")
         self.assertIn("pdfBase64", result)
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_get_job_sends_auth_header(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response({"id": "job-1", "status": "pending"})
 
@@ -208,7 +208,7 @@ class TestGetJob(unittest.TestCase):
         self.assertEqual(req.get_method(), "GET")
         self.assertTrue(req.full_url.endswith("/v1/jobs/job-1"))
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_get_job_raises_on_404(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             404, {"error": "Job not found"}
@@ -224,7 +224,7 @@ class TestGetJob(unittest.TestCase):
 class TestExtract(unittest.TestCase):
     """Tests for Forme.extract()."""
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_extract_returns_data(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             {"data": {"customer": "Acme", "total": 100}}
@@ -235,7 +235,7 @@ class TestExtract(unittest.TestCase):
 
         self.assertEqual(result, {"customer": "Acme", "total": 100})
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_extract_returns_none_on_no_embedded_data(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             404, {"error": "No embedded data found"}
@@ -246,7 +246,7 @@ class TestExtract(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_extract_raises_on_other_errors(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(
             500, {"error": "Server error"}
@@ -258,7 +258,7 @@ class TestExtract(unittest.TestCase):
 
         self.assertEqual(ctx.exception.status, 500)
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_extract_sends_pdf_content_type(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response({"data": {}})
 
@@ -273,7 +273,7 @@ class TestExtract(unittest.TestCase):
 class TestBaseUrl(unittest.TestCase):
     """Tests for base_url handling."""
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_custom_base_url(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             b"%PDF", content_type="application/pdf"
@@ -285,7 +285,7 @@ class TestBaseUrl(unittest.TestCase):
         req = mock_urlopen.call_args[0][0]
         self.assertTrue(req.full_url.startswith("https://custom.example.com/"))
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_trailing_slash_stripped(self, mock_urlopen):
         mock_urlopen.return_value = _mock_response(
             b"%PDF", content_type="application/pdf"
@@ -302,7 +302,7 @@ class TestBaseUrl(unittest.TestCase):
 class TestErrorFallback(unittest.TestCase):
     """Test error message fallback when JSON parsing fails."""
 
-    @patch("forme.client.urllib.request.urlopen")
+    @patch("formepdf.client.urllib.request.urlopen")
     def test_non_json_error_body(self, mock_urlopen):
         mock_urlopen.side_effect = _mock_http_error(502, "Bad Gateway")
 

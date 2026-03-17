@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-WASM_PATH = Path(__file__).parent.parent / "forme" / "forme.wasm"
+WASM_PATH = Path(__file__).parent.parent / "formepdf" / "forme.wasm"
 HAS_WASM = WASM_PATH.exists()
 
 try:
@@ -28,13 +28,13 @@ pytestmark = pytest.mark.skipif(
 
 class TestWasmRendering:
     def test_simple_document(self):
-        from forme.templates import Document, Page, Text
+        from formepdf.templates import Document, Page, Text
         doc = Document(Page(Text("Hello, World!")))
         pdf = doc.render()
         assert pdf[:5] == b"%PDF-"
 
     def test_styled_text(self):
-        from forme.templates import Document, Page, Text
+        from formepdf.templates import Document, Page, Text
         doc = Document(
             Page(
                 Text("Bold text", style={"fontWeight": "bold", "fontSize": 24}),
@@ -46,7 +46,7 @@ class TestWasmRendering:
         assert len(pdf) > 100
 
     def test_multi_element(self):
-        from forme.templates import Document, Page, View, Text
+        from formepdf.templates import Document, Page, View, Text
         doc = Document(
             Page(
                 View(
@@ -61,7 +61,7 @@ class TestWasmRendering:
         assert pdf[:5] == b"%PDF-"
 
     def test_embed_data(self):
-        from forme.templates import Document, Page, Text
+        from formepdf.templates import Document, Page, Text
         import json as json_mod
         data = {"invoice_id": "INV-001", "total": 99.99}
         doc = Document(Page(Text("Invoice")))
@@ -75,12 +75,12 @@ class TestWasmRendering:
         assert pdf[:5] == b"%PDF-"
 
     def test_invalid_json_raises(self):
-        from forme.wasm import render_pdf, FormeRenderError
+        from formepdf.wasm import render_pdf, FormeRenderError
         with pytest.raises(FormeRenderError):
             render_pdf("not valid json {{{")
 
     def test_qr_code_renders(self):
-        from forme.templates import Document, Page, QrCode
+        from formepdf.templates import Document, Page, QrCode
         doc = Document(
             Page(QrCode("https://formepdf.com", size=80))
         )
@@ -89,7 +89,7 @@ class TestWasmRendering:
         assert len(pdf) > 100
 
     def test_render_pdf_direct(self):
-        from forme.wasm import render_pdf
+        from formepdf.wasm import render_pdf
         doc_json = json.dumps({
             "children": [{
                 "kind": {

@@ -5,13 +5,13 @@ Python SDK for the [Forme](https://formepdf.com) hosted PDF API.
 ## Installation
 
 ```bash
-pip install forme
+pip install formepdf
 ```
 
 ## Quick Start
 
 ```python
-from forme import Forme
+from formepdf import Forme
 
 client = Forme("forme_sk_...")
 
@@ -78,7 +78,7 @@ data = client.extract(pdf_bytes)
 All methods raise `FormeError` on non-2xx responses:
 
 ```python
-from forme import Forme, FormeError
+from formepdf import Forme, FormeError
 
 try:
     pdf = client.render("invoice", data)

@@ -1,6 +1,6 @@
 [project]
-name = "forme"
-version = "0.7.9"
+name = "formepdf"
+version = "0.7.10"
 description = "Python SDK for the Forme hosted PDF API"
 readme = "README.md"
 license = "MIT"
@@ -36,4 +36,5 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-artifacts = ["forme/forme.wasm"]
+packages = ["formepdf"]
+artifacts = ["formepdf/forme.wasm"]

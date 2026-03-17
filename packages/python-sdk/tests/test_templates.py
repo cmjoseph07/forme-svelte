@@ -1,7 +1,7 @@
 """Tests for template serialization — no WASM needed."""
 import json
 
-from forme.templates import (
+from formepdf.templates import (
     Document, Page, View, Text, Image, Table, Row, Cell,
     Svg, QrCode, Barcode, PageBreak, Fixed, Watermark,
     _expand_edges, _map_style, _parse_color, _map_dimension,

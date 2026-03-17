@@ -1,6 +1,6 @@
 """WASM bridge for local PDF rendering via wasmtime.
 
-Requires: pip install forme[local]  (adds wasmtime dependency)
+Requires: pip install formepdf[local]  (adds wasmtime dependency)
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class _FormeEngine:
         except ImportError:
             raise ImportError(
                 "wasmtime is required for local rendering. "
-                "Install it with: pip install forme[local]"
+                "Install it with: pip install formepdf[local]"
             ) from None
 
         self._wasmtime = wasmtime
