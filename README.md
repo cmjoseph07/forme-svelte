@@ -6,7 +6,7 @@ PDF generation with JSX. Page breaks that actually work.
 
 ## Why
 
-Every PDF tool makes you choose: fight with CSS page breaks or use an editor that can't handle dynamic data. Forme is a layout engine built for pages. No headless browser. No Chrome. Renders in milliseconds. Runs anywhere Node runs.
+Every PDF tool makes you choose: fight with CSS page breaks or use an editor that can't handle dynamic data. Forme is a layout engine built for pages. No headless browser. No Chrome. Renders in milliseconds. Runs anywhere — Node, the browser, or at the edge.
 
 **[Try it in the playground](https://playground.formepdf.com/)**
 
@@ -84,6 +84,31 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Document language**: `<Document lang="en-US">` sets the PDF `/Lang` tag for accessibility.
 - **Dynamic page numbers**: `{{pageNumber}}` and `{{totalPages}}` in any text element.
 - **Embedded data**: Attach structured JSON to any PDF. Recipients can extract the original data programmatically — invoices carry their line items, reports carry their datasets.
+- **Browser rendering**: Import `@formepdf/core/browser` to generate PDFs entirely client-side. Same engine, same templates — no server required.
+
+## Browser Usage
+
+Generate PDFs in the browser with zero server dependencies:
+
+```tsx
+import { renderDocument } from '@formepdf/core/browser';
+import { Document, Page, Text } from '@formepdf/react';
+
+const pdfBytes = await renderDocument(
+  <Document>
+    <Page size="Letter" margin={36}>
+      <Text style={{ fontSize: 24 }}>Generated in the browser</Text>
+    </Page>
+  </Document>
+);
+
+// Download, display in an iframe, or upload
+const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+const url = URL.createObjectURL(blob);
+window.open(url);
+```
+
+Works with Vite, Next.js, Remix, or any bundler that handles WASM. The only difference from server-side usage is the import path.
 
 ## Custom Fonts
 
@@ -177,6 +202,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Text overflow | `textOverflow: 'ellipsis'` | No | CSS `text-overflow` |
 | Font fallback | `fontFamily: "Inter, Helvetica"` | Single family only | Full CSS font stack |
 | Custom fonts | TTF with OpenType shaping | Yes | Yes |
+| Browser rendering | Yes (`@formepdf/core/browser`) | Yes (client-side) | No (server only) |
 | Dependencies | None (WASM) | yoga-layout | Chrome/Chromium |
 | Runs in-process | Yes | Yes | No (subprocess) |
 

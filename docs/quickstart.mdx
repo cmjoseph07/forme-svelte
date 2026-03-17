@@ -131,6 +131,29 @@ Then pass data via the `--data` flag:
 npx forme build invoice.tsx --data data.json -o invoice.pdf
 ```
 
+## 6. Render in the browser
+
+Forme runs entirely client-side too. Import the browser entry point — no server required:
+
+```tsx
+import { renderDocument } from '@formepdf/core/browser';
+import { Document, Page, Text } from '@formepdf/react';
+
+const pdfBytes = await renderDocument(
+  <Document>
+    <Page size="Letter" margin={36}>
+      <Text style={{ fontSize: 24 }}>Generated in the browser</Text>
+    </Page>
+  </Document>
+);
+
+// Display or download
+const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+window.open(URL.createObjectURL(blob));
+```
+
+Same engine, same templates. Works with Vite, Next.js, Remix, or any bundler that handles WASM.
+
 ## Next steps
 
 - [Components reference](./components.md) for all available components and props

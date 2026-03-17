@@ -315,6 +315,9 @@ Extraction: `extractData()` in `packages/core/src/extract.ts` scans PDF bytes fo
 
 Key files: `packages/core/src/index.ts` (RenderDocumentOptions.embedData), `packages/core/src/extract.ts` (extractData), `engine/src/model/mod.rs` (Document.embedded_data), `engine/src/pdf/mod.rs` (EmbeddedFile stream + Names tree), `engine/src/lib.rs` (passes embedded_data to serializer).
 
+### Browser Entry Point (`@formepdf/core/browser`)
+`packages/core/src/browser.ts` provides the same API as the Node entry point but with zero Node dependencies. WASM loading uses wasm-pack's `fetch()`-based loader (auto-resolves via `import.meta.url` with bundlers). `init(module?)` allows pre-loading or passing a custom WASM URL/bytes. Font resolution uses `fetch()` for URL-based fonts instead of `node:fs`. Base64 encoding uses `btoa()` instead of `Buffer.from()`. `extractData()` uses the browser-native `DecompressionStream` API instead of `node:zlib`. The WASM module itself is pure compute with no Node APIs — the browser entry is just a Node-free JS wrapper around the same `pkg/forme.js` glue code.
+
 ## Known Issues & Limitations (Current State)
 
 1. No variable font axis support.

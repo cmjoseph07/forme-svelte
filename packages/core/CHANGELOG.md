@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.7] - 2026-03-16
+
+### Added
+- Browser entry point (`@formepdf/core/browser`) for client-side PDF generation
+- `init()` function to pre-load WASM or provide a custom URL/bytes
+- Browser-native `extractData()` using DecompressionStream (no node:zlib)
+
 ## [0.7.6] - 2026-03-13
 
 ### Added

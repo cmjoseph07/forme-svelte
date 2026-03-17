@@ -2,6 +2,12 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.7] - 2026-03-16
+
+### Added
+- `@formepdf/core`: Browser entry point (`@formepdf/core/browser`) for client-side PDF generation — no Node.js required
+- VS Code 0.7.8: Single preview panel that follows the active editor
+
 ## [0.7.6] - 2026-03-13
 
 ### Added
