@@ -1,4 +1,4 @@
-import { Document, Page, View, Text } from '@formepdf/react';
+import { Document, Page, View, Text, QrCode } from '@formepdf/react';
 
 export default function ShippingLabel(data: any) {
   return (
@@ -6,7 +6,7 @@ export default function ShippingLabel(data: any) {
       <Page size={{ width: 288, height: 432 }} margin={16}>
         {/* From Address */}
         <View style={{ marginBottom: 12, padding: 8 }}>
-          <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>From</Text>
+          <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 0 }}>From</Text>
           <Text style={{ fontSize: 8, color: '#334155' }}>{data.from.name}</Text>
           <Text style={{ fontSize: 8, color: '#334155' }}>{data.from.address}</Text>
           <Text style={{ fontSize: 8, color: '#334155' }}>{data.from.cityStateZip}</Text>
@@ -16,8 +16,8 @@ export default function ShippingLabel(data: any) {
         <View style={{ borderTopWidth: 2, borderColor: '#0f172a', marginBottom: 12 }} />
 
         {/* To Address */}
-        <View style={{ padding: 12, marginBottom: 12 }}>
-          <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>To</Text>
+        <View style={{ padding: 12, marginBottom: 0 }}>
+          <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0, marginBottom: 2 }}>To</Text>
           <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a' }}>{data.to.name}</Text>
           <Text style={{ fontSize: 10, color: '#0f172a', marginTop: 4 }}>{data.to.address}</Text>
           {data.to.address2 && (
@@ -26,39 +26,10 @@ export default function ShippingLabel(data: any) {
           <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{data.to.cityStateZip}</Text>
         </View>
 
-        {/* Barcode Placeholder */}
-        <View style={{ marginBottom: 8, padding: 8 }}>
-          <View style={{ alignItems: 'center', marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', gap: 2 }}>
-              {/* Simulate barcode with thin rectangles */}
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 2, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 1, height: 40, backgroundColor: '#0f172a' }} />
-              <View style={{ width: 3, height: 40, backgroundColor: '#0f172a' }} />
-            </View>
-          </View>
-          <Text style={{ fontSize: 8, fontWeight: 700, color: '#0f172a', letterSpacing: 2, textAlign: 'center' }}>{data.tracking}</Text>
+        {/* Tracking QR Code */}
+        <View style={{ marginBottom: 8, padding: 8, alignItems: 'center' }}>
+          <QrCode data={data.trackingUrl || `https://track.example.com/${data.tracking}`} size={60} />
+          <Text style={{ fontSize: 8, fontWeight: 700, color: '#0f172a', letterSpacing: 2, textAlign: 'center', marginTop: 6 }}>{data.tracking}</Text>
         </View>
 
         {/* Divider */}

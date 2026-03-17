@@ -79,6 +79,15 @@ class TestWasmRendering:
         with pytest.raises(FormeRenderError):
             render_pdf("not valid json {{{")
 
+    def test_qr_code_renders(self):
+        from forme.templates import Document, Page, QrCode
+        doc = Document(
+            Page(QrCode("https://formepdf.com", size=80))
+        )
+        pdf = doc.render()
+        assert pdf[:5] == b"%PDF-"
+        assert len(pdf) > 100
+
     def test_render_pdf_direct(self):
         from forme.wasm import render_pdf
         doc_json = json.dumps({

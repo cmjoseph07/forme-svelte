@@ -290,6 +290,25 @@ class TestMiscComponents:
         assert d["kind"]["data"] == "https://example.com"
         assert d["kind"]["size"] == 100
 
+    def test_qr_code_with_color(self):
+        qr = QrCode("test", size=80, color="#ff0000")
+        d = qr.to_dict()
+        assert d["kind"]["color"]["r"] == 1.0
+        assert d["kind"]["color"]["g"] == 0.0
+
+    def test_qr_code_minimal(self):
+        qr = QrCode("data")
+        d = qr.to_dict()
+        assert d["kind"]["type"] == "QrCode"
+        assert d["kind"]["data"] == "data"
+        assert "size" not in d["kind"]
+        assert "color" not in d["kind"]
+
+    def test_qr_code_with_style(self):
+        qr = QrCode("url", size=120, style={"margin": 8})
+        d = qr.to_dict()
+        assert d["style"]["margin"] == {"top": 8, "right": 8, "bottom": 8, "left": 8}
+
     def test_svg(self):
         s = Svg(200, 100, '<rect width="200" height="100" fill="blue"/>')
         d = s.to_dict()
