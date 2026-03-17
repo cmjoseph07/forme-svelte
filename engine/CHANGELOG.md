@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.8] - 2026-03-17
+
+### Added
+- `barcode.rs`: 1D barcode generation via `barcoders` crate (Code128, Code39, EAN13, EAN8, Codabar)
+- `NodeKind::Barcode` variant with `data`, `format`, `width`, `height` fields
+- `layout_barcode()` function (follows `layout_qrcode` pattern)
+- `DrawCommand::Barcode` with filled rectangle emission in PDF serializer
+- `wasm_raw` feature with C-ABI exports for non-JS WASM hosts (wasmtime, wasmer)
+
 ## [0.7.6] - 2026-03-13
 
 ### Added

@@ -2,6 +2,13 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.8] - 2026-03-17
+
+### Added
+- `<Barcode>` component: 1D barcodes (Code 128, Code 39, EAN-13, EAN-8, Codabar) rendered as native PDF vector rectangles
+- Python SDK: local rendering via wasmtime with component DSL (`Document`, `Page`, `View`, `Text`, `Image`, `Table`, `QrCode`, `Barcode`, etc.)
+- Python SDK: `pip install forme[local]` optional dependency for self-hosted PDF generation
+
 ## [0.7.7] - 2026-03-16
 
 ### Added

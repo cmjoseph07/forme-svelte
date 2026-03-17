@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.8] - 2026-03-17
+
+### Added
+- `<Barcode>` component with `data`, `format`, `width`, `height`, `color` props
+- `BarcodeFormat` type: `'Code128' | 'Code39' | 'EAN13' | 'EAN8' | 'Codabar'`
+- `BarcodeProps` interface and `serializeBarcode()` serialization
+
 ## [0.7.3] - 2026-03-07
 
 _No changes._

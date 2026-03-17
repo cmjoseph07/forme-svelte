@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.9] - 2026-03-17
+
+### Changed
+- Updated `@formepdf/renderer` to 0.7.8 (barcode support)
+
 ## [0.7.8] - 2026-03-16
 
 ### Changed

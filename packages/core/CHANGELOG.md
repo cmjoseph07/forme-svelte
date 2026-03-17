@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.8] - 2026-03-17
+
+### Added
+- Barcode support in WASM engine (Code 128, Code 39, EAN-13, EAN-8, Codabar)
+
 ## [0.7.7] - 2026-03-16
 
 ### Added
