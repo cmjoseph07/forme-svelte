@@ -1,0 +1,548 @@
+---
+title: Template Gallery
+sidebarTitle: Template Gallery
+description: Copy-paste starter templates for common PDF documents — invoices, receipts, shipping labels, event tickets, catalogs, and typography layouts.
+---
+
+Ready-to-use templates you can copy into your project or the [hosted dashboard](https://app.formepdf.com). Each template includes the full JSX and sample JSON data.
+
+## Invoice
+
+Professional invoice with line items, tax calculation, and payment terms.
+
+<CodeGroup>
+
+```jsx JSX
+import { Document, Page, View, Text, Table, Row, Cell, Fixed } from '@formepdf/react';
+
+export default function Invoice(data) {
+  const missing = ['items', 'date', 'dueDate', 'clientName'].filter(f => !data[f]);
+  if (missing.length) throw new Error('Missing required fields: ' + missing.map(f => '"' + f + '"').join(', '));
+  if (!Array.isArray(data.items) || !data.items.length) throw new Error('"items" must be a non-empty array of { description, quantity, unitPrice }');
+
+  const taxRate = data.taxRate ?? 0;
+  const subtotal = data.items.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
+  const tax = subtotal * taxRate;
+  const total = subtotal + tax;
+
+  return (
+    <Document title="Invoice" author="Acme Inc">
+      <Page size="Letter" margin={48}>
+        <Fixed position="footer">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderColor: '#e2e8f0' }}>
+            <Text style={{ fontSize: 8, color: '#94a3b8' }}>Acme Inc</Text>
+            <Text style={{ fontSize: 8, color: '#94a3b8' }}>Page {'{{pageNumber}}'} of {'{{totalPages}}'}</Text>
+          </View>
+        </Fixed>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 32 }}>
+          <View>
+            <View style={{ width: 48, height: 48, backgroundColor: '#2563eb', borderRadius: 8, marginBottom: 12, justifyContent: 'center', alignItems: 'center' }}>
+              <Text style={{ fontSize: 18, fontWeight: 700, color: '#ffffff', textAlign: 'center', lineHeight: 1.2 }}>A</Text>
+            </View>
+            <Text style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>Acme Inc</Text>
+            <Text style={{ fontSize: 9, color: '#64748b', marginTop: 4 }}>123 Business Ave</Text>
+            <Text style={{ fontSize: 9, color: '#64748b' }}>San Francisco, CA 94102</Text>
+          </View>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 32, fontWeight: 700, color: '#2563eb' }}>INVOICE</Text>
+            <Text style={{ fontSize: 10, color: '#64748b', marginTop: 8 }}>Invoice No: INV-001</Text>
+            <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Date: {data.date}</Text>
+            <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Due: {data.dueDate}</Text>
+          </View>
+        </View>
+
+        <View style={{ marginBottom: 24 }}>
+          <Text style={{ fontSize: 9, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Bill To</Text>
+          <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>{data.clientName}</Text>
+          {data.clientCompany && <Text style={{ fontSize: 9, color: '#64748b', marginTop: 2 }}>{data.clientCompany}</Text>}
+        </View>
+
+        <Table columns={[
+          { width: { fraction: 0.45 } },
+          { width: { fraction: 0.15 } },
+          { width: { fraction: 0.2 } },
+          { width: { fraction: 0.2 } }
+        ]}>
+          <Row header style={{ backgroundColor: '#2563eb' }}>
+            <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, fontWeight: 700, color: '#ffffff' }}>Description</Text></Cell>
+            <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, fontWeight: 700, color: '#ffffff', textAlign: 'center' }}>Qty</Text></Cell>
+            <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, fontWeight: 700, color: '#ffffff', textAlign: 'right' }}>Unit Price</Text></Cell>
+            <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, fontWeight: 700, color: '#ffffff', textAlign: 'right' }}>Amount</Text></Cell>
+          </Row>
+          {data.items.map((item, i) => (
+            <Row key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
+              <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, color: '#1e293b' }}>{item.description}</Text></Cell>
+              <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, color: '#475569', textAlign: 'center' }}>{item.quantity}</Text></Cell>
+              <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, color: '#475569', textAlign: 'right' }}>${item.unitPrice.toFixed(2)}</Text></Cell>
+              <Cell style={{ padding: 10 }}><Text style={{ fontSize: 9, color: '#1e293b', textAlign: 'right' }}>${(item.quantity * item.unitPrice).toFixed(2)}</Text></Cell>
+            </Row>
+          ))}
+        </Table>
+
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 16 }}>
+          <View style={{ width: 200 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
+              <Text style={{ fontSize: 9, color: '#64748b' }}>Subtotal</Text>
+              <Text style={{ fontSize: 9, color: '#1e293b' }}>${subtotal.toFixed(2)}</Text>
+            </View>
+            {taxRate > 0 && (
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
+                <Text style={{ fontSize: 9, color: '#64748b' }}>Tax ({(taxRate * 100).toFixed(0)}%)</Text>
+                <Text style={{ fontSize: 9, color: '#1e293b' }}>${tax.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 12, backgroundColor: '#2563eb', borderRadius: 4, marginTop: 4 }}>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>Total Due</Text>
+              <Text style={{ fontSize: 11, fontWeight: 700, color: '#ffffff' }}>${total.toFixed(2)}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={{ marginTop: 32, padding: 16, backgroundColor: '#f8fafc', borderRadius: 4 }}>
+          <Text style={{ fontSize: 9, fontWeight: 700, color: '#1e293b', marginBottom: 8 }}>Payment Terms</Text>
+          <Text style={{ fontSize: 9, color: '#64748b' }}>Net 30. Please make payment by the due date.</Text>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+```
+
+```json Sample Data
+{
+  "date": "2024-01-15",
+  "dueDate": "2024-02-15",
+  "clientName": "Jane Smith",
+  "clientCompany": "Smith Corp",
+  "taxRate": 0.08,
+  "items": [
+    { "description": "Web Development", "quantity": 40, "unitPrice": 150 },
+    { "description": "UI/UX Design", "quantity": 20, "unitPrice": 125 },
+    { "description": "Project Management", "quantity": 10, "unitPrice": 100 }
+  ]
+}
+```
+
+</CodeGroup>
+
+---
+
+## Receipt
+
+Simple purchase receipt with itemized totals and tax.
+
+<CodeGroup>
+
+```jsx JSX
+import { Document, Page, View, Text } from '@formepdf/react';
+
+export default function Receipt(data) {
+  const missing = ['storeName', 'items', 'date'].filter(f => !data[f]);
+  if (missing.length) throw new Error('Missing required fields: ' + missing.map(f => '"' + f + '"').join(', '));
+
+  const taxRate = data.taxRate ?? 0;
+  const subtotal = data.items.reduce((sum, item) => sum + item.price * (item.quantity || 1), 0);
+  const tax = subtotal * taxRate;
+  const total = subtotal + tax;
+
+  return (
+    <Document title="Receipt">
+      <Page size="Letter" margin={{ top: 72, right: 120, bottom: 72, left: 120 }}>
+        <View style={{ alignItems: 'center', marginBottom: 24 }}>
+          <Text style={{ fontSize: 20, fontWeight: 700, color: '#1e293b' }}>{data.storeName}</Text>
+          <Text style={{ fontSize: 9, color: '#64748b', marginTop: 4 }}>123 Main Street</Text>
+          <Text style={{ fontSize: 9, color: '#64748b', marginTop: 2 }}>Portland, OR 97201</Text>
+        </View>
+        <View style={{ borderTopWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+          <Text style={{ fontSize: 9, color: '#64748b' }}>Receipt #1042</Text>
+          <Text style={{ fontSize: 9, color: '#64748b' }}>{data.date}</Text>
+        </View>
+        {data.items.map((item, i) => (
+          <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 6, paddingBottom: 6 }}>
+            <View style={{ flexDirection: 'row', gap: 8, flexGrow: 1 }}>
+              <Text style={{ fontSize: 9, color: '#1e293b' }}>{item.name}</Text>
+              {(item.quantity || 1) > 1 && <Text style={{ fontSize: 9, color: '#94a3b8' }}>x{item.quantity}</Text>}
+            </View>
+            <Text style={{ fontSize: 9, color: '#1e293b' }}>${(item.price * (item.quantity || 1)).toFixed(2)}</Text>
+          </View>
+        ))}
+        <View style={{ borderTopWidth: 1, borderColor: '#e2e8f0', marginTop: 12, marginBottom: 12 }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4, paddingBottom: 4 }}>
+          <Text style={{ fontSize: 9, color: '#64748b' }}>Subtotal</Text>
+          <Text style={{ fontSize: 9, color: '#1e293b' }}>${subtotal.toFixed(2)}</Text>
+        </View>
+        {taxRate > 0 && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4, paddingBottom: 4 }}>
+            <Text style={{ fontSize: 9, color: '#64748b' }}>Tax ({(taxRate * 100).toFixed(1)}%)</Text>
+            <Text style={{ fontSize: 9, color: '#1e293b' }}>${tax.toFixed(2)}</Text>
+          </View>
+        )}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12, paddingBottom: 12, borderTopWidth: 2, borderColor: '#1e293b', marginTop: 4 }}>
+          <Text style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>Total</Text>
+          <Text style={{ fontSize: 12, fontWeight: 700, color: '#1e293b' }}>${total.toFixed(2)}</Text>
+        </View>
+        <View style={{ alignItems: 'center', marginTop: 32 }}>
+          <Text style={{ fontSize: 10, color: '#64748b' }}>Thank you for your purchase!</Text>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+```
+
+```json Sample Data
+{
+  "storeName": "Sunrise Cafe",
+  "date": "2024-01-15",
+  "taxRate": 0.085,
+  "items": [
+    { "name": "Cappuccino", "price": 5.50, "quantity": 2 },
+    { "name": "Croissant", "price": 3.75, "quantity": 1 },
+    { "name": "Orange Juice", "price": 4.25, "quantity": 1 }
+  ]
+}
+```
+
+</CodeGroup>
+
+---
+
+## Shipping Label
+
+4x6 shipping label with sender/receiver addresses and tracking barcode placeholder.
+
+<CodeGroup>
+
+```jsx JSX
+import { Document, Page, View, Text } from '@formepdf/react';
+
+export default function ShippingLabel(data) {
+  const missing = ['fromName', 'fromAddress', 'fromCity', 'toName', 'toAddress', 'toCity', 'tracking'].filter(f => !data[f]);
+  if (missing.length) throw new Error('Missing required fields: ' + missing.map(f => '"' + f + '"').join(', '));
+
+  return (
+    <Document title="Shipping Label">
+      <Page size={{ width: 288, height: 432 }} margin={16}>
+        <View style={{ marginBottom: 12, padding: 8 }}>
+          <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 4 }}>From</Text>
+          <Text style={{ fontSize: 8, color: '#334155' }}>{data.fromName}</Text>
+          <Text style={{ fontSize: 8, color: '#334155' }}>{data.fromAddress}</Text>
+          <Text style={{ fontSize: 8, color: '#334155' }}>{data.fromCity}</Text>
+        </View>
+        <View style={{ borderTopWidth: 2, borderColor: '#0f172a', marginBottom: 12 }} />
+        <View style={{ padding: 12, marginBottom: 12 }}>
+          <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>To</Text>
+          <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a' }}>{data.toName}</Text>
+          <Text style={{ fontSize: 10, color: '#0f172a', marginTop: 4 }}>{data.toAddress}</Text>
+          <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{data.toCity}</Text>
+        </View>
+        <View style={{ marginBottom: 8, padding: 8 }}>
+          <Text style={{ fontSize: 8, fontWeight: 700, color: '#0f172a', letterSpacing: 2, textAlign: 'center' }}>{data.tracking}</Text>
+        </View>
+        <View style={{ borderTopWidth: 1, borderColor: '#cbd5e1', marginBottom: 8 }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', padding: 8 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 7, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>Weight</Text>
+            <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{data.weight || '—'}</Text>
+          </View>
+          <View style={{ flex: 1, alignItems: 'center' }}>
+            <Text style={{ fontSize: 7, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>Dimensions</Text>
+            <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{data.dimensions || '—'}</Text>
+          </View>
+          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+            <Text style={{ fontSize: 7, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1 }}>Service</Text>
+            <Text style={{ fontSize: 10, fontWeight: 700, color: '#0f172a', marginTop: 2 }}>{data.service || '—'}</Text>
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+```
+
+```json Sample Data
+{
+  "fromName": "Acme Warehouse",
+  "fromAddress": "500 Commerce Blvd",
+  "fromCity": "Austin, TX 78701",
+  "toName": "Jane Smith",
+  "toAddress": "742 Evergreen Terrace",
+  "toCity": "Springfield, IL 62704",
+  "tracking": "1Z999AA10123456784",
+  "weight": "2.4 lbs",
+  "dimensions": "12x8x6 in",
+  "service": "Priority"
+}
+```
+
+</CodeGroup>
+
+---
+
+## Event Ticket
+
+Horizontal event ticket with seat information and tear-off stub.
+
+<CodeGroup>
+
+```jsx JSX
+import { Document, Page, View, Text } from '@formepdf/react';
+
+export default function EventTicket(data) {
+  const missing = ['eventName', 'venue', 'date', 'time'].filter(f => !data[f]);
+  if (missing.length) throw new Error('Missing required fields: ' + missing.map(f => '"' + f + '"').join(', '));
+
+  return (
+    <Document title="Event Ticket">
+      <Page size={{ width: 612, height: 288 }} margin={24}>
+        <View style={{ flexDirection: 'row' }}>
+          <View style={{ flex: 1, paddingRight: 20 }}>
+            {data.presenter && (
+              <Text style={{ fontSize: 8, fontWeight: 700, color: '#2563eb', textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 4 }}>
+                {data.presenter}
+              </Text>
+            )}
+            <Text style={{ fontSize: 16, fontWeight: 700, color: '#0f172a', lineHeight: 1.2, marginBottom: 3 }}>
+              {data.eventName}
+            </Text>
+            <Text style={{ fontSize: 9, color: '#475569', marginBottom: 4 }}>{data.venue}</Text>
+            <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e293b', marginBottom: 14 }}>
+              {data.date} · {data.time}
+            </Text>
+            <View style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0, marginBottom: 10 }}>
+              <View style={{ backgroundColor: '#1e293b', padding: 5 }}>
+                <Text style={{ fontSize: 7, fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.5 }}>Section</Text>
+              </View>
+              <View style={{ backgroundColor: '#1e293b', padding: 5 }}>
+                <Text style={{ fontSize: 7, fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.5 }}>Row</Text>
+              </View>
+              <View style={{ backgroundColor: '#1e293b', padding: 5 }}>
+                <Text style={{ fontSize: 7, fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.5 }}>Seat</Text>
+              </View>
+              <View style={{ backgroundColor: '#1e293b', padding: 5 }}>
+                <Text style={{ fontSize: 7, fontWeight: 700, color: '#ffffff', textTransform: 'uppercase', letterSpacing: 0.5 }}>Gate</Text>
+              </View>
+              <View style={{ backgroundColor: '#f8fafc', padding: 5, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{data.section || '—'}</Text>
+              </View>
+              <View style={{ backgroundColor: '#f8fafc', padding: 5, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{data.row || '—'}</Text>
+              </View>
+              <View style={{ backgroundColor: '#f8fafc', padding: 5, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{data.seat || '—'}</Text>
+              </View>
+              <View style={{ backgroundColor: '#f8fafc', padding: 5, borderBottomWidth: 1, borderColor: '#e2e8f0' }}>
+                <Text style={{ fontSize: 11, fontWeight: 700, color: '#0f172a' }}>{data.gate || '—'}</Text>
+              </View>
+            </View>
+            <Text style={{ fontSize: 8, color: '#64748b' }}>General Admission · Doors open 6:00 PM</Text>
+          </View>
+          <View style={{ width: 1, backgroundColor: '#e2e8f0' }} />
+          <View style={{ width: 130, alignItems: 'center', justifyContent: 'center', paddingLeft: 16 }}>
+            <Text style={{ fontSize: 8, fontWeight: 700, color: '#0f172a', marginTop: 10 }}>
+              {data.ticketNumber || '—'}
+            </Text>
+            <View style={{ marginTop: 8, paddingVertical: 3, paddingHorizontal: 6, backgroundColor: '#f1f5f9', borderRadius: 3 }}>
+              <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                Scan for entry
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+```
+
+```json Sample Data
+{
+  "presenter": "Live Nation Presents",
+  "eventName": "Summer Music Festival 2024",
+  "venue": "Madison Square Garden, New York",
+  "date": "August 15, 2024",
+  "time": "7:00 PM",
+  "section": "A",
+  "row": "12",
+  "seat": "7",
+  "gate": "N",
+  "ticketNumber": "TK-2024-001"
+}
+```
+
+</CodeGroup>
+
+---
+
+## Catalog
+
+Product catalog with categories, price badges, and sale indicators.
+
+<CodeGroup>
+
+```jsx JSX
+import { Document, Page, View, Text, Fixed } from '@formepdf/react';
+
+function Badge({ label }) {
+  const bg = label === 'SALE' ? '#dc2626' : '#2563eb';
+  return (
+    <View style={{ backgroundColor: bg, borderRadius: 3, textAlign: 'center', paddingVertical: 2, paddingHorizontal: 6 }}>
+      <Text style={{ fontSize: 7, fontWeight: 700, color: '#ffffff', letterSpacing: 0.5 }}>{label}</Text>
+    </View>
+  );
+}
+
+function ProductCard({ product }) {
+  const hasSale = product.originalPrice && product.originalPrice > product.price;
+  return (
+    <View style={{ flexBasis: '48%', padding: 12, borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 6, marginBottom: 10 }} wrap={false}>
+      {product.badge && (
+        <View style={{ position: 'absolute', top: -18, right: -18 }}>
+          <Badge label={product.badge} />
+        </View>
+      )}
+      <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e293b', marginBottom: 4 }}>{product.name}</Text>
+      <View style={{ marginBottom: 4 }}>
+        {hasSale ? (
+          <Text style={{ fontSize: 10 }}>
+            <Text style={{ fontWeight: 700, color: '#1e293b' }}>${product.price.toFixed(2)}</Text>
+            <Text style={{ color: '#94a3b8', textDecoration: 'line-through', fontSize: 9 }}> ${product.originalPrice.toFixed(2)}</Text>
+          </Text>
+        ) : (
+          <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>${product.price.toFixed(2)}</Text>
+        )}
+      </View>
+      <Text style={{ fontSize: 8, color: '#64748b', lineHeight: 1.4 }}>{product.description}</Text>
+    </View>
+  );
+}
+
+export default function Catalog(data) {
+  if (!data.companyName) throw new Error('Missing required field: "companyName"');
+  if (!Array.isArray(data.categories) || !data.categories.length) throw new Error('"categories" must be a non-empty array');
+
+  return (
+    <Document title="Product Catalog">
+      <Page size="Letter" margin={48}>
+        <Fixed position="footer">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 8, borderTopWidth: 1, borderColor: '#e2e8f0' }}>
+            <Text style={{ fontSize: 8, color: '#94a3b8' }}>Product Catalog</Text>
+            <Text style={{ fontSize: 8, color: '#94a3b8' }}>Page {'{{pageNumber}}'} of {'{{totalPages}}'}</Text>
+          </View>
+        </Fixed>
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ fontSize: 22, fontWeight: 700, color: '#1e293b' }}>{data.companyName}</Text>
+          <Text style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginTop: 2 }}>Product Catalog 2024</Text>
+        </View>
+        <View style={{ borderTopWidth: 1, borderColor: '#e2e8f0', marginBottom: 20 }} />
+        {data.categories.map((category, ci) => (
+          <View key={ci} style={{ marginBottom: 20 }}>
+            <View style={{ marginBottom: 10, paddingBottom: 6, borderBottomWidth: 2, borderColor: '#1e293b' }}>
+              <Text style={{ fontSize: 14, fontWeight: 700, color: '#1e293b', textTransform: 'uppercase', letterSpacing: 1 }}>{category.name}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {category.products.map((product, pi) => (
+                <ProductCard key={pi} product={product} />
+              ))}
+            </View>
+          </View>
+        ))}
+      </Page>
+    </Document>
+  );
+}
+```
+
+```json Sample Data
+{
+  "companyName": "Tech Store",
+  "categories": [
+    {
+      "name": "Electronics",
+      "products": [
+        { "name": "Wireless Headphones", "price": 79.99, "description": "Active noise cancelling, 30hr battery", "badge": "NEW" },
+        { "name": "USB-C Hub", "price": 49.99, "originalPrice": 69.99, "description": "7-in-1 adapter with HDMI, USB 3.0", "badge": "SALE" },
+        { "name": "Mechanical Keyboard", "price": 129.99, "description": "Cherry MX switches, RGB backlit" },
+        { "name": "Webcam HD", "price": 59.99, "description": "1080p, auto-focus, built-in mic" }
+      ]
+    },
+    {
+      "name": "Accessories",
+      "products": [
+        { "name": "Laptop Stand", "price": 39.99, "description": "Adjustable aluminum stand" },
+        { "name": "Mouse Pad XL", "price": 19.99, "description": "Extended desk mat, non-slip base" }
+      ]
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+---
+
+## Typography
+
+Two-column text layout with a pull quote, demonstrating text formatting.
+
+<CodeGroup>
+
+```jsx JSX
+import { Document, Page, View, Text } from '@formepdf/react';
+
+export default function Typography(data) {
+  if (!data.title) throw new Error('Missing required field: "title"');
+
+  return (
+    <Document title={data.title} lang="en">
+      <Page size="Letter" margin={{ top: 48, right: 48, bottom: 54, left: 48 }}>
+        <View style={{ marginBottom: 20 }}>
+          <Text style={{ fontSize: 26, fontWeight: 700, color: '#1a1a1a', letterSpacing: -0.5 }}>
+            {data.title}
+          </Text>
+          {data.subtitle && (
+            <Text style={{ fontSize: 10, color: '#6b7280', marginTop: 4, letterSpacing: 0.3 }}>
+              {data.subtitle}
+            </Text>
+          )}
+          <View style={{ height: 0.75, backgroundColor: '#d1d5db', marginTop: 14 }} />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 24 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9, lineHeight: 1.5, color: '#1a1a1a', textAlign: 'justify', hyphens: 'auto' }}>
+              Typography is the art and technique of arranging type to make written language legible, readable, and appealing when displayed.
+            </Text>
+            <Text style={{ fontSize: 9, lineHeight: 1.5, color: '#1a1a1a', textAlign: 'justify', hyphens: 'auto', marginTop: 9 }}>
+              The term typography is also applied to the style, arrangement, and appearance of the letters, numbers, and symbols created by the process.
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9, lineHeight: 1.5, color: '#1a1a1a', textAlign: 'justify', hyphens: 'auto' }}>
+              Good typography establishes a visual hierarchy, provides a graphic balance to the page, and sets the overall tone of the product.
+            </Text>
+            <View style={{ borderLeftWidth: 2.5, borderLeftColor: '#9ca3af', paddingLeft: 14, paddingVertical: 10, marginVertical: 14 }}>
+              <Text style={{ fontSize: 11, fontStyle: 'italic', lineHeight: 1.55, color: '#374151' }}>
+                "Typography is two-dimensional architecture, based on experience and imagination."
+              </Text>
+              <Text style={{ fontSize: 8, color: '#6b7280', marginTop: 5, letterSpacing: 0.2 }}>
+                — Hermann Zapf
+              </Text>
+            </View>
+          </View>
+        </View>
+      </Page>
+    </Document>
+  );
+}
+```
+
+```json Sample Data
+{
+  "title": "The Art of Typography",
+  "subtitle": "A demonstration of text layout and formatting"
+}
+```
+
+</CodeGroup>

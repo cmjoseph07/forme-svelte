@@ -1,0 +1,501 @@
+---
+title: Hosted API Reference
+sidebarTitle: Hosted API
+description: Complete API reference for the Forme hosted PDF rendering service — sync and async rendering, job polling, S3 uploads, webhooks, and data extraction.
+---
+
+Base URL: `https://api.formepdf.com`
+
+All `/v1/*` endpoints require an API key passed as a Bearer token:
+
+```
+Authorization: Bearer forme_sk_...
+```
+
+Create API keys in the [dashboard](https://app.formepdf.com/dashboard/keys).
+
+---
+
+## Render PDF (sync)
+
+`POST /v1/render/:slug`
+
+Renders a PDF from a template and returns the file directly.
+
+**Path params:** `slug` — your template's URL slug.
+
+**Body:** JSON object passed as template data. All fields are forwarded to your JSX template function.
+
+**Optional fields:**
+- `s3` — upload the PDF to your S3 bucket instead of returning bytes (see [S3 Upload](#s3-upload) below)
+
+<CodeGroup>
+
+```bash curl
+curl https://api.formepdf.com/v1/render/invoice \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"clientName": "Jane Smith", "date": "2024-01-15", "dueDate": "2024-02-15", "items": [{"description": "Consulting", "quantity": 10, "unitPrice": 150}]}' \
+  --output invoice.pdf
+```
+
+```javascript Node.js
+const res = await fetch("https://api.formepdf.com/v1/render/invoice", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer forme_sk_abc123...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    clientName: "Jane Smith",
+    date: "2024-01-15",
+    dueDate: "2024-02-15",
+    items: [{ description: "Consulting", quantity: 10, unitPrice: 150 }],
+  }),
+});
+
+const pdf = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync("invoice.pdf", pdf);
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://api.formepdf.com/v1/render/invoice",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/json",
+    },
+    json={
+        "clientName": "Jane Smith",
+        "date": "2024-01-15",
+        "dueDate": "2024-02-15",
+        "items": [{"description": "Consulting", "quantity": 10, "unitPrice": 150}],
+    },
+)
+
+with open("invoice.pdf", "wb") as f:
+    f.write(res.content)
+```
+
+```go Go
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	body, _ := json.Marshal(map[string]any{
+		"clientName": "Jane Smith",
+		"date":       "2024-01-15",
+		"dueDate":    "2024-02-15",
+		"items": []map[string]any{
+			{"description": "Consulting", "quantity": 10, "unitPrice": 150},
+		},
+	})
+
+	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/render/invoice", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+	req.Header.Set("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+	defer res.Body.Close()
+
+	out, _ := os.Create("invoice.pdf")
+	io.Copy(out, res.Body)
+}
+```
+
+</CodeGroup>
+
+**Response:** `200 OK` with `Content-Type: application/pdf` body.
+
+---
+
+## Render PDF (async)
+
+`POST /v1/render/:slug/async`
+
+Queues a render job and returns immediately. Use this for large documents or when you don't need the PDF inline.
+
+**Body:** Same as sync, plus:
+- `webhookUrl` (optional) — URL to POST the result to when rendering completes
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/render/invoice/async \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"clientName": "Jane Smith", "date": "2024-01-15", "dueDate": "2024-02-15", "items": [{"description": "Consulting", "quantity": 10, "unitPrice": 150}], "webhookUrl": "https://example.com/webhook"}'
+```
+
+```javascript Node.js
+const res = await fetch("https://api.formepdf.com/v1/render/invoice/async", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer forme_sk_abc123...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    clientName: "Jane Smith",
+    date: "2024-01-15",
+    dueDate: "2024-02-15",
+    items: [{ description: "Consulting", quantity: 10, unitPrice: 150 }],
+    webhookUrl: "https://example.com/webhook",
+  }),
+});
+
+const { jobId, status } = await res.json();
+console.log(jobId); // "clxyz..."
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "https://api.formepdf.com/v1/render/invoice/async",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/json",
+    },
+    json={
+        "clientName": "Jane Smith",
+        "date": "2024-01-15",
+        "dueDate": "2024-02-15",
+        "items": [{"description": "Consulting", "quantity": 10, "unitPrice": 150}],
+        "webhookUrl": "https://example.com/webhook",
+    },
+)
+
+data = res.json()
+print(data["jobId"])  # "clxyz..."
+```
+
+```go Go
+body, _ := json.Marshal(map[string]any{
+	"clientName": "Jane Smith",
+	"date":       "2024-01-15",
+	"dueDate":    "2024-02-15",
+	"items": []map[string]any{
+		{"description": "Consulting", "quantity": 10, "unitPrice": 150},
+	},
+	"webhookUrl": "https://example.com/webhook",
+})
+
+req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/render/invoice/async", bytes.NewReader(body))
+req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+req.Header.Set("Content-Type", "application/json")
+
+res, _ := http.DefaultClient.Do(req)
+```
+
+</CodeGroup>
+
+**Response:** `202 Accepted`
+```json
+{ "jobId": "clxyz...", "status": "pending" }
+```
+
+### Webhook payload
+
+When the job completes, Forme POSTs to your `webhookUrl`:
+
+```json
+{
+  "jobId": "clxyz...",
+  "status": "complete",
+  "pdfBase64": "JVBERi0xLjQK..."
+}
+```
+
+On failure:
+```json
+{
+  "jobId": "clxyz...",
+  "status": "failed",
+  "error": "Missing required field: \"items\""
+}
+```
+
+---
+
+## Poll Job Status
+
+`GET /v1/jobs/:jobId`
+
+Check the status of an async render job.
+
+<CodeGroup>
+
+```bash curl
+curl https://api.formepdf.com/v1/jobs/clxyz... \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+```javascript Node.js
+// Poll until complete
+let job;
+do {
+  const res = await fetch(`https://api.formepdf.com/v1/jobs/${jobId}`, {
+    headers: { Authorization: "Bearer forme_sk_abc123..." },
+  });
+  job = await res.json();
+
+  if (job.status === "pending" || job.status === "processing") {
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+} while (job.status === "pending" || job.status === "processing");
+
+if (job.status === "complete") {
+  const pdf = Buffer.from(job.pdfBase64, "base64");
+  fs.writeFileSync("invoice.pdf", pdf);
+}
+```
+
+```python Python
+import time
+import base64
+
+while True:
+    res = requests.get(
+        f"https://api.formepdf.com/v1/jobs/{job_id}",
+        headers={"Authorization": "Bearer forme_sk_abc123..."},
+    )
+    job = res.json()
+
+    if job["status"] in ("complete", "failed"):
+        break
+    time.sleep(1)
+
+if job["status"] == "complete":
+    pdf_bytes = base64.b64decode(job["pdfBase64"])
+    with open("invoice.pdf", "wb") as f:
+        f.write(pdf_bytes)
+```
+
+```go Go
+for {
+	req, _ := http.NewRequest("GET", "https://api.formepdf.com/v1/jobs/"+jobId, nil)
+	req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+	res, _ := http.DefaultClient.Do(req)
+
+	var job map[string]any
+	json.NewDecoder(res.Body).Decode(&job)
+	res.Body.Close()
+
+	if job["status"] == "complete" || job["status"] == "failed" {
+		break
+	}
+	time.Sleep(time.Second)
+}
+```
+
+</CodeGroup>
+
+**Response:**
+```json
+{
+  "id": "clxyz...",
+  "status": "complete",
+  "pdfBase64": "JVBERi0xLjQK...",
+  "completedAt": "2024-01-15T12:00:00.000Z"
+}
+```
+
+Possible `status` values: `pending`, `processing`, `complete`, `failed`.
+
+---
+
+## S3 Upload
+
+Pass an `s3` object in the sync render body to upload the PDF directly to your S3-compatible bucket instead of returning the bytes.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/render/invoice \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "clientName": "Jane Smith",
+    "date": "2024-01-15",
+    "dueDate": "2024-02-15",
+    "items": [{"description": "Consulting", "quantity": 10, "unitPrice": 150}],
+    "s3": {
+      "bucket": "my-pdfs",
+      "key": "invoices/inv-001.pdf",
+      "region": "us-east-1",
+      "accessKeyId": "AKIA...",
+      "secretAccessKey": "secret..."
+    }
+  }'
+```
+
+```javascript Node.js
+const res = await fetch("https://api.formepdf.com/v1/render/invoice", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer forme_sk_abc123...",
+    "Content-Type": "application/json",
+  },
+  body: JSON.stringify({
+    clientName: "Jane Smith",
+    date: "2024-01-15",
+    dueDate: "2024-02-15",
+    items: [{ description: "Consulting", quantity: 10, unitPrice: 150 }],
+    s3: {
+      bucket: "my-pdfs",
+      key: "invoices/inv-001.pdf",
+      region: "us-east-1",
+      accessKeyId: "AKIA...",
+      secretAccessKey: "secret...",
+    },
+  }),
+});
+
+const { url } = await res.json();
+console.log(url); // "https://my-pdfs.s3.us-east-1.amazonaws.com/invoices/inv-001.pdf"
+```
+
+```python Python
+res = requests.post(
+    "https://api.formepdf.com/v1/render/invoice",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/json",
+    },
+    json={
+        "clientName": "Jane Smith",
+        "date": "2024-01-15",
+        "dueDate": "2024-02-15",
+        "items": [{"description": "Consulting", "quantity": 10, "unitPrice": 150}],
+        "s3": {
+            "bucket": "my-pdfs",
+            "key": "invoices/inv-001.pdf",
+            "region": "us-east-1",
+            "accessKeyId": "AKIA...",
+            "secretAccessKey": "secret...",
+        },
+    },
+)
+
+print(res.json()["url"])
+```
+
+</CodeGroup>
+
+**Response:** `200 OK`
+```json
+{ "url": "https://my-pdfs.s3.us-east-1.amazonaws.com/invoices/inv-001.pdf" }
+```
+
+**S3 config fields:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `bucket` | Yes | S3 bucket name |
+| `key` | Yes | Object key (path) in the bucket |
+| `accessKeyId` | Yes | AWS access key ID |
+| `secretAccessKey` | Yes | AWS secret access key |
+| `region` | * | AWS region (e.g. `us-east-1`). Required unless `endpoint` is set. |
+| `endpoint` | * | Custom S3-compatible endpoint URL. Required unless `region` is set. |
+
+Works with any S3-compatible service (AWS S3, Cloudflare R2, MinIO, DigitalOcean Spaces).
+
+---
+
+## Extract Embedded Data
+
+`POST /v1/extract`
+
+Extract embedded JSON data from a PDF that was rendered with `embedData`.
+
+Send the raw PDF bytes as the request body with `Content-Type: application/pdf`.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/extract \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/pdf" \
+  --data-binary @invoice.pdf
+```
+
+```javascript Node.js
+const pdf = fs.readFileSync("invoice.pdf");
+const res = await fetch("https://api.formepdf.com/v1/extract", {
+  method: "POST",
+  headers: {
+    Authorization: "Bearer forme_sk_abc123...",
+    "Content-Type": "application/pdf",
+  },
+  body: pdf,
+});
+
+const { data } = await res.json();
+console.log(data); // the original JSON passed to embedData
+```
+
+```python Python
+with open("invoice.pdf", "rb") as f:
+    pdf_bytes = f.read()
+
+res = requests.post(
+    "https://api.formepdf.com/v1/extract",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/pdf",
+    },
+    data=pdf_bytes,
+)
+
+print(res.json()["data"])
+```
+
+</CodeGroup>
+
+**Response:** `200 OK`
+```json
+{ "data": { "clientName": "Jane Smith", "items": [...] } }
+```
+
+Returns `404` if no embedded data is found.
+
+---
+
+## Rate Limits
+
+- **100 requests per minute** per API key
+- Monthly render limits depend on your plan:
+
+| Plan | Monthly renders | Templates |
+|------|----------------|-----------|
+| Free | 500 | 3 |
+| Pro | 5,000 | Unlimited |
+| Team | 25,000 | Unlimited |
+| Business | 100,000 | Unlimited |
+
+When you hit a rate limit, the API returns `429 Too Many Requests`. When you exceed your monthly render quota, it returns `429` with a message to upgrade.
+
+## Error Format
+
+All errors return JSON:
+
+```json
+{ "error": "Human-readable error message" }
+```
+
+Common HTTP status codes:
+- `400` — Invalid request (missing fields, bad S3 config)
+- `401` — Missing or invalid API key
+- `404` — Template or resource not found
+- `429` — Rate limit or usage limit exceeded
+- `502` — S3 upload failed
+- `500` — Internal server error

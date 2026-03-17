@@ -24,11 +24,11 @@
     "groups": [
       {
         "group": "Getting Started",
-        "pages": ["quickstart", "vscode", "faq"]
+        "pages": ["quickstart", "template-gallery", "vscode", "faq"]
       },
       {
         "group": "Reference",
-        "pages": ["components", "styles", "fonts", "page-breaks", "charts", "templates", "embedded-data"]
+        "pages": ["components", "styles", "fonts", "page-breaks", "charts", "templates", "embedded-data", "api-reference"]
       },
       {
         "group": "Migration",
