@@ -23,6 +23,9 @@ classifiers = [
     "Typing :: Typed",
 ]
 
+[project.optional-dependencies]
+local = ["wasmtime>=20.0"]
+
 [project.urls]
 Homepage = "https://formepdf.com"
 Documentation = "https://docs.formepdf.com"
@@ -31,3 +34,6 @@ Repository = "https://github.com/formepdf/forme"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+artifacts = ["forme/forme.wasm"]

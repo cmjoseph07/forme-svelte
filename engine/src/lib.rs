@@ -41,6 +41,9 @@ pub mod text;
 #[cfg(feature = "wasm")]
 pub mod wasm;
 
+#[cfg(feature = "wasm-raw")]
+pub mod wasm_raw;
+
 pub use error::FormeError;
 
 use font::FontContext;

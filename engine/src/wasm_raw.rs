@@ -1,0 +1,142 @@
+//! C-ABI exports for non-JS WASM hosts (e.g. Python wasmtime, Go wazero).
+//!
+//! Provides a simple memory-based protocol:
+//! 1. Host calls `forme_alloc` to allocate input buffer in WASM memory
+//! 2. Host writes JSON bytes into the allocated buffer
+//! 3. Host calls `forme_render_pdf` with pointer and length
+//! 4. Host reads result via `forme_get_result_ptr`/`forme_get_result_len`
+//! 5. Host calls `forme_free_result` to release the output buffer
+//! 6. Host calls `forme_dealloc` to release the input buffer
+
+use std::alloc::{alloc, dealloc, Layout};
+
+// WASM is single-threaded, so static mut is safe here.
+static mut RESULT_BUF: *mut u8 = std::ptr::null_mut();
+static mut RESULT_LEN: usize = 0;
+static mut ERROR_BUF: *mut u8 = std::ptr::null_mut();
+static mut ERROR_LEN: usize = 0;
+
+/// Allocate a buffer in WASM linear memory.
+#[no_mangle]
+pub extern "C" fn forme_alloc(size: usize, align: usize) -> *mut u8 {
+    let layout = match Layout::from_size_align(size, align) {
+        Ok(l) => l,
+        Err(_) => return std::ptr::null_mut(),
+    };
+    unsafe { alloc(layout) }
+}
+
+/// Deallocate a buffer previously allocated with `forme_alloc`.
+///
+/// # Safety
+/// `ptr` must have been allocated by `forme_alloc` with the same `size` and `align`.
+#[no_mangle]
+pub unsafe extern "C" fn forme_dealloc(ptr: *mut u8, size: usize, align: usize) {
+    if ptr.is_null() || size == 0 {
+        return;
+    }
+    let layout = match Layout::from_size_align(size, align) {
+        Ok(l) => l,
+        Err(_) => return,
+    };
+    dealloc(ptr, layout);
+}
+
+/// Render a JSON document to PDF bytes.
+///
+/// Returns 0 on success (result available via `forme_get_result_ptr`/`forme_get_result_len`).
+/// Returns 1 on error (error message via `forme_get_error_ptr`/`forme_get_error_len`).
+///
+/// # Safety
+/// `ptr` must point to `len` valid UTF-8 bytes.
+#[no_mangle]
+pub unsafe extern "C" fn forme_render_pdf(ptr: *const u8, len: usize) -> i32 {
+    // Free any previous result/error
+    free_result_buf();
+    free_error_buf();
+
+    let json_bytes = std::slice::from_raw_parts(ptr, len);
+    let json_str = match std::str::from_utf8(json_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            set_error(&format!("Invalid UTF-8: {e}"));
+            return 1;
+        }
+    };
+
+    match crate::render_json(json_str) {
+        Ok(pdf_bytes) => {
+            let len = pdf_bytes.len();
+            let layout = Layout::from_size_align(len, 1).unwrap();
+            let buf = alloc(layout);
+            std::ptr::copy_nonoverlapping(pdf_bytes.as_ptr(), buf, len);
+            RESULT_BUF = buf;
+            RESULT_LEN = len;
+            0
+        }
+        Err(e) => {
+            set_error(&e.to_string());
+            1
+        }
+    }
+}
+
+/// Get pointer to the result PDF bytes (after successful `forme_render_pdf`).
+#[no_mangle]
+pub extern "C" fn forme_get_result_ptr() -> *const u8 {
+    unsafe { RESULT_BUF }
+}
+
+/// Get length of the result PDF bytes.
+#[no_mangle]
+pub extern "C" fn forme_get_result_len() -> usize {
+    unsafe { RESULT_LEN }
+}
+
+/// Get pointer to the error message (after failed `forme_render_pdf`).
+#[no_mangle]
+pub extern "C" fn forme_get_error_ptr() -> *const u8 {
+    unsafe { ERROR_BUF }
+}
+
+/// Get length of the error message.
+#[no_mangle]
+pub extern "C" fn forme_get_error_len() -> usize {
+    unsafe { ERROR_LEN }
+}
+
+/// Free the result buffer. Call after reading the PDF bytes.
+#[no_mangle]
+pub extern "C" fn forme_free_result() {
+    unsafe { free_result_buf() }
+}
+
+fn set_error(msg: &str) {
+    let bytes = msg.as_bytes();
+    let len = bytes.len();
+    let layout = Layout::from_size_align(len, 1).unwrap();
+    unsafe {
+        let buf = alloc(layout);
+        std::ptr::copy_nonoverlapping(bytes.as_ptr(), buf, len);
+        ERROR_BUF = buf;
+        ERROR_LEN = len;
+    }
+}
+
+unsafe fn free_result_buf() {
+    if !RESULT_BUF.is_null() && RESULT_LEN > 0 {
+        let layout = Layout::from_size_align(RESULT_LEN, 1).unwrap();
+        dealloc(RESULT_BUF, layout);
+        RESULT_BUF = std::ptr::null_mut();
+        RESULT_LEN = 0;
+    }
+}
+
+unsafe fn free_error_buf() {
+    if !ERROR_BUF.is_null() && ERROR_LEN > 0 {
+        let layout = Layout::from_size_align(ERROR_LEN, 1).unwrap();
+        dealloc(ERROR_BUF, layout);
+        ERROR_BUF = std::ptr::null_mut();
+        ERROR_LEN = 0;
+    }
+}
