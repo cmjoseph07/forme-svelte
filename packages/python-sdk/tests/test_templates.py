@@ -3,7 +3,7 @@ import json
 
 from forme.templates import (
     Document, Page, View, Text, Image, Table, Row, Cell,
-    Svg, QrCode, PageBreak, Fixed, Watermark,
+    Svg, QrCode, Barcode, PageBreak, Fixed, Watermark,
     _expand_edges, _map_style, _parse_color, _map_dimension,
 )
 
@@ -328,6 +328,33 @@ class TestMiscComponents:
         assert d["kind"]["text"] == "DRAFT"
         assert d["kind"]["font_size"] == 60
         assert d["kind"]["angle"] == -45
+
+
+class TestBarcode:
+    def test_barcode_default_format(self):
+        bc = Barcode("ABC-123")
+        d = bc.to_dict()
+        assert d["kind"]["type"] == "Barcode"
+        assert d["kind"]["data"] == "ABC-123"
+        assert d["kind"]["format"] == "Code128"
+        assert d["kind"]["height"] == 60.0
+
+    def test_barcode_custom_format(self):
+        bc = Barcode("HELLO", format="Code39", width=200, height=40)
+        d = bc.to_dict()
+        assert d["kind"]["format"] == "Code39"
+        assert d["kind"]["width"] == 200
+        assert d["kind"]["height"] == 40
+
+    def test_barcode_with_color(self):
+        bc = Barcode("12345", color="#003366")
+        d = bc.to_dict()
+        assert "color" in d["style"]
+
+    def test_barcode_no_width_omitted(self):
+        bc = Barcode("test")
+        d = bc.to_dict()
+        assert "width" not in d["kind"]
 
 
 class TestEmbedData:

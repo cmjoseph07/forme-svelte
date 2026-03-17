@@ -10,6 +10,7 @@ import type {
   FixedProps,
   SvgProps,
   QrCodeProps,
+  BarcodeProps,
   CanvasProps,
   WatermarkProps,
 } from './types.js';
@@ -250,6 +251,25 @@ export function Svg(_props: SvgProps): null {
  * ```
  */
 export function QrCode(_props: QrCodeProps): null {
+  return null;
+}
+
+/**
+ * A 1D barcode rendered as crisp vector rectangles in the PDF.
+ *
+ * @param props.data - The data to encode
+ * @param props.format - Barcode format: "Code128" (default), "Code39", "EAN13", "EAN8", "Codabar"
+ * @param props.width - Width in points. Defaults to available width.
+ * @param props.height - Height in points. Default: 60.
+ * @param props.color - Bar color. Default: black.
+ * @param props.style - Style properties for the barcode container.
+ *
+ * @example
+ * ```tsx
+ * <Barcode data="ABC-123" format="Code128" width={200} height={50} />
+ * ```
+ */
+export function Barcode(_props: BarcodeProps): null {
   return null;
 }
 

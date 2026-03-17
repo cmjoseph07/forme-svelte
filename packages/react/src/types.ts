@@ -267,6 +267,22 @@ export interface QrCodeProps {
   style?: Style;
 }
 
+export type BarcodeFormat = 'Code128' | 'Code39' | 'EAN13' | 'EAN8' | 'Codabar';
+
+export interface BarcodeProps {
+  /** The data to encode. */
+  data: string;
+  /** Barcode format. Default: "Code128". */
+  format?: BarcodeFormat;
+  /** Width in points. Defaults to available width. */
+  width?: number;
+  /** Height in points. Default: 60. */
+  height?: number;
+  /** Bar color. Default: black. */
+  color?: string;
+  style?: Style;
+}
+
 /** Data point for bar and line charts. */
 export interface ChartDataPoint {
   label: string;
@@ -463,6 +479,7 @@ export type FormeNodeKind =
   | { type: 'Fixed'; position: 'Header' | 'Footer' }
   | { type: 'Svg'; width: number; height: number; view_box?: string; content: string }
   | { type: 'QrCode'; data: string; size?: number }
+  | { type: 'Barcode'; data: string; format: BarcodeFormat; width?: number; height: number }
   | { type: 'Canvas'; width: number; height: number; operations: CanvasOp[] }
   | { type: 'Watermark'; text: string; font_size: number; angle: number }
   | { type: 'PageBreak' };

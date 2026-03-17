@@ -5510,3 +5510,104 @@ fn test_embedded_data_via_json() {
         "JSON-deserialized embedded data should be present in PDF"
     );
 }
+
+// ─── Barcode Tests ──────────────────────────────────────────────
+
+#[test]
+fn test_barcode_renders_to_pdf() {
+    let doc = Document {
+        children: vec![Node {
+            kind: NodeKind::Barcode {
+                data: "ABC-123".to_string(),
+                format: forme::barcode::BarcodeFormat::Code128,
+                width: Some(200.0),
+                height: 60.0,
+            },
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+    };
+
+    let pdf = forme::render(&doc).expect("Barcode should render to PDF");
+    assert!(pdf.len() > 100, "PDF should have content");
+    assert!(pdf.starts_with(b"%PDF"), "Should be a valid PDF");
+}
+
+#[test]
+fn test_barcode_json_deserialization() {
+    let json = r#"{
+        "children": [{
+            "kind": { "type": "Barcode", "data": "HELLO", "format": "Code39", "height": 50 },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Barcode JSON should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_barcode_code128_default_format() {
+    let json = r#"{
+        "children": [{
+            "kind": { "type": "Barcode", "data": "12345", "height": 40 },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Default format barcode should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_barcode_layout_dimensions() {
+    let doc = Document {
+        children: vec![Node {
+            kind: NodeKind::Barcode {
+                data: "TEST".to_string(),
+                format: forme::barcode::BarcodeFormat::Code39,
+                width: Some(150.0),
+                height: 40.0,
+            },
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+    };
+
+    let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
+    assert!(pdf.starts_with(b"%PDF"));
+    assert_eq!(layout.pages.len(), 1);
+    let elem = &layout.pages[0].elements[0];
+    assert!((elem.width - 150.0).abs() < 0.1);
+    assert!((elem.height - 40.0).abs() < 0.1);
+}

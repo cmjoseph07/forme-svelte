@@ -72,6 +72,7 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Column flex**: `justifyContent` and `alignItems` work in both row and column directions.
 - **SVG**: Inline SVG rendering with support for `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and `path` elements.
 - **QR codes**: Built-in `<QrCode>` component. Vector-based, crisp at any zoom level.
+- **Barcodes**: Built-in `<Barcode>` component. Code 128, Code 39, EAN-13, EAN-8, Codabar. Vector-based.
 - **Text overflow**: `textOverflow: 'ellipsis'` truncates single-line text with "..." when it exceeds available width. Also supports `'clip'`.
 - **Builtin Unicode support**: Noto Sans is bundled - Cyrillic, Greek, and other non-Latin scripts work out of the box without registering fonts.
 - **Font fallback chains**: `fontFamily: "Inter, Helvetica"` tries each font in order, falling back automatically.
@@ -167,6 +168,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | `<Cell>` | Table cell. `colSpan`, `rowSpan`. |
 | `<Svg>` | Inline SVG graphics. `href`, `alt`. |
 | `<QrCode>` | QR code. `data`, `size`, `color`. Vector-based. |
+| `<Barcode>` | 1D barcode. `data`, `format`, `width`, `height`, `color`. Code 128, Code 39, EAN-13, EAN-8, Codabar. |
 | `<Canvas>` | Arbitrary vector drawing via `draw` callback. |
 | `<BarChart>` | Bar chart. `data`, `color`, `showGrid`, `showValues`. |
 | `<LineChart>` | Line chart. `data`, `color`, `showDots`, `showArea`. |
@@ -194,6 +196,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Links | `href` prop on Text/View/Image/Svg | `<Link>` component | HTML `<a>` tags |
 | Bookmarks | `bookmark` prop on any element | Yes | No |
 | QR codes | Built-in `<QrCode>` component | No | Via HTML/JS libraries |
+| Barcodes | Built-in `<Barcode>` (5 formats) | No | Via HTML/JS libraries |
 | Charts | Built-in BarChart, LineChart, PieChart | No | Via HTML/JS libraries |
 | VS Code extension | Native sidebar panels | No | No |
 | Canvas drawing | `<Canvas draw={...}>` for custom vector graphics | No | HTML Canvas (raster) |

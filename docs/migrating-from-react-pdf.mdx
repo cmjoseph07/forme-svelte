@@ -153,15 +153,17 @@ Both approaches produce the same result. Forme uses template placeholders instea
 
 9. **QR codes.** Built-in `<QrCode>` component renders vector-based QR codes. react-pdf has no equivalent.
 
-10. **Text overflow.** `textOverflow: 'ellipsis'` truncates single-line text with "..." when it exceeds available width. react-pdf does not support text truncation.
+10. **Barcodes.** Built-in `<Barcode>` component supports Code 128, Code 39, EAN-13, EAN-8, and Codabar. react-pdf has no equivalent.
 
-11. **Font fallback chains.** `fontFamily: "Inter, Helvetica"` tries each font in order. react-pdf only accepts a single family name.
+11. **Text overflow.** `textOverflow: 'ellipsis'` truncates single-line text with "..." when it exceeds available width. react-pdf does not support text truncation.
+
+12. **Font fallback chains.** `fontFamily: "Inter, Helvetica"` tries each font in order. react-pdf only accepts a single family name.
 
 ## What works in react-pdf but not Forme (yet)
 
 Be honest about these gaps before migrating:
 
-1. **`<Canvas>` component.** react-pdf has a `<Canvas>` component for custom drawing. Forme does not have an equivalent. Use `<Svg>` for custom graphics.
+1. **`<Canvas>` component.** react-pdf's `<Canvas>` uses a render callback with the raw PDF page object. Forme's `<Canvas>` provides a recording context with a Canvas-like API (`moveTo`, `lineTo`, `arc`, `rect`, `fill`, `stroke`, etc.).
 
 2. **`<Note>` component.** react-pdf supports PDF annotations via `<Note>`. Forme does not support this yet.
 

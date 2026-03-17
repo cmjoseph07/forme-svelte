@@ -1,5 +1,5 @@
 import { type ReactElement, isValidElement, Children, Fragment } from 'react';
-import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Canvas, Watermark, PageBreak } from './components.js';
+import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
   isRefMarker, getRefPath,
@@ -33,6 +33,7 @@ import type {
   FormeGridTrackSize,
   FormeGridPlacement,
   QrCodeProps,
+  BarcodeProps,
   CanvasProps,
   CanvasOp,
   CanvasContext,
@@ -263,6 +264,9 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
   if (element.type === QrCode) {
     return serializeQrCode(element);
   }
+  if (element.type === Barcode) {
+    return serializeBarcode(element);
+  }
   if (element.type === Canvas) {
     return serializeCanvas(element);
   }
@@ -473,6 +477,25 @@ function serializeQrCode(element: ReactElement): FormeNode {
   const props = element.props as QrCodeProps;
   const kind: FormeNodeKind = { type: 'QrCode', data: props.data } as FormeNodeKind;
   if (props.size !== undefined) (kind as Record<string, unknown>).size = props.size;
+  const style = mapStyle(props.style);
+  if (props.color) style.color = parseColor(props.color);
+  return {
+    kind,
+    style,
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeBarcode(element: ReactElement): FormeNode {
+  const props = element.props as BarcodeProps;
+  const kind: FormeNodeKind = {
+    type: 'Barcode',
+    data: props.data,
+    format: props.format ?? 'Code128',
+    height: props.height ?? 60,
+  } as FormeNodeKind;
+  if (props.width !== undefined) (kind as Record<string, unknown>).width = props.width;
   const style = mapStyle(props.style);
   if (props.color) style.color = parseColor(props.color);
   return {
@@ -1324,6 +1347,7 @@ function serializeTemplateChild(child: unknown, parent: ParentContext = null): u
   if (element.type === Fixed) return serializeTemplateFixed(element);
   if (element.type === Svg) return serializeSvg(element);
   if (element.type === QrCode) return serializeQrCode(element);
+  if (element.type === Barcode) return serializeBarcode(element);
   if (element.type === Canvas) return serializeCanvas(element);
   if (element.type === Watermark) return serializeWatermark(element);
   if (element.type === PageBreak) {

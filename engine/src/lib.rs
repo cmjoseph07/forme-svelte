@@ -26,6 +26,7 @@
 //!   [pdf]      — Serialize to PDF bytes
 //! ```
 
+pub mod barcode;
 pub mod error;
 pub mod font;
 pub mod image_loader;

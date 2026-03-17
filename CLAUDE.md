@@ -11,7 +11,7 @@ forme/
 ├── CLAUDE.md               # You are here
 ├── README.md               # Product readme
 ├── engine/                 # Rust rendering engine
-│   ├── Cargo.toml          # Deps: serde, serde_json, miniz_oxide, ttf-parser, qrcode
+│   ├── Cargo.toml          # Deps: serde, serde_json, miniz_oxide, ttf-parser, qrcode, barcoders
 │   ├── src/
 │   │   ├── lib.rs          # Public API: render(), render_json(), render_with_layout()
 │   │   ├── main.rs         # CLI binary + example invoice JSON
@@ -34,6 +34,7 @@ forme/
 │   │   │   └── subset.rs   # TrueType font subsetting for PDF embedding
 │   │   ├── image_loader/   # JPEG/PNG/WebP decoding from file paths and data URIs
 │   │   ├── svg/mod.rs      # SVG parsing and rendering (rect, circle, line, path, arc)
+│   │   ├── barcode.rs      # 1D barcode generation (barcoders crate → bar/space pattern)
 │   │   ├── qrcode.rs       # QR code generation (qrcode crate → bool matrix)
 │   │   ├── template.rs     # Expression evaluator for template system
 │   │   └── pdf/
@@ -251,6 +252,11 @@ Also widened `<Page margin>` to accept strings and arrays: `<Page margin="36 72"
 
 Key files: `engine/src/qrcode.rs`, `engine/src/model/mod.rs` (NodeKind::QrCode), `engine/src/layout/mod.rs` (layout_qrcode), `engine/src/pdf/mod.rs` (QrCode rendering), `packages/react/src/components.tsx` (QrCode), `packages/react/src/serialize.ts` (serializeQrCode).
 
+### Barcodes
+`<Barcode data="ABC-123" format="Code128" width={200} height={50} />` renders a 1D barcode as vector rectangles. The engine module `barcode.rs` uses the `barcoders` crate to generate bar patterns (`Vec<u8>` of 0/1 values). Supported formats: Code128 (auto-prepends Set B start character), Code39, EAN13, EAN8, Codabar. `NodeKind::Barcode { data, format, width, height }` is laid out by `layout_barcode()` (follows the `layout_qrcode` pattern — compute display size, generate bars, check page fit, push element). PDF rendering emits a filled rectangle for each `1` value. The `DrawCommand::Barcode { bars, bar_width, height, color }` variant carries the pattern data.
+
+Key files: `engine/src/barcode.rs`, `engine/src/model/mod.rs` (NodeKind::Barcode), `engine/src/layout/mod.rs` (layout_barcode), `engine/src/pdf/mod.rs` (Barcode rendering), `packages/react/src/components.tsx` (Barcode), `packages/react/src/serialize.ts` (serializeBarcode).
+
 ### Text Overflow (Ellipsis/Clip)
 `textOverflow: 'ellipsis'` truncates single-line text with "..." (U+2026) when it exceeds available width. `textOverflow: 'clip'` truncates without an indicator. `TextOverflow` enum in `style/mod.rs` with variants `Wrap` (default), `Ellipsis`, `Clip`. When not `Wrap`, `layout_text` and `layout_text_runs` take only the first line from line breaking, then call truncation methods on `TextLayout` (`truncate_with_ellipsis`, `truncate_clip`, `truncate_runs_with_ellipsis`, `truncate_runs_clip`) to fit within `available_width`. No PDF changes needed — text is already truncated before serialization.
 
@@ -370,6 +376,7 @@ fn layout_node(&self, node, cursor, pages, x, available_width, parent_style) {
         Image { .. } => layout_image(node, ...),            // Block placement
         Svg { .. } => layout_svg(node, ...),                // SVG rendering
         QrCode { data, size } => layout_qrcode(node, ...), // Vector QR code
+        Barcode { data, format, .. } => layout_barcode(node, ...), // 1D barcode
         Canvas { .. } => layout_canvas(node, ...),        // Arbitrary vector graphics
         Watermark { .. } => { cursor.watermarks.push(node) } // Store for per-page injection
         PageBreak => { pages.push(cursor.finalize()); *cursor = cursor.new_page(); }
@@ -431,6 +438,7 @@ Engine (Rust):
 - `miniz_oxide`: DEFLATE compression for PDF content streams
 - `ttf-parser`: Font file parsing for real glyph metrics and subsetting
 - `qrcode`: QR code generation (pure Rust, WASM-safe)
+- `barcoders`: 1D barcode generation (Code128, Code39, EAN13, EAN8, Codabar)
 - `rustybuzz`: OpenType shaping (GSUB/GPOS)
 - `unicode-bidi` + `unicode-script`: Bidirectional text support
 - `unicode-linebreak`: UAX#14 line break algorithm

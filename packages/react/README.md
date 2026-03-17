@@ -42,6 +42,8 @@ const pdfBytes = await renderDocument(doc);
 - `Fixed` - Fixed headers and footers
 - `PageBreak` - Explicit page break
 - `Svg` - Basic SVG rendering
+- `QrCode` - Vector QR codes
+- `Barcode` - 1D barcodes (Code 128, Code 39, EAN-13, EAN-8, Codabar)
 
 ## Docs
 

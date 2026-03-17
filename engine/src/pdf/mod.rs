@@ -955,6 +955,36 @@ impl PdfWriter {
                 return;
             }
 
+            DrawCommand::Barcode {
+                bars,
+                bar_width,
+                height,
+                color,
+            } => {
+                *element_counter += 1;
+                let _ = writeln!(stream, "q");
+                let _ = writeln!(stream, "{:.3} {:.3} {:.3} rg", color.r, color.g, color.b);
+                for (i, &bar) in bars.iter().enumerate() {
+                    if bar == 1 {
+                        let bx = element.x + i as f64 * bar_width;
+                        let by = page_height - element.y - height;
+                        let _ = writeln!(
+                            stream,
+                            "{:.2} {:.2} {:.2} {:.2} re",
+                            bx, by, bar_width, height
+                        );
+                    }
+                }
+                let _ = writeln!(stream, "f\nQ");
+                if tagged_mcid.is_some() {
+                    let _ = writeln!(stream, "EMC");
+                    if let Some(ref mut tb) = tag_builder {
+                        tb.end_element();
+                    }
+                }
+                return;
+            }
+
             DrawCommand::QrCode {
                 modules,
                 module_size,

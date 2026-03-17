@@ -795,6 +795,45 @@ class QrCode(_Component):
         }
 
 
+class Barcode(_Component):
+    """A 1D barcode element."""
+
+    def __init__(
+        self,
+        data: str,
+        *,
+        format: str = "Code128",
+        width: Optional[float] = None,
+        height: float = 60.0,
+        color: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.data = data
+        self.format = format
+        self.width = width
+        self.height = height
+        self.color = color
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "Barcode",
+            "data": self.data,
+            "format": self.format,
+            "height": self.height,
+        }
+        if self.width is not None:
+            kind["width"] = self.width
+        style = _map_style(self.style)
+        if self.color:
+            style["color"] = _parse_color(self.color)
+        return {
+            "kind": kind,
+            "style": style,
+            "children": [],
+        }
+
+
 class Fixed(_Component):
     """A fixed-position element (header/footer)."""
 

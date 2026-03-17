@@ -320,6 +320,21 @@ pub enum NodeKind {
         operations: Vec<CanvasOp>,
     },
 
+    /// A 1D barcode rendered as vector rectangles.
+    Barcode {
+        /// The data to encode.
+        data: String,
+        /// Barcode format (Code128, Code39, EAN13, EAN8, Codabar). Default: Code128.
+        #[serde(default)]
+        format: crate::barcode::BarcodeFormat,
+        /// Width in points. Defaults to available width.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        width: Option<f64>,
+        /// Height in points. Default: 60.
+        #[serde(default = "default_barcode_height")]
+        height: f64,
+    },
+
     /// A QR code rendered as vector rectangles.
     QrCode {
         /// The data to encode (URL, text, etc.).
@@ -445,6 +460,10 @@ fn default_one() -> u32 {
     1
 }
 
+fn default_barcode_height() -> f64 {
+    60.0
+}
+
 fn default_watermark_font_size() -> f64 {
     60.0
 }
@@ -545,6 +564,7 @@ impl Node {
             NodeKind::Image { .. } => false,
             NodeKind::Svg { .. } => false,
             NodeKind::Canvas { .. } => false,
+            NodeKind::Barcode { .. } => false,
             NodeKind::QrCode { .. } => false,
             NodeKind::Watermark { .. } => false,
             NodeKind::PageBreak => false,

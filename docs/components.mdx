@@ -1,13 +1,13 @@
 ---
 title: Components
 sidebarTitle: Components
-description: All Forme React components for PDF generation - Document, Page, View, Text, Image, Table, Row, Cell, Fixed, PageBreak, and Svg.
+description: All Forme React components for PDF generation - Document, Page, View, Text, Image, Table, Row, Cell, Fixed, PageBreak, Svg, QrCode, and Barcode.
 ---
 
 Forme provides 12 components for building PDF documents. All components are imported from `@formepdf/react`.
 
 ```tsx
-import { Document, Page, View, Text, Image, Svg, QrCode, Table, Row, Cell, Fixed, PageBreak } from '@formepdf/react';
+import { Document, Page, View, Text, Image, Svg, QrCode, Barcode, Table, Row, Cell, Fixed, PageBreak } from '@formepdf/react';
 ```
 
 ---
@@ -394,6 +394,38 @@ Renders a QR code from a data string. Output is vector-based (not a raster image
 ```
 
 QR codes are rendered as filled rectangles in the PDF — one rectangle per dark module. This is a native vector representation, not an embedded image, which keeps file sizes small and output sharp.
+
+---
+
+## Barcode
+
+Renders a 1D barcode from a data string. Output is vector-based (filled rectangles), crisp at any zoom level.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `data` | `string` | (required) | The data to encode |
+| `format` | `"Code128"` \| `"Code39"` \| `"EAN13"` \| `"EAN8"` \| `"Codabar"` | `"Code128"` | Barcode format |
+| `width` | `number` | - | Display width in points. Defaults to available width. |
+| `height` | `number` | `60` | Bar height in points |
+| `color` | `string` | `"#000000"` | Color of the bars |
+| `style` | `Style` | - | Additional style properties (margin, etc.) |
+
+### Example
+
+```tsx
+{/* Code 128 barcode (default format) */}
+<Barcode data="ABC-123" width={200} height={50} />
+
+{/* EAN-13 barcode */}
+<Barcode data="5901234123457" format="EAN13" width={180} height={60} />
+
+{/* Code 39 with custom color */}
+<Barcode data="HELLO" format="Code39" width={250} height={40} color="#1e293b" />
+```
+
+Barcodes are rendered as filled rectangles in the PDF — one rectangle per dark bar. Supported formats: Code 128 (general purpose), Code 39 (alphanumeric), EAN-13 (retail products), EAN-8 (small packages), and Codabar (libraries, blood banks).
 
 ---
 

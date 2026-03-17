@@ -345,6 +345,7 @@ impl LayoutInfo {
                     DrawCommand::Image { .. } => "Image",
                     DrawCommand::ImagePlaceholder => "ImagePlaceholder",
                     DrawCommand::Svg { .. } => "Svg",
+                    DrawCommand::Barcode { .. } => "Barcode",
                     DrawCommand::QrCode { .. } => "QrCode",
                     DrawCommand::Watermark { .. } => "Watermark",
                 };
@@ -464,6 +465,7 @@ fn node_kind_name(kind: &NodeKind) -> &'static str {
         NodeKind::PageBreak => "PageBreak",
         NodeKind::Svg { .. } => "Svg",
         NodeKind::Canvas { .. } => "Canvas",
+        NodeKind::Barcode { .. } => "Barcode",
         NodeKind::QrCode { .. } => "QrCode",
         NodeKind::Watermark { .. } => "Watermark",
     }
@@ -502,6 +504,13 @@ pub enum DrawCommand {
         height: f64,
         /// When true, clip content to [0, 0, width, height] (used by Canvas).
         clip: bool,
+    },
+    /// Draw a 1D barcode as filled rectangles.
+    Barcode {
+        bars: Vec<u8>,
+        bar_width: f64,
+        height: f64,
+        color: Color,
     },
     /// Draw a QR code as filled rectangles.
     QrCode {
@@ -1005,6 +1014,26 @@ impl LayoutEngine {
                     *svg_h,
                     view_box.as_deref(),
                     content,
+                );
+            }
+
+            NodeKind::Barcode {
+                data,
+                format,
+                width: explicit_width,
+                height: bar_height,
+            } => {
+                self.layout_barcode(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    available_width,
+                    data,
+                    *format,
+                    *explicit_width,
+                    *bar_height,
                 );
             }
 
@@ -3660,6 +3689,69 @@ impl LayoutEngine {
         cursor.y += canvas_height + margin.bottom;
     }
 
+    /// Layout a 1D barcode as a row of vector rectangles.
+    #[allow(clippy::too_many_arguments)]
+    fn layout_barcode(
+        &self,
+        node: &Node,
+        style: &ResolvedStyle,
+        cursor: &mut PageCursor,
+        pages: &mut Vec<LayoutPage>,
+        x: f64,
+        available_width: f64,
+        data: &str,
+        format: crate::barcode::BarcodeFormat,
+        explicit_width: Option<f64>,
+        bar_height: f64,
+    ) {
+        let margin = &style.margin;
+        let display_width = explicit_width.unwrap_or(available_width - margin.horizontal());
+        let total_height = bar_height + margin.vertical();
+
+        if total_height > cursor.remaining_height() {
+            pages.push(cursor.finalize());
+            *cursor = cursor.new_page();
+        }
+
+        cursor.y += margin.top;
+
+        let draw = match crate::barcode::generate_barcode(data, format) {
+            Ok(barcode_data) => {
+                let bar_width = if barcode_data.bars.is_empty() {
+                    0.0
+                } else {
+                    display_width / barcode_data.bars.len() as f64
+                };
+                DrawCommand::Barcode {
+                    bars: barcode_data.bars,
+                    bar_width,
+                    height: bar_height,
+                    color: style.color,
+                }
+            }
+            Err(_) => DrawCommand::None,
+        };
+
+        cursor.elements.push(LayoutElement {
+            x: x + margin.left,
+            y: cursor.content_y + cursor.y,
+            width: display_width,
+            height: bar_height,
+            draw,
+            children: vec![],
+            node_type: Some("Barcode".to_string()),
+            resolved_style: Some(style.clone()),
+            source_location: node.source_location.clone(),
+            href: node.href.clone(),
+            bookmark: node.bookmark.clone(),
+            alt: node.alt.clone(),
+            is_header_row: false,
+            overflow: style.overflow,
+        });
+
+        cursor.y += bar_height + margin.bottom;
+    }
+
     /// Layout a QR code as a square block of vector rectangles.
     #[allow(clippy::too_many_arguments)]
     fn layout_qrcode(
@@ -3799,6 +3891,7 @@ impl LayoutEngine {
                 w * aspect + style.padding.vertical()
             }
             NodeKind::Svg { height, .. } => *height + style.margin.vertical(),
+            NodeKind::Barcode { height, .. } => *height + style.margin.vertical(),
             NodeKind::QrCode { size, .. } => {
                 let display_size = size.unwrap_or(available_width - style.margin.horizontal());
                 display_size + style.margin.vertical()
@@ -4069,6 +4162,10 @@ impl LayoutEngine {
                 } else {
                     100.0
                 };
+                w + style.padding.horizontal() + style.margin.horizontal()
+            }
+            NodeKind::Barcode { width, .. } => {
+                let w = width.unwrap_or(0.0);
                 w + style.padding.horizontal() + style.margin.horizontal()
             }
             NodeKind::QrCode { size, .. } => {

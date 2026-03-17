@@ -1,5 +1,5 @@
 // Components
-export { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Canvas, Watermark, PageBreak } from './components.js';
+export { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak } from './components.js';
 export { BarChart, LineChart, PieChart } from './charts.js';
 
 // Serialization
@@ -39,6 +39,8 @@ export type {
   FixedProps,
   SvgProps,
   QrCodeProps,
+  BarcodeProps,
+  BarcodeFormat,
   CanvasProps,
   CanvasContext,
   CanvasOp,
