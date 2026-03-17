@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.9] - 2026-03-17
+
+### Changed
+- Rebuilt WASM with barcode support and wasm-raw C-ABI exports
+
 ## [0.7.8] - 2026-03-17
 
 ### Added

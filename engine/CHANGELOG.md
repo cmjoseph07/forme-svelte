@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.9] - 2026-03-17
+
+_Version bump only._
+
 ## [0.7.8] - 2026-03-17
 
 ### Added

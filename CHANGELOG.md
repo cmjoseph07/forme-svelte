@@ -2,6 +2,11 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.9] - 2026-03-17
+
+### Changed
+- Rebuilt WASM binary with barcode and Python SDK (wasm-raw) support
+
 ## [0.7.8] - 2026-03-17
 
 ### Added
