@@ -26,6 +26,9 @@ Thumbs.db
 .env
 .env.*
 
+# Scripts
+scripts/
+
 # Scratch files
 test-*.tsx
 test-*.json
