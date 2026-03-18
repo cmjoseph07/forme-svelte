@@ -2,7 +2,25 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.10] - 2026-03-18
+
+### Added
+- Auto margin support (`margin-left: auto`, `margin-right: auto`) for horizontal centering — enables `mx-auto` in Tailwind
+- Engine: `EdgeValue` enum (`Pt` / `Auto`) and `MarginEdges` struct with auto detection and resolution
+- Layout: auto margin resolution in flex row cross-axis and column cross-axis (priority over `align-items`)
+- Integration tests for auto margin centering, push-right, and JSON deserialization
+- `@formepdf/tailwind`: `mx-auto`, `my-auto`, `mt-auto`, `mr-auto`, `mb-auto`, `ml-auto` support
+- Added `@formepdf/tailwind` to the version bump script
+
+### Fixed
+- `@formepdf/tailwind` `FormeStyle` type compatibility with `@formepdf/react` `Style` (narrowed `fontWeight`, added `oblique`/`wrap-reverse`, widened `minWidth`/`maxWidth` to accept strings)
+- Python SDK `_expand_margin_edges()` preserves `"auto"` string values
+
 ## [0.7.9] - 2026-03-17
+
+### Added
+- `@formepdf/tailwind` package: style Forme components with Tailwind CSS utility classes (`tw("p-4 text-lg font-bold")`)
+- Full Tailwind class coverage: spacing, typography, colors (all shades), layout, flexbox, grid, borders, opacity, negative values, arbitrary bracket values, `self-*` alignment
 
 ### Changed
 - Rebuilt WASM binary with barcode and Python SDK (wasm-raw) support
