@@ -1,25 +1,5 @@
 import { Document, Page, View, Text, Image, Svg, Table, Row, Cell, Fixed, PageBreak, StyleSheet } from '@formepdf/react';
-
-const styles = StyleSheet.create({
-  sectionTitle: { fontSize: 20, fontWeight: 700, color: '#0f172a', marginBottom: 12 },
-  bodyText: { fontSize: 10, color: '#334155', lineHeight: 1.6, marginBottom: 12 },
-  introText: { fontSize: 10, color: '#334155', lineHeight: 1.6, marginBottom: 16 },
-  headerFooterText: { fontSize: 8, color: '#94a3b8' },
-  headerBar: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, paddingBottom: 8, borderBottomWidth: 1, borderColor: '#e2e8f0', marginBottom: 16 },
-  footerBar: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, paddingTop: 8, borderTopWidth: 1, borderColor: '#e2e8f0' },
-  tableHeaderCell: { padding: 8 },
-  tableHeaderText: { fontSize: 9, fontWeight: 700, color: '#ffffff', textAlign: 'right' as const },
-  tableCell: { padding: 8 },
-  tableCellText: { fontSize: 9, color: '#334155', textAlign: 'right' as const },
-  chartTitle: { fontSize: 10, fontWeight: 700, color: '#334155', marginBottom: 6 },
-  recCard: { flexDirection: 'row' as const, gap: 24, marginBottom: 16, padding: 16, backgroundColor: '#f8fafc', borderRadius: 4, borderLeftWidth: 3, borderColor: '#0f172a' },
-  recBadge: { width: 24, height: 24, backgroundColor: '#0f172a', borderRadius: 12, justifyContent: 'center' as const, alignItems: 'center' as const },
-  recBadgeText: { fontSize: 10, fontWeight: 700, color: '#ffffff', lineHeight: 1.2 },
-  recTitle: { fontSize: 11, fontWeight: 700, color: '#0f172a', marginBottom: 4 },
-  recBody: { fontSize: 9, color: '#475569', lineHeight: 1.5 },
-  recLabel: { fontSize: 8, fontWeight: 700, color: '#64748b' },
-  recValue: { fontSize: 8, color: '#334155' },
-});
+import { tw } from '@formepdf/tailwind';
 
 // ── Chart SVG generators ─────────────────────────────────────────────
 
@@ -190,22 +170,22 @@ export default function Report(data: any) {
       {/* Cover Page */}
       <Page size="Letter" margin={72}>
         <View style={{ flexGrow: 1, justifyContent: 'center' }}>
-          <View style={{ backgroundColor: '#0f172a', padding: 32, borderRadius: 4, marginBottom: 32 }}>
-            <Text style={{ fontSize: 32, fontWeight: 700, color: '#ffffff' }}>{data.title}</Text>
-            <Text style={{ fontSize: 14, color: '#94a3b8', marginTop: 12 }}>{data.subtitle}</Text>
+          <View style={tw("p-8 bg-slate-900 rounded mb-8")}>
+            <Text style={tw("text-[32px] font-bold text-white")}>{data.title}</Text>
+            <Text style={tw("text-[14px] text-slate-400 mt-3")}>{data.subtitle}</Text>
           </View>
           <View>
           </View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 }}>
+          <View style={tw("flex-row justify-between mt-6")}>
             <View>
-              <Text style={{ fontSize: 10, color: '#64748b' }}>Prepared by</Text>
-              <Text style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginTop: 4 }}>{data.author}</Text>
-              <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{data.department}</Text>
+              <Text style={tw("text-[10px] text-slate-500")}>Prepared by</Text>
+              <Text style={tw("text-[12px] font-bold text-slate-800 mt-1")}>{data.author}</Text>
+              <Text style={tw("text-[10px] text-slate-500 mt-0.5")}>{data.department}</Text>
             </View>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={{ fontSize: 10, color: '#64748b' }}>Date</Text>
-              <Text style={{ fontSize: 12, fontWeight: 700, color: '#1e293b', marginTop: 4 }}>{data.date}</Text>
-              <Text style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>{data.classification}</Text>
+            <View style={tw("items-end")}>
+              <Text style={tw("text-[10px] text-slate-500")}>Date</Text>
+              <Text style={tw("text-[12px] font-bold text-slate-800 mt-1")}>{data.date}</Text>
+              <Text style={tw("text-[10px] text-slate-500 mt-0.5")}>{data.classification}</Text>
             </View>
           </View>
         </View>
@@ -214,42 +194,42 @@ export default function Report(data: any) {
       {/* Content Pages */}
       <Page size="Letter" margin={54}>
         <Fixed position="header">
-          <View style={styles.headerBar}>
-            <Text style={styles.headerFooterText}>{data.company}</Text>
-            <Text style={styles.headerFooterText}>{data.title}</Text>
+          <View style={tw("flex-row justify-between pb-2 border-b border-slate-200 mb-4")}>
+            <Text style={tw("text-[8px] text-slate-400")}>{data.company}</Text>
+            <Text style={tw("text-[8px] text-slate-400")}>{data.title}</Text>
           </View>
         </Fixed>
 
         <Fixed position="footer">
-          <View style={styles.footerBar}>
-            <Text style={styles.headerFooterText}>{data.classification}</Text>
-            <Text style={styles.headerFooterText}>Page {'{{pageNumber}}'} of {'{{totalPages}}'}</Text>
+          <View style={tw("flex-row justify-between pt-2 border-t border-slate-200")}>
+            <Text style={tw("text-[8px] text-slate-400")}>{data.classification}</Text>
+            <Text style={tw("text-[8px] text-slate-400")}>Page {'{{pageNumber}}'} of {'{{totalPages}}'}</Text>
           </View>
         </Fixed>
 
         {/* Table of Contents */}
-        <Text style={styles.sectionTitle}>Table of Contents</Text>
+        <Text style={tw("text-xl font-bold text-slate-900 mb-3")}>Table of Contents</Text>
         {data.sections.map((section: any, i: number) => (
-          <View key={i} href={`#${section.title}`} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6, borderBottomWidth: 1, borderColor: '#f1f5f9' }}>
-            <Text style={{ fontSize: 10, color: '#2563eb', textDecoration: 'underline' }}>{i + 1}. {section.title}</Text>
+          <View key={i} href={`#${section.title}`} style={{ ...tw("flex-row justify-between py-1.5"), borderBottomWidth: 1, borderColor: '#f1f5f9' }}>
+            <Text style={tw("text-[10px] text-blue-600 underline")}>{i + 1}. {section.title}</Text>
           </View>
         ))}
 
         <PageBreak />
 
         {/* Executive Summary */}
-        <Text bookmark={data.sections[0].title} style={styles.sectionTitle}>1. {data.sections[0].title}</Text>
+        <Text bookmark={data.sections[0].title} style={tw("text-xl font-bold text-slate-900 mb-3")}>1. {data.sections[0].title}</Text>
         {data.sections[0].paragraphs.map((p: string, i: number) => (
-          <Text key={i} style={styles.bodyText}>{p}</Text>
+          <Text key={i} style={tw("text-[10px] text-slate-700 leading-[1.6] mb-3")}>{p}</Text>
         ))}
 
         {/* Key Metrics */}
         {data.keyMetrics && (
-          <View style={{ flexDirection: 'row', gap: 12, marginTop: 8, marginBottom: 24 }}>
+          <View style={tw("flex-row gap-3 mt-2 mb-6")}>
             {data.keyMetrics.map((metric: any, i: number) => (
-              <View key={i} style={{ flexGrow: 1, padding: 16, backgroundColor: '#f8fafc', borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0' }}>
-                <Text style={{ fontSize: 20, fontWeight: 700, color: '#0f172a' }}>{metric.value}</Text>
-                <Text style={{ fontSize: 9, color: '#64748b', marginTop: 4 }}>{metric.label}</Text>
+              <View key={i} style={tw("flex-1 p-4 bg-slate-50 rounded border border-slate-200")}>
+                <Text style={tw("text-xl font-bold text-slate-900")}>{metric.value}</Text>
+                <Text style={tw("text-[9px] text-slate-500 mt-1")}>{metric.label}</Text>
               </View>
             ))}
           </View>
@@ -258,8 +238,8 @@ export default function Report(data: any) {
         <PageBreak />
 
         {/* Data Section */}
-        <Text bookmark={data.sections[1].title} style={styles.sectionTitle}>2. {data.sections[1].title}</Text>
-        <Text style={styles.introText}>{data.sections[1].intro}</Text>
+        <Text bookmark={data.sections[1].title} style={tw("text-xl font-bold text-slate-900 mb-3")}>2. {data.sections[1].title}</Text>
+        <Text style={tw("text-[10px] text-slate-700 leading-[1.6] mb-4")}>{data.sections[1].intro}</Text>
 
         <Table columns={[
           { width: { fraction: 0.28 } },
@@ -268,20 +248,20 @@ export default function Report(data: any) {
           { width: { fraction: 0.18 } },
           { width: { fraction: 0.18 } }
         ]}>
-          <Row header style={{ backgroundColor: '#0f172a' }}>
-            <Cell style={styles.tableHeaderCell}><Text style={{ fontSize: 9, fontWeight: 700, color: '#ffffff' }}>Region</Text></Cell>
-            <Cell style={styles.tableHeaderCell}><Text style={styles.tableHeaderText}>Q1</Text></Cell>
-            <Cell style={styles.tableHeaderCell}><Text style={styles.tableHeaderText}>Q2</Text></Cell>
-            <Cell style={styles.tableHeaderCell}><Text style={styles.tableHeaderText}>Q3</Text></Cell>
-            <Cell style={styles.tableHeaderCell}><Text style={styles.tableHeaderText}>Q4</Text></Cell>
+          <Row header style={tw("bg-slate-900")}>
+            <Cell style={tw("p-2")}><Text style={tw("text-[9px] font-bold text-white")}>Region</Text></Cell>
+            <Cell style={tw("p-2")}><Text style={tw("text-[9px] font-bold text-white text-right")}>Q1</Text></Cell>
+            <Cell style={tw("p-2")}><Text style={tw("text-[9px] font-bold text-white text-right")}>Q2</Text></Cell>
+            <Cell style={tw("p-2")}><Text style={tw("text-[9px] font-bold text-white text-right")}>Q3</Text></Cell>
+            <Cell style={tw("p-2")}><Text style={tw("text-[9px] font-bold text-white text-right")}>Q4</Text></Cell>
           </Row>
           {tableData.map((row: any, i: number) => (
             <Row key={i} style={{ backgroundColor: i % 2 === 0 ? '#ffffff' : '#f8fafc' }}>
-              <Cell style={styles.tableCell}><Text style={{ fontSize: 9, color: '#334155', fontWeight: 700 }}>{row.region}</Text></Cell>
-              <Cell style={styles.tableCell}><Text style={styles.tableCellText}>{row.q1}</Text></Cell>
-              <Cell style={styles.tableCell}><Text style={styles.tableCellText}>{row.q2}</Text></Cell>
-              <Cell style={styles.tableCell}><Text style={styles.tableCellText}>{row.q3}</Text></Cell>
-              <Cell style={styles.tableCell}><Text style={styles.tableCellText}>{row.q4}</Text></Cell>
+              <Cell style={tw("p-2")}><Text style={tw("text-[9px] text-slate-700 font-bold")}>{row.region}</Text></Cell>
+              <Cell style={tw("p-2")}><Text style={tw("text-[9px] text-slate-700 text-right")}>{row.q1}</Text></Cell>
+              <Cell style={tw("p-2")}><Text style={tw("text-[9px] text-slate-700 text-right")}>{row.q2}</Text></Cell>
+              <Cell style={tw("p-2")}><Text style={tw("text-[9px] text-slate-700 text-right")}>{row.q3}</Text></Cell>
+              <Cell style={tw("p-2")}><Text style={tw("text-[9px] text-slate-700 text-right")}>{row.q4}</Text></Cell>
             </Row>
           ))}
         </Table>
@@ -289,31 +269,31 @@ export default function Report(data: any) {
         <PageBreak />
 
         {/* Visual Analysis */}
-        <Text bookmark={data.sections[2].title} style={styles.sectionTitle}>3. {data.sections[2].title}</Text>
-        <Text style={styles.introText}>{data.sections[2].intro}</Text>
+        <Text bookmark={data.sections[2].title} style={tw("text-xl font-bold text-slate-900 mb-3")}>3. {data.sections[2].title}</Text>
+        <Text style={tw("text-[10px] text-slate-700 leading-[1.6] mb-4")}>{data.sections[2].intro}</Text>
 
-        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 24 }}>
-          <View style={{ flexGrow: 1 }}>
-            <Text style={styles.chartTitle}>Revenue by Region</Text>
-            <View style={{ backgroundColor: '#f8fafc', borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0', padding: 8 }}>
+        <View style={tw("flex-row gap-4 mb-6")}>
+          <View style={tw("flex-1")}>
+            <Text style={tw("text-[10px] font-bold text-slate-700 mb-1.5")}>Revenue by Region</Text>
+            <View style={tw("bg-slate-50 rounded border border-slate-200 p-2")}>
               <Svg width={230} height={150} viewBox="0 0 230 150" content={renderBarChart(tableData)} />
-              <View style={{ gap: 3, marginTop: 8 }}>
+              <View style={tw("gap-[3] mt-2")}>
                 {tableData.map((row: any, i: number) => (
-                  <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <View key={i} style={tw("flex-row items-center gap-1")}>
                     <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                    <Text style={{ fontSize: 7, color: '#64748b' }}>{row.region}</Text>
+                    <Text style={tw("text-[7px] text-slate-500")}>{row.region}</Text>
                   </View>
                 ))}
               </View>
             </View>
           </View>
-          <View style={{ flexGrow: 1 }}>
-            <Text style={styles.chartTitle}>Market Share</Text>
-            <View style={{ backgroundColor: '#f8fafc', borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0', padding: 8 }}>
-              <View style={{ alignItems: 'center' }}>
+          <View style={tw("flex-1")}>
+            <Text style={tw("text-[10px] font-bold text-slate-700 mb-1.5")}>Market Share</Text>
+            <View style={tw("bg-slate-50 rounded border border-slate-200 p-2")}>
+              <View style={tw("items-center")}>
                 <Svg width={110} height={150} viewBox="0 0 110 150" content={renderDonutChart(tableData)} />
               </View>
-              <View style={{ gap: 3, marginTop: 8 }}>
+              <View style={tw("gap-[3] mt-2")}>
                 {tableData.map((row: any, i: number) => {
                   const total = tableData.reduce((s: number, r: any) =>
                     s + parseFloat(r.q1.replace(/[$,]/g, '')) + parseFloat(r.q2.replace(/[$,]/g, ''))
@@ -322,9 +302,9 @@ export default function Report(data: any) {
                                  + parseFloat(row.q3.replace(/[$,]/g, '')) + parseFloat(row.q4.replace(/[$,]/g, ''));
                   const pct = ((rowTotal / total) * 100).toFixed(0);
                   return (
-                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                    <View key={i} style={tw("flex-row items-center gap-[3]")}>
                       <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }} />
-                      <Text style={{ fontSize: 7, color: '#64748b' }}>{row.region} {pct}%</Text>
+                      <Text style={tw("text-[7px] text-slate-500")}>{row.region} {pct}%</Text>
                     </View>
                   );
                 })}
@@ -333,8 +313,8 @@ export default function Report(data: any) {
           </View>
         </View>
 
-        <Text style={styles.chartTitle}>Quarterly Growth Trend</Text>
-        <View style={{ backgroundColor: '#f8fafc', borderRadius: 4, borderWidth: 1, borderColor: '#e2e8f0', paddingVertical: 12, marginBottom: 24 }}>
+        <Text style={tw("text-[10px] font-bold text-slate-700 mb-1.5")}>Quarterly Growth Trend</Text>
+        <View style={tw("bg-slate-50 rounded border border-slate-200 py-3 mb-6")}>
           <Svg width={484} height={140} viewBox="0 0 484 140" content={renderLineChart(tableData)} />
           <View style={{ position: 'relative', height: 14, marginTop: 4 }}>
             {['Q1', 'Q2', 'Q3', 'Q4'].map((q, i) => (
@@ -346,25 +326,25 @@ export default function Report(data: any) {
         <PageBreak />
 
         {/* Recommendations */}
-        <Text bookmark={data.sections[3].title} style={styles.sectionTitle}>4. {data.sections[3].title}</Text>
-        <Text style={styles.introText}>{data.sections[3].intro}</Text>
+        <Text bookmark={data.sections[3].title} style={tw("text-xl font-bold text-slate-900 mb-3")}>4. {data.sections[3].title}</Text>
+        <Text style={tw("text-[10px] text-slate-700 leading-[1.6] mb-4")}>{data.sections[3].intro}</Text>
 
         {data.sections[3].items.map((item: any, i: number) => (
-          <View key={i} style={styles.recCard}>
-            <View style={styles.recBadge}>
-              <Text style={styles.recBadgeText}>{i + 1}</Text>
+          <View key={i} style={{ ...tw("flex-row gap-6 mb-4 p-4 bg-slate-50 rounded"), borderLeftWidth: 3, borderColor: '#0f172a' }}>
+            <View style={tw("w-6 h-6 bg-slate-900 rounded-[12] justify-center items-center")}>
+              <Text style={tw("text-[10px] font-bold text-white leading-[1.2]")}>{i + 1}</Text>
             </View>
-            <View style={{ flexGrow: 1, flexShrink: 1 }}>
-              <Text style={styles.recTitle}>{item.title}</Text>
-              <Text style={styles.recBody}>{item.description}</Text>
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <Text style={styles.recLabel}>Priority:</Text>
-                  <Text style={styles.recValue}>{item.priority}</Text>
+            <View style={tw("flex-1 flex-shrink")}>
+              <Text style={tw("text-[11px] font-bold text-slate-900 mb-1")}>{item.title}</Text>
+              <Text style={tw("text-[9px] text-slate-600 leading-[1.5]")}>{item.description}</Text>
+              <View style={tw("flex-row gap-4 mt-2")}>
+                <View style={tw("flex-row gap-1")}>
+                  <Text style={tw("text-[8px] font-bold text-slate-500")}>Priority:</Text>
+                  <Text style={tw("text-[8px] text-slate-700")}>{item.priority}</Text>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  <Text style={styles.recLabel}>Timeline:</Text>
-                  <Text style={styles.recValue}>{item.timeline}</Text>
+                <View style={tw("flex-row gap-1")}>
+                  <Text style={tw("text-[8px] font-bold text-slate-500")}>Timeline:</Text>
+                  <Text style={tw("text-[8px] text-slate-700")}>{item.timeline}</Text>
                 </View>
               </View>
             </View>
