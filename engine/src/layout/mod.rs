@@ -158,7 +158,7 @@ fn size_constraint_to_str(sc: &SizeConstraint) -> Option<String> {
 impl ElementStyleInfo {
     fn from_resolved(style: &ResolvedStyle) -> Self {
         ElementStyleInfo {
-            margin: style.margin,
+            margin: style.margin.to_edges(),
             padding: style.padding,
             border_width: style.border_width,
             width: size_constraint_to_str(&style.width),
@@ -1085,7 +1085,7 @@ impl LayoutEngine {
         font_context: &FontContext,
     ) {
         let padding = &style.padding;
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
         let border = &style.border_width;
 
         let outer_width = match style.width {
@@ -1200,7 +1200,7 @@ impl LayoutEngine {
     ) {
         let padding = &style.padding;
         let border = &style.border_width;
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
 
         // Save state before child layout for page-break detection
         let initial_page_count = pages.len();
@@ -1446,37 +1446,68 @@ impl LayoutEngine {
                     }
                     let child_start = cursor.elements.len();
 
+                    // Auto margins take priority over align-items for cross-axis positioning.
+                    // For column flex, horizontal auto margins center or push the child.
+                    let child_margin = &child.style.resolve(parent_style, available_width).margin;
+                    let has_auto_h = child_margin.has_auto_horizontal();
+
                     // For align-items Center/FlexEnd, measure child width and adjust x.
                     // Returns (child_x, layout_width): layout_width is what we pass
                     // to layout_node. For Fixed-width children (incl. percentage),
                     // we pass available_width so percentages re-resolve correctly.
                     // For Auto-width children, we pass the intrinsic width so they
                     // don't stretch to fill the parent.
-                    let (child_x, layout_w) =
-                        if !matches!(align, AlignItems::Stretch | AlignItems::FlexStart) {
-                            let child_style = child.style.resolve(parent_style, available_width);
-                            let has_explicit_width =
-                                matches!(child_style.width, SizeConstraint::Fixed(_));
-                            let intrinsic = self
-                                .measure_intrinsic_width(child, &child_style, font_context)
-                                .min(available_width);
-                            let w = match child_style.width {
-                                SizeConstraint::Fixed(fw) => fw,
-                                SizeConstraint::Auto => intrinsic,
-                            };
-                            let lw = if has_explicit_width {
-                                available_width
-                            } else {
-                                w
-                            };
-                            match align {
-                                AlignItems::Center => (content_x + (available_width - w) / 2.0, lw),
-                                AlignItems::FlexEnd => (content_x + available_width - w, lw),
-                                _ => (content_x, available_width),
-                            }
-                        } else {
-                            (content_x, available_width)
+                    let (child_x, layout_w) = if has_auto_h {
+                        let child_style = child.style.resolve(parent_style, available_width);
+                        let has_explicit_width =
+                            matches!(child_style.width, SizeConstraint::Fixed(_));
+                        let intrinsic = self
+                            .measure_intrinsic_width(child, &child_style, font_context)
+                            .min(available_width);
+                        let w = match child_style.width {
+                            SizeConstraint::Fixed(fw) => fw,
+                            SizeConstraint::Auto => intrinsic,
                         };
+                        let lw = if has_explicit_width {
+                            available_width
+                        } else {
+                            w
+                        };
+                        let fixed_h = child_margin.horizontal();
+                        let slack = (available_width - w - fixed_h).max(0.0);
+                        let auto_left = child_margin.left.is_auto();
+                        let auto_right = child_margin.right.is_auto();
+                        let ml = match (auto_left, auto_right) {
+                            (true, true) => slack / 2.0,
+                            (true, false) => slack,
+                            (false, true) => 0.0,
+                            (false, false) => 0.0,
+                        };
+                        (content_x + child_margin.left.resolve() + ml, lw)
+                    } else if !matches!(align, AlignItems::Stretch | AlignItems::FlexStart) {
+                        let child_style = child.style.resolve(parent_style, available_width);
+                        let has_explicit_width =
+                            matches!(child_style.width, SizeConstraint::Fixed(_));
+                        let intrinsic = self
+                            .measure_intrinsic_width(child, &child_style, font_context)
+                            .min(available_width);
+                        let w = match child_style.width {
+                            SizeConstraint::Fixed(fw) => fw,
+                            SizeConstraint::Auto => intrinsic,
+                        };
+                        let lw = if has_explicit_width {
+                            available_width
+                        } else {
+                            w
+                        };
+                        match align {
+                            AlignItems::Center => (content_x + (available_width - w) / 2.0, lw),
+                            AlignItems::FlexEnd => (content_x + available_width - w, lw),
+                            _ => (content_x, available_width),
+                        }
+                    } else {
+                        (content_x, available_width)
+                    };
 
                     self.layout_node(
                         child,
@@ -1868,20 +1899,39 @@ impl LayoutEngine {
                 let item_height =
                     self.measure_node_height(item.node, fw, &item.style, font_context);
 
-                let y_offset = match align {
-                    AlignItems::FlexStart => 0.0,
-                    AlignItems::FlexEnd => line_height - item_height - item.style.margin.vertical(),
-                    AlignItems::Center => {
-                        (line_height - item_height - item.style.margin.vertical()) / 2.0
+                // Auto margins on cross axis take priority over align-items
+                let has_auto_v = item.style.margin.has_auto_vertical();
+                let y_offset = if has_auto_v {
+                    let fixed_v = item.style.margin.vertical();
+                    let slack = (line_height - item_height - fixed_v).max(0.0);
+                    let auto_top = item.style.margin.top.is_auto();
+                    let auto_bottom = item.style.margin.bottom.is_auto();
+                    match (auto_top, auto_bottom) {
+                        (true, true) => slack / 2.0,
+                        (true, false) => slack,
+                        (false, true) => 0.0,
+                        (false, false) => 0.0,
                     }
-                    AlignItems::Stretch => 0.0,
-                    AlignItems::Baseline => 0.0,
+                } else {
+                    match align {
+                        AlignItems::FlexStart => 0.0,
+                        AlignItems::FlexEnd => {
+                            line_height - item_height - item.style.margin.vertical()
+                        }
+                        AlignItems::Center => {
+                            (line_height - item_height - item.style.margin.vertical()) / 2.0
+                        }
+                        AlignItems::Stretch => 0.0,
+                        AlignItems::Baseline => 0.0,
+                    }
                 };
 
                 // When stretch applies and item has no explicit height, pass
                 // the cross-axis height so inner layout sees a fixed container.
+                // Auto margins prevent stretch.
                 let cross_h = if matches!(align, AlignItems::Stretch)
                     && matches!(item.style.height, SizeConstraint::Auto)
+                    && !has_auto_v
                 {
                     let stretch_h = line_height - item.style.margin.vertical();
                     if stretch_h > item_height {
@@ -1984,7 +2034,7 @@ impl LayoutEngine {
         font_context: &FontContext,
     ) {
         let padding = &style.padding;
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
         let border = &style.border_width;
 
         let table_x = x + margin.left;
@@ -2214,7 +2264,7 @@ impl LayoutEngine {
         source_location: Option<&SourceLocation>,
         bookmark: Option<&str>,
     ) {
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
         let text_x = x + margin.left;
         let text_width = available_width - margin.horizontal();
 
@@ -3378,7 +3428,7 @@ impl LayoutEngine {
         explicit_width: Option<f64>,
         explicit_height: Option<f64>,
     ) {
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
 
         // Try to load the image from the node's src field
         let src = match &node.kind {
@@ -3469,7 +3519,7 @@ impl LayoutEngine {
         view_box: Option<&str>,
         content: &str,
     ) {
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
         let total_height = svg_height + margin.vertical();
 
         if total_height > cursor.remaining_height() {
@@ -3651,7 +3701,7 @@ impl LayoutEngine {
         canvas_height: f64,
         operations: &[CanvasOp],
     ) {
-        let margin = style.margin;
+        let margin = style.margin.to_edges();
         let total_height = canvas_height + margin.top + margin.bottom;
 
         // Page break check
@@ -3704,7 +3754,7 @@ impl LayoutEngine {
         explicit_width: Option<f64>,
         bar_height: f64,
     ) {
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
         let display_width = explicit_width.unwrap_or(available_width - margin.horizontal());
         let total_height = bar_height + margin.vertical();
 
@@ -3765,7 +3815,7 @@ impl LayoutEngine {
         data: &str,
         explicit_size: Option<f64>,
     ) {
-        let margin = &style.margin;
+        let margin = &style.margin.to_edges();
         let display_size = explicit_size.unwrap_or(available_width - margin.horizontal());
         let total_height = display_size + margin.vertical();
 
@@ -5124,11 +5174,11 @@ mod tests {
 
         let parent = make_styled_view(
             Style {
-                margin: Some(Edges {
+                margin: Some(MarginEdges::from_edges(Edges {
                     top: 50.0,
                     left: 50.0,
                     ..Default::default()
-                }),
+                })),
                 width: Some(Dimension::Pt(200.0)),
                 height: Some(Dimension::Pt(200.0)),
                 ..Default::default()

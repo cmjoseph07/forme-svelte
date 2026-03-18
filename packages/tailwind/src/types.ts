@@ -13,7 +13,7 @@ export interface FormeStyle {
   flexGrow?: number;
   flexShrink?: number;
   flexBasis?: number | string;
-  flexWrap?: "wrap" | "nowrap";
+  flexWrap?: "nowrap" | "wrap" | "wrap-reverse";
   gap?: number;
   columnGap?: number;
   rowGap?: number;
@@ -25,11 +25,11 @@ export interface FormeStyle {
   overflow?: "hidden" | "visible";
   display?: "flex" | "grid";
   alignSelf?:
-    | "auto"
     | "flex-start"
     | "flex-end"
     | "center"
-    | "stretch";
+    | "stretch"
+    | "baseline";
 
   // Grid
   gridTemplateColumns?: string;
@@ -44,13 +44,13 @@ export interface FormeStyle {
   // Dimensions
   width?: number | string;
   height?: number | string;
-  minWidth?: number;
-  maxWidth?: number;
-  minHeight?: number;
-  maxHeight?: number;
+  minWidth?: number | string;
+  maxWidth?: number | string;
+  minHeight?: number | string;
+  maxHeight?: number | string;
 
   // Spacing
-  padding?: number;
+  padding?: number | string;
   paddingTop?: number;
   paddingRight?: number;
   paddingBottom?: number;
@@ -58,17 +58,17 @@ export interface FormeStyle {
   paddingHorizontal?: number;
   paddingVertical?: number;
   margin?: number | string;
-  marginTop?: number | string;
-  marginRight?: number | string;
-  marginBottom?: number | string;
-  marginLeft?: number | string;
-  marginHorizontal?: number | string;
-  marginVertical?: number | string;
+  marginTop?: number | "auto";
+  marginRight?: number | "auto";
+  marginBottom?: number | "auto";
+  marginLeft?: number | "auto";
+  marginHorizontal?: number | "auto";
+  marginVertical?: number | "auto";
 
   // Typography
   fontSize?: number;
-  fontWeight?: number | string;
-  fontStyle?: "normal" | "italic";
+  fontWeight?: number | "normal" | "bold";
+  fontStyle?: "normal" | "italic" | "oblique";
   textAlign?: "left" | "center" | "right" | "justify";
   lineHeight?: number;
   letterSpacing?: number;

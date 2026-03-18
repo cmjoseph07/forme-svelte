@@ -10,7 +10,7 @@
 //! there is one critical addition: **Page** is a first-class node type.
 
 use crate::style::Style;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 /// A complete document ready for rendering.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,13 +156,133 @@ impl PageSize {
     }
 }
 
-/// Edge values (top, right, bottom, left) used for margin and padding.
+/// Edge values (top, right, bottom, left) used for padding and page margins.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Edges {
     pub top: f64,
     pub right: f64,
     pub bottom: f64,
     pub left: f64,
+}
+
+/// A margin edge value — either a fixed point value or auto.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub enum EdgeValue {
+    Pt(f64),
+    Auto,
+}
+
+impl Default for EdgeValue {
+    fn default() -> Self {
+        EdgeValue::Pt(0.0)
+    }
+}
+
+impl EdgeValue {
+    /// Resolve to a concrete value, treating Auto as 0.
+    pub fn resolve(&self) -> f64 {
+        match self {
+            EdgeValue::Pt(v) => *v,
+            EdgeValue::Auto => 0.0,
+        }
+    }
+
+    /// Whether this edge is auto.
+    pub fn is_auto(&self) -> bool {
+        matches!(self, EdgeValue::Auto)
+    }
+}
+
+impl<'de> Deserialize<'de> for EdgeValue {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de;
+
+        struct EdgeValueVisitor;
+
+        impl<'de> de::Visitor<'de> for EdgeValueVisitor {
+            type Value = EdgeValue;
+
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a number or the string \"auto\"")
+            }
+
+            fn visit_f64<E: de::Error>(self, v: f64) -> Result<EdgeValue, E> {
+                Ok(EdgeValue::Pt(v))
+            }
+
+            fn visit_i64<E: de::Error>(self, v: i64) -> Result<EdgeValue, E> {
+                Ok(EdgeValue::Pt(v as f64))
+            }
+
+            fn visit_u64<E: de::Error>(self, v: u64) -> Result<EdgeValue, E> {
+                Ok(EdgeValue::Pt(v as f64))
+            }
+
+            fn visit_str<E: de::Error>(self, v: &str) -> Result<EdgeValue, E> {
+                if v == "auto" {
+                    Ok(EdgeValue::Auto)
+                } else {
+                    Err(de::Error::invalid_value(de::Unexpected::Str(v), &self))
+                }
+            }
+        }
+
+        deserializer.deserialize_any(EdgeValueVisitor)
+    }
+}
+
+/// Margin edges that support auto values.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
+pub struct MarginEdges {
+    pub top: EdgeValue,
+    pub right: EdgeValue,
+    pub bottom: EdgeValue,
+    pub left: EdgeValue,
+}
+
+impl MarginEdges {
+    /// Sum of resolved (non-auto) horizontal margins.
+    pub fn horizontal(&self) -> f64 {
+        self.left.resolve() + self.right.resolve()
+    }
+
+    /// Sum of resolved (non-auto) vertical margins.
+    pub fn vertical(&self) -> f64 {
+        self.top.resolve() + self.bottom.resolve()
+    }
+
+    /// Whether any horizontal margin is auto.
+    pub fn has_auto_horizontal(&self) -> bool {
+        self.left.is_auto() || self.right.is_auto()
+    }
+
+    /// Whether any vertical margin is auto.
+    pub fn has_auto_vertical(&self) -> bool {
+        self.top.is_auto() || self.bottom.is_auto()
+    }
+
+    /// Convert from plain Edges (all Pt values).
+    pub fn from_edges(e: Edges) -> Self {
+        MarginEdges {
+            top: EdgeValue::Pt(e.top),
+            right: EdgeValue::Pt(e.right),
+            bottom: EdgeValue::Pt(e.bottom),
+            left: EdgeValue::Pt(e.left),
+        }
+    }
+
+    /// Convert to plain Edges, resolving auto to 0.
+    pub fn to_edges(&self) -> Edges {
+        Edges {
+            top: self.top.resolve(),
+            right: self.right.resolve(),
+            bottom: self.bottom.resolve(),
+            left: self.left.resolve(),
+        }
+    }
 }
 
 impl Edges {

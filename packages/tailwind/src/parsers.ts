@@ -33,7 +33,11 @@ function parseSpacing(cls: string): Partial<FormeStyle> | null {
   if (sideMatch) {
     const key = spacingMap[sideMatch[1]];
     if (!key) return null;
-    if (sideMatch[2] === "auto") return { [key]: "auto" };
+    // Margin sides and axes support "auto" for centering
+    if (sideMatch[2] === "auto") {
+      if (sideMatch[1].startsWith("m")) return { [key]: "auto" as const };
+      return null; // padding doesn't support auto
+    }
     const val = parseSpacingValue(sideMatch[2]);
     if (val !== undefined) return { [key]: val };
   }
@@ -413,7 +417,7 @@ function parseGrid(cls: string): Partial<FormeStyle> | null {
 // ── Self Alignment ──────────────────────────────────────────────────
 
 const alignSelfMap: Record<string, FormeStyle["alignSelf"]> = {
-  auto: "auto", start: "flex-start", end: "flex-end", center: "center", stretch: "stretch",
+  start: "flex-start", end: "flex-end", center: "center", stretch: "stretch", baseline: "baseline",
 };
 
 function parseSelf(cls: string): Partial<FormeStyle> | null {

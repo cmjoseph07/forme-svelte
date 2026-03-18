@@ -7,7 +7,7 @@
 //! We don't try to implement all of CSS. We implement the parts that matter
 //! for PDF documents, and we implement them correctly.
 
-use crate::model::{Edges, Position};
+use crate::model::{Edges, MarginEdges, Position};
 use serde::{Deserialize, Serialize};
 
 /// The complete set of style properties for a node.
@@ -31,9 +31,9 @@ pub struct Style {
     /// Padding inside the border.
     #[serde(default)]
     pub padding: Option<Edges>,
-    /// Margin outside the border.
+    /// Margin outside the border. Supports auto values for centering.
     #[serde(default)]
-    pub margin: Option<Edges>,
+    pub margin: Option<MarginEdges>,
 
     // ── Display & Layout Mode ──────────────────────────────────
     /// Display mode: flex (default) or grid.
@@ -485,7 +485,7 @@ pub struct ResolvedStyle {
     pub max_width: f64,
     pub max_height: f64,
     pub padding: Edges,
-    pub margin: Edges,
+    pub margin: MarginEdges,
 
     // Display
     pub display: Display,

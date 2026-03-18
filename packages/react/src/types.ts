@@ -89,12 +89,12 @@ export interface Style {
   paddingHorizontal?: number;
   paddingVertical?: number;
   margin?: number | string | number[] | Edges;
-  marginTop?: number;
-  marginRight?: number;
-  marginBottom?: number;
-  marginLeft?: number;
-  marginHorizontal?: number;
-  marginVertical?: number;
+  marginTop?: number | 'auto';
+  marginRight?: number | 'auto';
+  marginBottom?: number | 'auto';
+  marginLeft?: number | 'auto';
+  marginHorizontal?: number | 'auto';
+  marginVertical?: number | 'auto';
 
   // Typography
   fontSize?: number;
@@ -458,6 +458,14 @@ export interface FormeEdges {
   left: number;
 }
 
+/** Margin edges that support auto values (for centering). */
+export interface FormeMarginEdges {
+  top: number | 'auto';
+  right: number | 'auto';
+  bottom: number | 'auto';
+  left: number | 'auto';
+}
+
 export interface FormeNode {
   kind: FormeNodeKind;
   style: FormeStyle;
@@ -546,7 +554,7 @@ export interface FormeStyle {
   maxWidth?: FormeDimension;
   maxHeight?: FormeDimension;
   padding?: FormeEdges;
-  margin?: FormeEdges;
+  margin?: FormeMarginEdges;
   flexDirection?: string;
   justifyContent?: string;
   alignItems?: string;

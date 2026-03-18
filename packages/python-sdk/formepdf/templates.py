@@ -199,6 +199,13 @@ def _expand_edges(val: Union[int, float, str, list, tuple]) -> Dict[str, float]:
     return {"top": 0, "right": 0, "bottom": 0, "left": 0}
 
 
+def _expand_margin_edges(val: Union[int, float, str, list, tuple]) -> Dict[str, Any]:
+    """Expand a shorthand margin value, preserving 'auto' string values."""
+    if val == "auto":
+        return {"top": "auto", "right": "auto", "bottom": "auto", "left": "auto"}
+    return _expand_edges(val)
+
+
 def _expand_corners(val: Union[int, float]) -> Dict[str, float]:
     """Expand a border radius shorthand."""
     v = float(val)
@@ -259,7 +266,7 @@ def _map_style(style: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     _margin_keys = ("margin", "marginTop", "marginRight", "marginBottom", "marginLeft",
                     "marginHorizontal", "marginVertical")
     if any(k in style for k in _margin_keys):
-        base = _expand_edges(style["margin"]) if "margin" in style else {"top": 0, "right": 0, "bottom": 0, "left": 0}
+        base = _expand_margin_edges(style["margin"]) if "margin" in style else {"top": 0, "right": 0, "bottom": 0, "left": 0}
         vt = style.get("marginVertical", base["top"])
         vb = style.get("marginVertical", base["bottom"])
         hl = style.get("marginHorizontal", base["left"])

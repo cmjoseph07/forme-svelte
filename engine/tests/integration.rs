@@ -5611,3 +5611,145 @@ fn test_barcode_layout_dimensions() {
     assert!((elem.width - 150.0).abs() < 0.1);
     assert!((elem.height - 40.0).abs() < 0.1);
 }
+
+// ─── Auto margin centering ──────────────────────────────────────
+
+#[test]
+fn auto_margin_horizontal_centers_child() {
+    // A 200pt-wide child with margin-left: auto, margin-right: auto
+    // inside a standard A4 page should be horizontally centered.
+    let child = make_styled_view(
+        Style {
+            width: Some(Dimension::Pt(200.0)),
+            height: Some(Dimension::Pt(50.0)),
+            margin: Some(MarginEdges {
+                top: EdgeValue::Pt(0.0),
+                right: EdgeValue::Auto,
+                bottom: EdgeValue::Pt(0.0),
+                left: EdgeValue::Auto,
+            }),
+            ..Default::default()
+        },
+        vec![],
+    );
+
+    let page = Node::page(
+        PageConfig {
+            margin: Edges::uniform(0.0),
+            ..Default::default()
+        },
+        Style::default(),
+        vec![child],
+    );
+
+    let doc = Document {
+        children: vec![page],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+    };
+
+    let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
+    assert_eq!(layout.pages.len(), 1);
+
+    // A4 width = 595.28. Child = 200pt. Expected x = (595.28 - 200) / 2 = 197.64
+    let elem = &layout.pages[0].elements[0];
+    assert!((elem.width - 200.0).abs() < 0.1, "width: {}", elem.width);
+    let expected_x = (595.28 - 200.0) / 2.0;
+    assert!(
+        (elem.x - expected_x).abs() < 0.5,
+        "x: {}, expected: {}",
+        elem.x,
+        expected_x
+    );
+}
+
+#[test]
+fn auto_margin_left_pushes_right() {
+    // margin-left: auto should push the child to the right
+    let child = make_styled_view(
+        Style {
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            margin: Some(MarginEdges {
+                top: EdgeValue::Pt(0.0),
+                right: EdgeValue::Pt(0.0),
+                bottom: EdgeValue::Pt(0.0),
+                left: EdgeValue::Auto,
+            }),
+            ..Default::default()
+        },
+        vec![],
+    );
+
+    let page = Node::page(
+        PageConfig {
+            margin: Edges::uniform(0.0),
+            ..Default::default()
+        },
+        Style::default(),
+        vec![child],
+    );
+
+    let doc = Document {
+        children: vec![page],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+    };
+
+    let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
+    let elem = &layout.pages[0].elements[0];
+    // Should be pushed to the right: x = 595.28 - 100 = 495.28
+    let expected_x = 595.28 - 100.0;
+    assert!(
+        (elem.x - expected_x).abs() < 0.5,
+        "x: {}, expected: {}",
+        elem.x,
+        expected_x
+    );
+}
+
+#[test]
+fn auto_margin_deserializes_from_json() {
+    // Verify that "auto" string deserializes correctly in margin edges
+    let json = r#"{
+        "children": [{
+            "kind": { "type": "Page", "config": { "size": "A4", "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 }, "wrap": true } },
+            "style": {},
+            "children": [{
+                "kind": { "type": "View" },
+                "style": {
+                    "width": { "Pt": 200 },
+                    "height": { "Pt": 50 },
+                    "margin": { "top": 0, "right": "auto", "bottom": 0, "left": "auto" }
+                },
+                "children": []
+            }]
+        }],
+        "metadata": {},
+        "defaultPage": { "size": "A4", "margin": { "top": 0, "right": 0, "bottom": 0, "left": 0 }, "wrap": true }
+    }"#;
+
+    let (pdf, layout) = forme::render_json_with_layout(json).expect("Should render from JSON");
+    assert!(pdf.starts_with(b"%PDF"));
+    assert_eq!(layout.pages.len(), 1);
+
+    let elem = &layout.pages[0].elements[0];
+    assert!((elem.width - 200.0).abs() < 0.1);
+    let expected_x = (595.28 - 200.0) / 2.0;
+    assert!(
+        (elem.x - expected_x).abs() < 0.5,
+        "x: {}, expected: {}",
+        elem.x,
+        expected_x
+    );
+}

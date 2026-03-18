@@ -423,7 +423,7 @@ describe("tw()", () => {
       expect(tw("self-center")).toEqual({ alignSelf: "center" });
       expect(tw("self-end")).toEqual({ alignSelf: "flex-end" });
       expect(tw("self-stretch")).toEqual({ alignSelf: "stretch" });
-      expect(tw("self-auto")).toEqual({ alignSelf: "auto" });
+      expect(tw("self-baseline")).toEqual({ alignSelf: "baseline" });
     });
   });
 

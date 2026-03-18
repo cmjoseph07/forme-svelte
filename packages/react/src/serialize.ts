@@ -24,6 +24,7 @@ import type {
   FormePageConfig,
   FormePageSize,
   FormeEdges,
+  FormeMarginEdges,
   FormeColumnDef,
   FormeColumnWidth,
   FormeDimension,
@@ -758,11 +759,11 @@ export function mapStyle(style?: Style): FormeStyle {
     };
   }
   if (style.margin !== undefined || style.marginTop !== undefined || style.marginRight !== undefined || style.marginBottom !== undefined || style.marginLeft !== undefined || style.marginHorizontal !== undefined || style.marginVertical !== undefined) {
-    const base = style.margin !== undefined ? expandEdges(style.margin) : { top: 0, right: 0, bottom: 0, left: 0 };
-    const vt = style.marginVertical ?? base.top;
-    const vb = style.marginVertical ?? base.bottom;
-    const hl = style.marginHorizontal ?? base.left;
-    const hr = style.marginHorizontal ?? base.right;
+    const base: FormeMarginEdges = style.margin !== undefined ? expandMarginEdges(style.margin) : { top: 0, right: 0, bottom: 0, left: 0 };
+    const vt: number | 'auto' = style.marginVertical ?? base.top;
+    const vb: number | 'auto' = style.marginVertical ?? base.bottom;
+    const hl: number | 'auto' = style.marginHorizontal ?? base.left;
+    const hr: number | 'auto' = style.marginHorizontal ?? base.right;
     result.margin = {
       top: style.marginTop ?? vt,
       right: style.marginRight ?? hr,
@@ -1116,6 +1117,24 @@ export function expandEdges(val: number | string | number[] | Edges): FormeEdges
     return { top: val, right: val, bottom: val, left: val };
   }
   if (typeof val === 'string' || Array.isArray(val)) {
+    return parseCSSEdges(val);
+  }
+  return { top: val.top, right: val.right, bottom: val.bottom, left: val.left };
+}
+
+/** Expand margin edges, preserving 'auto' string values. */
+function expandMarginEdges(val: number | string | number[] | Edges): FormeMarginEdges {
+  if (typeof val === 'number') {
+    return { top: val, right: val, bottom: val, left: val };
+  }
+  if (typeof val === 'string') {
+    if (val === 'auto') {
+      return { top: 'auto', right: 'auto', bottom: 'auto', left: 'auto' };
+    }
+    const edges = parseCSSEdges(val);
+    return edges;
+  }
+  if (Array.isArray(val)) {
     return parseCSSEdges(val);
   }
   return { top: val.top, right: val.right, bottom: val.bottom, left: val.left };
