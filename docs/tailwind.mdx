@@ -1,0 +1,279 @@
+---
+title: Tailwind CSS
+sidebarTitle: Tailwind CSS
+description: Style Forme components with Tailwind CSS utility classes. Convert familiar class names like "p-4 text-lg font-bold" into Forme style objects.
+---
+
+`@formepdf/tailwind` lets you style Forme components with Tailwind CSS utility classes instead of writing style objects by hand.
+
+```bash
+npm install @formepdf/tailwind
+```
+
+```tsx
+import { tw } from '@formepdf/tailwind';
+import { Document, Page, View, Text } from '@formepdf/react';
+
+<Document>
+  <Page size="Letter" margin={54}>
+    <View style={tw("flex-row items-center justify-between p-6 bg-slate-100 rounded-lg")}>
+      <Text style={tw("text-2xl font-bold text-slate-900")}>Invoice #001</Text>
+      <Text style={tw("text-sm text-slate-500")}>March 2026</Text>
+    </View>
+
+    <View style={tw("mt-6 p-4 border border-slate-200 rounded-md")}>
+      <View style={tw("flex-row justify-between")}>
+        <Text style={tw("text-sm")}>Website Redesign</Text>
+        <Text style={tw("text-sm font-semibold")}>$3,500</Text>
+      </View>
+    </View>
+  </Page>
+</Document>
+```
+
+The `tw()` function returns a plain `FormeStyle` object. You can spread it, merge it, or pass it directly to `style`.
+
+## How it works
+
+`tw()` parses a space-separated string of Tailwind classes and returns the equivalent Forme style object. Unknown classes are silently ignored. When classes conflict, the last one wins.
+
+```tsx
+tw("p-4 text-lg font-bold text-blue-500")
+// → { padding: 16, fontSize: 18, fontWeight: 700, color: '#3b82f6' }
+```
+
+You can merge with custom styles using spread:
+
+```tsx
+<View style={{ ...tw("p-4 bg-white rounded-lg"), borderWidth: 1, borderColor: '#e2e8f0' }}>
+```
+
+## Spacing
+
+Tailwind spacing values are multiplied by 4 (matching Tailwind's default 4px scale). `p-4` = 16pt, `m-2` = 8pt, etc.
+
+| Class | Forme property |
+|-------|---------------|
+| `p-{n}` | `padding` |
+| `px-{n}` / `py-{n}` | `paddingHorizontal` / `paddingVertical` |
+| `pt-{n}` / `pr-{n}` / `pb-{n}` / `pl-{n}` | `paddingTop` / `paddingRight` / `paddingBottom` / `paddingLeft` |
+| `m-{n}` | `margin` |
+| `mx-{n}` / `my-{n}` | `marginHorizontal` / `marginVertical` |
+| `mt-{n}` / `mr-{n}` / `mb-{n}` / `ml-{n}` | `marginTop` / `marginRight` / `marginBottom` / `marginLeft` |
+| `m-auto` / `mx-auto` / `my-auto` | `margin: "auto"` / `marginHorizontal: "auto"` / `marginVertical: "auto"` |
+| `p-px` | `padding: 1` |
+
+### Negative values
+
+Prefix any spacing or positional class with `-` to negate:
+
+```tsx
+tw("-mt-4")  // → { marginTop: -16 }
+tw("-top-2") // → { top: -8 }
+```
+
+## Typography
+
+| Class | Forme property |
+|-------|---------------|
+| `text-xs` / `text-sm` / `text-base` / `text-lg` / `text-xl` / `text-2xl` ... `text-9xl` | `fontSize` (12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128) |
+| `font-thin` / `font-light` / `font-normal` / `font-medium` / `font-semibold` / `font-bold` / `font-extrabold` / `font-black` | `fontWeight` (100-900) |
+| `italic` | `fontStyle: "italic"` |
+| `text-left` / `text-center` / `text-right` / `text-justify` | `textAlign` |
+| `leading-tight` / `leading-normal` / `leading-loose` / `leading-{n}` | `lineHeight` |
+| `tracking-tight` / `tracking-normal` / `tracking-wide` | `letterSpacing` |
+| `underline` / `line-through` / `no-underline` | `textDecoration` |
+| `uppercase` / `lowercase` / `capitalize` / `normal-case` | `textTransform` |
+
+## Colors
+
+The full Tailwind color palette is supported: slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose. Each with shades 50-950.
+
+| Class | Forme property |
+|-------|---------------|
+| `text-{color}-{shade}` | `color` |
+| `bg-{color}-{shade}` | `backgroundColor` |
+| `border-{color}-{shade}` | `borderColor` |
+| `text-black` / `text-white` | `color: "#000000"` / `color: "#ffffff"` |
+
+```tsx
+tw("text-blue-600 bg-blue-50 border-blue-200")
+// → { color: '#2563eb', backgroundColor: '#eff6ff', borderColor: '#bfdbfe' }
+```
+
+## Layout
+
+| Class | Forme property |
+|-------|---------------|
+| `flex` | No-op (flex is the default in Forme) |
+| `flex-row` / `flex-col` | `flexDirection` |
+| `flex-row-reverse` / `flex-col-reverse` | `flexDirection` |
+| `items-start` / `items-center` / `items-end` / `items-stretch` / `items-baseline` | `alignItems` |
+| `justify-start` / `justify-center` / `justify-end` / `justify-between` / `justify-around` / `justify-evenly` | `justifyContent` |
+| `self-start` / `self-center` / `self-end` / `self-stretch` / `self-auto` | `alignSelf` |
+| `flex-1` | `flex: 1` |
+| `flex-auto` / `flex-initial` / `flex-none` | flex shortcuts |
+| `flex-grow` / `flex-grow-0` | `flexGrow` |
+| `flex-shrink` / `flex-shrink-0` | `flexShrink` |
+| `flex-wrap` / `flex-nowrap` | `flexWrap` |
+| `gap-{n}` / `gap-x-{n}` / `gap-y-{n}` | `gap` / `columnGap` / `rowGap` |
+
+## Dimensions
+
+| Class | Forme property |
+|-------|---------------|
+| `w-{n}` / `h-{n}` | `width` / `height` (n * 4) |
+| `w-full` / `h-full` | `width: "100%"` / `height: "100%"` |
+| `w-auto` / `h-auto` | `width: "auto"` / `height: "auto"` |
+| `w-1/2` / `w-1/3` / `w-2/3` / `w-1/4` / `w-3/4` | Percentage widths |
+| `min-w-{n}` / `max-w-{n}` | `minWidth` / `maxWidth` |
+| `min-h-{n}` / `max-h-{n}` | `minHeight` / `maxHeight` |
+
+### Fraction widths
+
+Use fractions for percentage-based sizing:
+
+```tsx
+tw("w-1/2") // → { width: "50%" }
+tw("w-2/3") // → { width: "66.666667%" }
+tw("w-1/4") // → { width: "25%" }
+```
+
+## Grid
+
+| Class | Forme property |
+|-------|---------------|
+| `grid` | `display: "grid"` |
+| `grid-cols-{n}` (1-12) | `gridTemplateColumns: "repeat(n, 1fr)"` |
+| `grid-cols-none` | `gridTemplateColumns: "none"` |
+| `grid-rows-{n}` (1-6) | `gridTemplateRows: "repeat(n, 1fr)"` |
+| `grid-rows-none` | `gridTemplateRows: "none"` |
+| `col-span-{n}` (1-12) | `gridColumnSpan` |
+| `col-span-full` | Span all columns |
+| `col-start-{n}` / `col-end-{n}` | `gridColumnStart` / `gridColumnEnd` |
+| `row-span-{n}` (1-6) | `gridRowSpan` |
+| `row-span-full` | Span all rows |
+| `row-start-{n}` / `row-end-{n}` | `gridRowStart` / `gridRowEnd` |
+
+```tsx
+<View style={tw("grid grid-cols-3 gap-4")}>
+  <View style={tw("col-span-2 p-4 bg-blue-50")}><Text>Wide column</Text></View>
+  <View style={tw("p-4 bg-slate-50")}><Text>Narrow column</Text></View>
+</View>
+```
+
+## Borders
+
+| Class | Forme property |
+|-------|---------------|
+| `border` | `borderWidth: 1` |
+| `border-0` / `border-2` / `border-4` / `border-8` | `borderWidth` |
+| `border-t` / `border-r` / `border-b` / `border-l` | Per-side `borderWidth: 1` |
+| `border-t-{n}` / `border-r-{n}` / `border-b-{n}` / `border-l-{n}` | Per-side `borderWidth` |
+| `rounded` / `rounded-sm` / `rounded-md` / `rounded-lg` / `rounded-xl` / `rounded-2xl` / `rounded-3xl` | `borderRadius` (4, 2, 6, 8, 12, 16, 24) |
+| `rounded-full` | `borderRadius: 9999` |
+| `rounded-none` | `borderRadius: 0` |
+
+## Positioning
+
+| Class | Forme property |
+|-------|---------------|
+| `relative` / `absolute` | `position` |
+| `top-{n}` / `right-{n}` / `bottom-{n}` / `left-{n}` | Positional offsets (n * 4) |
+| `overflow-hidden` / `overflow-visible` | `overflow` |
+
+## Opacity
+
+| Class | Forme property |
+|-------|---------------|
+| `opacity-{0-100}` | `opacity` (divided by 100) |
+
+```tsx
+tw("opacity-50") // → { opacity: 0.5 }
+tw("opacity-75") // → { opacity: 0.75 }
+```
+
+## Arbitrary values
+
+Use bracket syntax for exact values that don't map to the Tailwind scale:
+
+```tsx
+tw("w-[200]")      // → { width: 200 }
+tw("w-[200px]")    // → { width: 200 } (px is stripped)
+tw("text-[14px]")  // → { fontSize: 14 }
+tw("p-[20]")       // → { padding: 20 }
+tw("gap-[12]")     // → { gap: 12 }
+tw("leading-[20]") // → { lineHeight: 20 }
+tw("rounded-[8]")  // → { borderRadius: 8 }
+tw("top-[10]")     // → { top: 10 }
+tw("opacity-[0.8]")// → { opacity: 0.8 }
+tw("border-[3]")   // → { borderWidth: 3 }
+```
+
+Colors work too:
+
+```tsx
+tw("text-[#333]")      // → { color: "#333" }
+tw("bg-[#ff0000]")     // → { backgroundColor: "#ff0000" }
+tw("border-[#ccc]")    // → { borderColor: "#ccc" }
+```
+
+All spacing prefixes support arbitrary values: `px-[10]`, `mt-[8]`, `mx-[16]`, `min-w-[100]`, `max-h-[300]`, etc.
+
+## Real-world examples
+
+### Invoice header
+
+```tsx
+<View style={tw("flex-row justify-between items-start p-8 bg-slate-50 rounded-xl")}>
+  <View>
+    <Text style={tw("text-3xl font-bold text-slate-900")}>Invoice</Text>
+    <Text style={tw("text-sm text-slate-500 mt-1")}>INV-2024-001</Text>
+  </View>
+  <View style={tw("items-end")}>
+    <Text style={tw("text-sm text-slate-500")}>March 18, 2026</Text>
+    <Text style={tw("text-sm font-semibold text-emerald-600 mt-1")}>Paid</Text>
+  </View>
+</View>
+```
+
+### Data grid
+
+```tsx
+<View style={tw("grid grid-cols-4 gap-4")}>
+  {metrics.map((m) => (
+    <View key={m.label} style={tw("p-4 bg-white border border-slate-200 rounded-lg")}>
+      <Text style={tw("text-xs uppercase tracking-wide text-slate-500")}>{m.label}</Text>
+      <Text style={tw("text-2xl font-bold text-slate-900 mt-1")}>{m.value}</Text>
+    </View>
+  ))}
+</View>
+```
+
+### Badge
+
+```tsx
+<View style={tw("px-2 py-1 bg-blue-100 rounded-full")}>
+  <Text style={tw("text-xs font-medium text-blue-700")}>New</Text>
+</View>
+```
+
+## What's not supported
+
+These Tailwind features don't apply to PDF rendering and are intentionally excluded:
+
+- **Responsive prefixes** (`sm:`, `md:`, `lg:`) — PDFs have no viewport breakpoints
+- **State variants** (`hover:`, `focus:`, `active:`) — PDFs are not interactive
+- **Dark mode** (`dark:`) — no media queries in PDF
+- **`space-x-{n}` / `space-y-{n}`** — these set margins on children, which requires more than a flat style object
+- **`z-index`**, **`aspect-ratio`**, **`object-fit`** — not supported by the Forme engine
+
+## TypeScript
+
+`tw()` returns a `FormeStyle` type that's compatible with Forme component `style` props:
+
+```tsx
+import { tw, type FormeStyle } from '@formepdf/tailwind';
+
+const cardStyle: FormeStyle = tw("p-4 bg-white rounded-lg border border-slate-200");
+```

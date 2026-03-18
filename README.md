@@ -86,6 +86,7 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Dynamic page numbers**: `{{pageNumber}}` and `{{totalPages}}` in any text element.
 - **Embedded data**: Attach structured JSON to any PDF. Recipients can extract the original data programmatically — invoices carry their line items, reports carry their datasets.
 - **Browser rendering**: Import `@formepdf/core/browser` to generate PDFs entirely client-side. Same engine, same templates — no server required.
+- **Tailwind CSS**: `tw("p-4 text-lg font-bold bg-blue-500")` converts Tailwind classes to Forme style objects. Full color palette, grid, arbitrary values, negative values, fractions.
 
 ## Browser Usage
 
@@ -206,6 +207,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Font fallback | `fontFamily: "Inter, Helvetica"` | Single family only | Full CSS font stack |
 | Custom fonts | TTF with OpenType shaping | Yes | Yes |
 | Browser rendering | Yes (`@formepdf/core/browser`) | Yes (client-side) | No (server only) |
+| Tailwind CSS | `tw("p-4 text-lg font-bold")` utility | No | No |
 | Dependencies | None (WASM) | yoga-layout | Chrome/Chromium |
 | Runs in-process | Yes | Yes | No (subprocess) |
 
@@ -220,6 +222,25 @@ See the [templates/](./templates) directory for production-ready examples:
 - Typography
 - Grid Dashboard
 - Event Ticket
+
+## Tailwind CSS
+
+Style Forme components with Tailwind utility classes via `@formepdf/tailwind`:
+
+```bash
+npm install @formepdf/tailwind
+```
+
+```tsx
+import { tw } from '@formepdf/tailwind';
+
+<View style={tw("flex-row items-center gap-4 p-6 bg-slate-100 rounded-lg")}>
+  <Text style={tw("text-2xl font-bold text-slate-900")}>Invoice</Text>
+  <Text style={tw("text-sm text-slate-500")}>Draft</Text>
+</View>
+```
+
+Supports spacing, typography, colors (full Tailwind palette), flexbox, grid, borders, opacity, arbitrary values (`w-[200]`, `bg-[#f00]`), negative values (`-mt-4`), fraction widths (`w-1/2`), and `self-*` alignment.
 
 ## Documentation
 
