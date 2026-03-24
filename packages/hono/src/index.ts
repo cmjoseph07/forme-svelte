@@ -1,5 +1,4 @@
-import { renderDocument } from '@formepdf/core';
-import { getTemplate, listTemplates } from './templates/index.js';
+import { getTemplate, listTemplates } from '@formepdf/templates';
 import type { MiddlewareHandler } from 'hono';
 import type { ReactElement } from 'react';
 
@@ -10,6 +9,34 @@ interface PdfOptions {
 
 interface FormePdfOptions {
   defaultDownload?: boolean;
+}
+
+// --- Runtime-adaptive import: Node.js uses @formepdf/core, edge uses @formepdf/core/browser ---
+
+type RenderDocumentFn = (element: ReactElement) => Promise<Uint8Array>;
+
+let _renderDocument: RenderDocumentFn | null = null;
+
+async function getRenderDocument(): Promise<RenderDocumentFn> {
+  if (_renderDocument) return _renderDocument;
+
+  // Check if we can resolve file paths — Workers with nodejs_compat provide
+  // process.versions.node but import.meta.url is undefined, so the Node
+  // entry's fileURLToPath() call crashes. This detects the actual capability.
+  const isEdge = typeof import.meta.url !== 'string' || !import.meta.url.startsWith('file://');
+  if (isEdge) {
+    const browser = await import('@formepdf/core/browser');
+    // In edge runtimes (Cloudflare Workers), import.meta.url doesn't resolve
+    // to a valid URL so the default WASM loader fails. Import the .wasm file
+    // directly — Wrangler/esbuild resolves this to a WebAssembly.Module.
+    const wasm = await import('@formepdf/core/pkg/forme_bg.wasm');
+    await browser.init(wasm.default ?? wasm);
+    _renderDocument = browser.renderDocument as RenderDocumentFn;
+  } else {
+    const core = await import('@formepdf/core');
+    _renderDocument = core.renderDocument as RenderDocumentFn;
+  }
+  return _renderDocument;
 }
 
 // --- Standalone pdfResponse (no middleware needed) ---
@@ -40,6 +67,7 @@ export async function pdfResponse(
     options.filename = options.filename || 'document.pdf';
   }
 
+  const renderDocument = await getRenderDocument();
   const pdfBytes = await renderDocument(element);
   const disposition = (options.download ?? false) ? 'attachment' : 'inline';
 
