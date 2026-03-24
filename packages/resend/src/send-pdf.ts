@@ -1,6 +1,6 @@
 import { Resend } from 'resend';
 import { renderDocument } from '@formepdf/core';
-import { getTemplate } from './templates/index.js';
+import { getTemplate } from '@formepdf/templates';
 import { buildDefaultEmail } from './default-email.js';
 import type { SendPdfOptions } from './types.js';
 

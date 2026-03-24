@@ -1,18 +1,14 @@
 import type { ReactElement } from 'react';
-
-import Invoice from './invoice.js';
-import Receipt from './receipt.js';
-import Report from './report.js';
-import ShippingLabel from './shipping-label.js';
-import Letter from './letter.js';
-
-import { invoiceSchema, invoiceDescription, invoiceFields, invoiceExample } from '../schemas/invoice.js';
-import { receiptSchema, receiptDescription, receiptFields, receiptExample } from '../schemas/receipt.js';
-import { reportSchema, reportDescription, reportFields, reportExample } from '../schemas/report.js';
-import { shippingLabelSchema, shippingLabelDescription, shippingLabelFields, shippingLabelExample } from '../schemas/shipping-label.js';
-import { letterSchema, letterDescription, letterFields, letterExample } from '../schemas/letter.js';
-
 import type { z } from 'zod';
+
+import { Invoice, Receipt, Report, ShippingLabel, Letter } from '@formepdf/templates';
+import {
+  invoiceSchema, invoiceDescription, invoiceFields, invoiceExample,
+  receiptSchema, receiptDescription, receiptFields, receiptExample,
+  reportSchema, reportDescription, reportFields, reportExample,
+  shippingLabelSchema, shippingLabelDescription, shippingLabelFields, shippingLabelExample,
+  letterSchema, letterDescription, letterFields, letterExample,
+} from '@formepdf/templates/schemas';
 
 export interface TemplateEntry {
   fn: (data: any) => ReactElement;
@@ -59,12 +55,3 @@ export const templates: Record<string, TemplateEntry> = {
     example: letterExample as unknown as Record<string, unknown>,
   },
 };
-
-// Validate all example data against schemas at load time to catch drift early
-for (const [name, entry] of Object.entries(templates)) {
-  try {
-    entry.schema.parse(entry.example);
-  } catch (err: any) {
-    throw new Error(`Template "${name}" example data does not match its schema: ${err.message}`);
-  }
-}

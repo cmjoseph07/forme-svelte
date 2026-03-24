@@ -1,5 +1,5 @@
 import { renderDocument } from '@formepdf/core';
-import { getTemplate } from './templates/index.js';
+import { getTemplate } from '@formepdf/templates';
 import type { RenderAttachOptions } from './types.js';
 
 export async function renderAndAttach(options: RenderAttachOptions) {

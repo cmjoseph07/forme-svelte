@@ -87,13 +87,33 @@ function extractSourceLocation(element: ReactElement): { file: string; line: num
   return undefined;
 }
 
+// ─── Component resolution ────────────────────────────────────────────
+
+/**
+ * Resolve wrapper function components (e.g. `<MyReport data={...} />`) by
+ * calling them until we reach a Forme primitive like `<Document>`. This lets
+ * users pass custom components directly to `renderDocument()` /
+ * `serialize()` without manually invoking them first.
+ */
+function resolveElement(element: ReactElement): ReactElement {
+  let resolved = element;
+  for (let i = 0; i < 10 && typeof resolved.type === 'function' && resolved.type !== Document; i++) {
+    const result = (resolved.type as (props: unknown) => ReactElement)(resolved.props);
+    if (!isValidElement(result)) break;
+    resolved = result;
+  }
+  return resolved;
+}
+
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
  * Serialize a React element tree into a Forme JSON document object.
- * The top-level element must be a <Document>.
+ * The top-level element must be a <Document> (or a component that returns one).
  */
 export function serialize(element: ReactElement): FormeDocument {
+  element = resolveElement(element);
+
   if (element.type !== Document) {
     throw new Error('Top-level element must be <Document>');
   }
@@ -1213,6 +1233,8 @@ function mergeFonts(
  * Like `serialize()` but with expression marker detection for template compilation.
  */
 export function serializeTemplate(element: ReactElement): Record<string, unknown> {
+  element = resolveElement(element);
+
   if (element.type !== Document) {
     throw new Error('Top-level element must be <Document>');
   }

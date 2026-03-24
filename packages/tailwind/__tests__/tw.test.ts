@@ -64,6 +64,13 @@ describe("tw()", () => {
       expect(tw("gap-y-3")).toEqual({ rowGap: 12 });
     });
 
+    it("space-y and space-x", () => {
+      expect(tw("space-y-4")).toEqual({ rowGap: 16 });
+      expect(tw("space-x-2")).toEqual({ columnGap: 8 });
+      expect(tw("space-y-0")).toEqual({ rowGap: 0 });
+      expect(tw("space-x-0.5")).toEqual({ columnGap: 2 });
+    });
+
     it("dimensions", () => {
       expect(tw("w-64")).toEqual({ width: 256 });
       expect(tw("h-32")).toEqual({ height: 128 });
@@ -139,16 +146,22 @@ describe("tw()", () => {
 
   // ── Typography ───────────────────────────────────────────────────
   describe("typography", () => {
-    it("font sizes", () => {
-      expect(tw("text-xs")).toEqual({ fontSize: 12 });
-      expect(tw("text-sm")).toEqual({ fontSize: 14 });
-      expect(tw("text-base")).toEqual({ fontSize: 16 });
-      expect(tw("text-lg")).toEqual({ fontSize: 18 });
-      expect(tw("text-xl")).toEqual({ fontSize: 20 });
-      expect(tw("text-2xl")).toEqual({ fontSize: 24 });
-      expect(tw("text-3xl")).toEqual({ fontSize: 30 });
-      expect(tw("text-4xl")).toEqual({ fontSize: 36 });
-      expect(tw("text-5xl")).toEqual({ fontSize: 48 });
+    it("font sizes with default line heights", () => {
+      expect(tw("text-xs")).toEqual({ fontSize: 12, lineHeight: 16 });
+      expect(tw("text-sm")).toEqual({ fontSize: 14, lineHeight: 20 });
+      expect(tw("text-base")).toEqual({ fontSize: 16, lineHeight: 24 });
+      expect(tw("text-lg")).toEqual({ fontSize: 18, lineHeight: 28 });
+      expect(tw("text-xl")).toEqual({ fontSize: 20, lineHeight: 28 });
+      expect(tw("text-2xl")).toEqual({ fontSize: 24, lineHeight: 32 });
+      expect(tw("text-3xl")).toEqual({ fontSize: 30, lineHeight: 36 });
+      expect(tw("text-4xl")).toEqual({ fontSize: 36, lineHeight: 40 });
+      expect(tw("text-5xl")).toEqual({ fontSize: 48, lineHeight: 48 });
+    });
+
+    it("explicit leading overrides text size default", () => {
+      expect(tw("text-sm leading-tight")).toEqual({ fontSize: 14, lineHeight: 1.25 });
+      expect(tw("text-lg leading-none")).toEqual({ fontSize: 18, lineHeight: 1 });
+      expect(tw("text-base leading-6")).toEqual({ fontSize: 16, lineHeight: 24 });
     });
 
     it("font weights", () => {
@@ -200,7 +213,7 @@ describe("tw()", () => {
     });
 
     it("combined typography", () => {
-      expect(tw("text-lg font-bold")).toEqual({ fontSize: 18, fontWeight: 700 });
+      expect(tw("text-lg font-bold")).toEqual({ fontSize: 18, lineHeight: 28, fontWeight: 700 });
       expect(tw("italic underline")).toEqual({ fontStyle: "italic", textDecoration: "underline" });
       expect(tw("text-center uppercase")).toEqual({ textAlign: "center", textTransform: "uppercase" });
     });
@@ -227,7 +240,7 @@ describe("tw()", () => {
     });
 
     it("does not confuse text-{size} with text-{color}", () => {
-      expect(tw("text-lg")).toEqual({ fontSize: 18 });
+      expect(tw("text-lg")).toEqual({ fontSize: 18, lineHeight: 28 });
       expect(tw("text-center")).toEqual({ textAlign: "center" });
     });
   });
@@ -392,8 +405,10 @@ describe("tw()", () => {
       expect(tw("border-[#ccc]")).toEqual({ borderColor: "#ccc" });
     });
 
-    it("gap and position", () => {
+    it("gap, space, and position", () => {
       expect(tw("gap-[12]")).toEqual({ gap: 12 });
+      expect(tw("space-y-[6]")).toEqual({ rowGap: 6 });
+      expect(tw("space-x-[12px]")).toEqual({ columnGap: 12 });
       expect(tw("top-[10]")).toEqual({ top: 10 });
       expect(tw("left-[20px]")).toEqual({ left: 20 });
     });
@@ -437,6 +452,7 @@ describe("tw()", () => {
         backgroundColor: "#f3f4f6",
         borderRadius: 8,
         fontSize: 18,
+        lineHeight: 28,
         fontWeight: 700,
         color: "#111827",
       });
@@ -455,7 +471,7 @@ describe("tw()", () => {
 
     it("last class wins on conflict", () => {
       expect(tw("p-4 p-8")).toEqual({ padding: 32 });
-      expect(tw("text-sm text-lg")).toEqual({ fontSize: 18 });
+      expect(tw("text-sm text-lg")).toEqual({ fontSize: 18, lineHeight: 28 });
       expect(tw("font-bold font-normal")).toEqual({ fontWeight: 400 });
     });
   });

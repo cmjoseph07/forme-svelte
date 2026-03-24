@@ -3,6 +3,7 @@ import { themeSchema } from './theme.js';
 
 export const shippingLabelSchema = z.object({
   tracking: z.string().describe('Tracking number'),
+  trackingUrl: z.string().optional().describe('Custom tracking URL (defaults to https://track.example.com/{tracking})'),
   service: z.string().describe('Shipping service level, e.g. "Priority"'),
   weight: z.string().describe('Package weight, e.g. "4.2 lbs"'),
   dimensions: z.string().describe('Package dimensions, e.g. "12 x 8 x 6 in"'),
@@ -23,10 +24,11 @@ export const shippingLabelSchema = z.object({
 
 export type ShippingLabelData = z.infer<typeof shippingLabelSchema>;
 
-export const shippingLabelDescription = 'Compact 4x6 shipping label with sender/recipient addresses, barcode placeholder, tracking number, and handling stamps.';
+export const shippingLabelDescription = 'Compact 4x6 shipping label with sender/recipient addresses, QR code tracking, and handling stamps.';
 
 export const shippingLabelFields: Record<string, string> = {
   tracking: 'string - tracking number',
+  trackingUrl: 'string? - custom tracking URL',
   service: 'string - shipping service level',
   weight: 'string - package weight',
   dimensions: 'string - package dimensions',

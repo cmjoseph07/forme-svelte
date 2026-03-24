@@ -47,9 +47,20 @@ function parseSpacing(cls: string): Partial<FormeStyle> | null {
 
 // ── Typography ───────────────────────────────────────────────────────
 
-const textSizes: Record<string, number> = {
-  xs: 12, sm: 14, base: 16, lg: 18, xl: 20,
-  "2xl": 24, "3xl": 30, "4xl": 36, "5xl": 48, "6xl": 60, "7xl": 72, "8xl": 96, "9xl": 128,
+const textSizeDefaults: Record<string, { fontSize: number; lineHeight: number }> = {
+  xs:    { fontSize: 12, lineHeight: 16 },
+  sm:    { fontSize: 14, lineHeight: 20 },
+  base:  { fontSize: 16, lineHeight: 24 },
+  lg:    { fontSize: 18, lineHeight: 28 },
+  xl:    { fontSize: 20, lineHeight: 28 },
+  "2xl": { fontSize: 24, lineHeight: 32 },
+  "3xl": { fontSize: 30, lineHeight: 36 },
+  "4xl": { fontSize: 36, lineHeight: 40 },
+  "5xl": { fontSize: 48, lineHeight: 48 },
+  "6xl": { fontSize: 60, lineHeight: 60 },
+  "7xl": { fontSize: 72, lineHeight: 72 },
+  "8xl": { fontSize: 96, lineHeight: 96 },
+  "9xl": { fontSize: 128, lineHeight: 128 },
 };
 
 const fontWeights: Record<string, number> = {
@@ -69,7 +80,8 @@ function parseTypography(cls: string): Partial<FormeStyle> | null {
   // text-{size}
   if (cls.startsWith("text-")) {
     const rest = cls.substring(5);
-    if (textSizes[rest] !== undefined) return { fontSize: textSizes[rest] };
+    const def = textSizeDefaults[rest];
+    if (def) return { fontSize: def.fontSize, lineHeight: def.lineHeight };
 
     // text-left/center/right/justify
     if (rest === "left" || rest === "center" || rest === "right" || rest === "justify") {
@@ -127,7 +139,7 @@ function parseColorClass(cls: string): Partial<FormeStyle> | null {
   if (cls.startsWith("text-")) {
     const rest = cls.substring(5);
     // Skip size and alignment keywords
-    if (textSizes[rest] !== undefined) return null;
+    if (textSizeDefaults[rest] !== undefined) return null;
     if (rest === "left" || rest === "center" || rest === "right" || rest === "justify") return null;
     const color = resolveColor(rest);
     if (color) return { color };
@@ -210,6 +222,18 @@ function parseLayout(cls: string): Partial<FormeStyle> | null {
   if (cls === "flex-shrink-0") return { flexShrink: 0 };
   if (cls === "flex-wrap") return { flexWrap: "wrap" };
   if (cls === "flex-nowrap") return { flexWrap: "nowrap" };
+
+  // space-y-{n} / space-x-{n} → map to gap (flex container spacing)
+  if (cls.startsWith("space-y-")) {
+    const n = parseFloat(cls.substring(8));
+    if (!isNaN(n)) return { rowGap: n * 4 };
+    return null;
+  }
+  if (cls.startsWith("space-x-")) {
+    const n = parseFloat(cls.substring(8));
+    if (!isNaN(n)) return { columnGap: n * 4 };
+    return null;
+  }
 
   // gap
   if (cls.startsWith("gap-x-")) {
@@ -438,6 +462,7 @@ const arbitraryPrefixMap: Record<string, keyof FormeStyle | "special"> = {
   m: "margin", mx: "marginHorizontal", my: "marginVertical",
   mt: "marginTop", mr: "marginRight", mb: "marginBottom", ml: "marginLeft",
   gap: "gap", "gap-x": "columnGap", "gap-y": "rowGap",
+  "space-x": "columnGap", "space-y": "rowGap",
   top: "top", right: "right", bottom: "bottom", left: "left",
   rounded: "borderRadius",
   opacity: "opacity",

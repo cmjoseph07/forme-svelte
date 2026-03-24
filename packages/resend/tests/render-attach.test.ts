@@ -6,11 +6,11 @@ vi.mock('@formepdf/core', () => ({
   renderDocument: (...args: any[]) => mockRenderDocument(...args),
 }));
 
-vi.mock('../src/templates/index.js', () => {
+vi.mock('@formepdf/templates', () => {
   const invoiceFn = vi.fn().mockReturnValue({ type: 'Document', props: {} });
   return {
     getTemplate: (name: string) => (name === 'invoice' ? invoiceFn : null),
-    listTemplates: () => [{ name: 'invoice' }],
+    listTemplates: () => [{ name: 'invoice' }, { name: 'receipt' }, { name: 'report' }, { name: 'shipping-label' }, { name: 'letter' }],
   };
 });
 

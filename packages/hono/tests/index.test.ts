@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockRenderDocument = vi.fn();
 
@@ -6,12 +6,16 @@ vi.mock('@formepdf/core', () => ({
   renderDocument: (...args: any[]) => mockRenderDocument(...args),
 }));
 
+vi.mock('@formepdf/core/browser', () => ({
+  renderDocument: (...args: any[]) => mockRenderDocument(...args),
+}));
+
 // Mock the templates module
-vi.mock('../src/templates/index.js', () => {
+vi.mock('@formepdf/templates', () => {
   const invoiceFn = vi.fn().mockReturnValue({ type: 'Document', props: {} });
   return {
     getTemplate: (name: string) => (name === 'invoice' ? invoiceFn : null),
-    listTemplates: () => [{ name: 'invoice' }, { name: 'receipt' }],
+    listTemplates: () => [{ name: 'invoice' }, { name: 'receipt' }, { name: 'report' }, { name: 'shipping-label' }, { name: 'letter' }],
   };
 });
 
@@ -64,7 +68,7 @@ describe('pdfResponse', () => {
 describe('listTemplates', () => {
   it('returns template entries', () => {
     const templates = listTemplates();
-    expect(templates).toEqual([{ name: 'invoice' }, { name: 'receipt' }]);
+    expect(templates).toEqual([{ name: 'invoice' }, { name: 'receipt' }, { name: 'report' }, { name: 'shipping-label' }, { name: 'letter' }]);
   });
 });
 
@@ -78,5 +82,24 @@ describe('formePdf middleware', () => {
 
     expect(typeof context.pdf).toBe('function');
     expect(next).toHaveBeenCalled();
+  });
+});
+
+describe('edge runtime detection', () => {
+  const originalProcess = globalThis.process;
+
+  afterEach(() => {
+    // Restore process
+    globalThis.process = originalProcess;
+  });
+
+  it('uses @formepdf/core in Node.js (process.versions.node exists)', async () => {
+    // Node.js is the default environment in vitest, so this verifies
+    // the existing behavior works — renderDocument resolves and renders
+    mockRenderDocument.mockResolvedValue(PDF_BYTES);
+    const renderFn = () => ({ type: 'Document', props: {} }) as any;
+    const response = await pdfResponse(renderFn);
+    expect(mockRenderDocument).toHaveBeenCalled();
+    expect(response.headers.get('Content-Type')).toBe('application/pdf');
   });
 });

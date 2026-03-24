@@ -1,6 +1,6 @@
 {
   "name": "@formepdf/resend",
-  "version": "0.7.10",
+  "version": "0.7.11",
   "description": "Render a PDF and email it in one call — Forme + Resend",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,8 +13,9 @@
     "dist"
   ],
   "dependencies": {
-    "@formepdf/react": "0.7.10",
-    "@formepdf/core": "0.7.10"
+    "@formepdf/react": "0.7.11",
+    "@formepdf/core": "0.7.11",
+    "@formepdf/templates": "0.7.11"
   },
   "peerDependencies": {
     "resend": ">=3.0.0"

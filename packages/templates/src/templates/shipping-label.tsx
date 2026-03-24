@@ -1,5 +1,5 @@
-import { Document, Page, View, Text } from '@formepdf/react';
-import type { ShippingLabelData } from '../schemas/shipping-label.js';
+import { Document, Page, View, Text, QrCode } from '@formepdf/react';
+import type { ShippingLabelData } from '../types.js';
 
 const DEFAULT_ACCENT = '#1e293b';
 
@@ -22,7 +22,7 @@ export default function ShippingLabel(data: ShippingLabelData) {
         <View style={{ borderTopWidth: 2, borderColor: accent, marginBottom: 12 }} />
 
         {/* To Address */}
-        <View style={{ padding: 12, marginBottom: 12 }}>
+        <View style={{ padding: 12, marginBottom: 0 }}>
           <Text style={{ fontSize: 7, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>To</Text>
           <Text style={{ fontSize: 10, fontWeight: 700, color: accent }}>{data.to.name}</Text>
           <Text style={{ fontSize: 10, color: accent, marginTop: 4 }}>{data.to.address}</Text>
@@ -32,39 +32,10 @@ export default function ShippingLabel(data: ShippingLabelData) {
           <Text style={{ fontSize: 10, fontWeight: 700, color: accent, marginTop: 2 }}>{data.to.cityStateZip}</Text>
         </View>
 
-        {/* Barcode Placeholder */}
-        <View style={{ marginBottom: 8, padding: 8 }}>
-          <View style={{ alignItems: 'center', marginBottom: 8 }}>
-            <View style={{ flexDirection: 'row', gap: 2 }}>
-              {/* Simulate barcode with thin rectangles */}
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 2, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 1, height: 40, backgroundColor: accent }} />
-              <View style={{ width: 3, height: 40, backgroundColor: accent }} />
-            </View>
-          </View>
-          <Text style={{ fontSize: 8, fontWeight: 700, color: accent, letterSpacing: 2, textAlign: 'center' }}>{data.tracking}</Text>
+        {/* Tracking QR Code */}
+        <View style={{ marginBottom: 8, padding: 8, alignItems: 'center' }}>
+          <QrCode data={data.trackingUrl || `https://track.example.com/${data.tracking}`} size={60} />
+          <Text style={{ fontSize: 8, fontWeight: 700, color: accent, letterSpacing: 2, textAlign: 'center', marginTop: 6 }}>{data.tracking}</Text>
         </View>
 
         {/* Divider */}

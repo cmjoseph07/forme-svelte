@@ -76,7 +76,7 @@ tw("-top-2") // → { top: -8 }
 
 | Class | Forme property |
 |-------|---------------|
-| `text-xs` / `text-sm` / `text-base` / `text-lg` / `text-xl` / `text-2xl` ... `text-9xl` | `fontSize` (12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72, 96, 128) |
+| `text-xs` / `text-sm` / `text-base` / `text-lg` / `text-xl` / `text-2xl` ... `text-9xl` | `fontSize` + `lineHeight` (matching Tailwind defaults, e.g. `text-sm` → 14/20) |
 | `font-thin` / `font-light` / `font-normal` / `font-medium` / `font-semibold` / `font-bold` / `font-extrabold` / `font-black` | `fontWeight` (100-900) |
 | `italic` | `fontStyle: "italic"` |
 | `text-left` / `text-center` / `text-right` / `text-justify` | `textAlign` |
@@ -117,6 +117,7 @@ tw("text-blue-600 bg-blue-50 border-blue-200")
 | `flex-shrink` / `flex-shrink-0` | `flexShrink` |
 | `flex-wrap` / `flex-nowrap` | `flexWrap` |
 | `gap-{n}` / `gap-x-{n}` / `gap-y-{n}` | `gap` / `columnGap` / `rowGap` |
+| `space-x-{n}` / `space-y-{n}` | `columnGap` / `rowGap` (mapped to gap for flex containers) |
 
 ## Dimensions
 
@@ -265,7 +266,6 @@ These Tailwind features don't apply to PDF rendering and are intentionally exclu
 - **Responsive prefixes** (`sm:`, `md:`, `lg:`) — PDFs have no viewport breakpoints
 - **State variants** (`hover:`, `focus:`, `active:`) — PDFs are not interactive
 - **Dark mode** (`dark:`) — no media queries in PDF
-- **`space-x-{n}` / `space-y-{n}`** — these set margins on children, which requires more than a flat style object
 - **`z-index`**, **`aspect-ratio`**, **`object-fit`** — not supported by the Forme engine
 
 ## TypeScript

@@ -29,7 +29,7 @@ tw("p-4 text-lg font-bold text-blue-500")
 
 ## Supported classes
 
-**Spacing** — `p-{n}`, `px-{n}`, `py-{n}`, `pt-{n}`, `m-{n}`, `mx-{n}`, `mx-auto`, negative values (`-mt-4`), `p-px`
+**Spacing** — `p-{n}`, `px-{n}`, `py-{n}`, `pt-{n}`, `m-{n}`, `mx-{n}`, `mx-auto`, `space-y-{n}`, `space-x-{n}`, negative values (`-mt-4`), `p-px`
 
 **Typography** — `text-xs` through `text-9xl`, `font-thin` through `font-black`, `italic`, `text-left/center/right/justify`, `leading-*`, `tracking-*`, `underline`, `line-through`, `uppercase`, `lowercase`, `capitalize`
 
@@ -71,7 +71,7 @@ const style: FormeStyle = tw("p-4 bg-white rounded-lg");
 
 ## What's not supported
 
-Tailwind features that don't apply to PDF rendering: responsive prefixes (`sm:`, `md:`), state variants (`hover:`, `focus:`), dark mode, `space-x/y`, `z-index`, `aspect-ratio`.
+Tailwind features that don't apply to PDF rendering: responsive prefixes (`sm:`, `md:`), state variants (`hover:`, `focus:`), dark mode, `z-index`, `aspect-ratio`.
 
 ## Docs
 

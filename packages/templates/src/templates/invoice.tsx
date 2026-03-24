@@ -1,5 +1,5 @@
 import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed } from '@formepdf/react';
-import type { InvoiceData } from '../schemas/invoice.js';
+import type { InvoiceData } from '../types.js';
 
 const DEFAULT_ACCENT = '#2563eb';
 

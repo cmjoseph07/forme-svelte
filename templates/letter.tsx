@@ -1,9 +1,14 @@
-import { Document, Page, View, Text } from '@formepdf/react';
+import { Document, Page, View, Text, Image } from '@formepdf/react';
 
 export default function Letter(data: any) {
   return (
     <Document title={`Letter to ${data.recipient.name}`} author={data.sender.name}>
       <Page size="Letter" margin={{ top: 72, right: 72, bottom: 72, left: 72 }}>
+        {/* Logo */}
+        {data.sender.logoUrl && (
+          <Image src={data.sender.logoUrl} style={{ width: 120, height: 40, marginBottom: 12 }} />
+        )}
+
         {/* Letterhead */}
         <View style={{ marginBottom: 32 }}>
           <Text style={{ fontSize: 16, fontWeight: 700, color: '#1e293b' }}>{data.sender.company}</Text>
@@ -44,7 +49,7 @@ export default function Letter(data: any) {
         <Text style={{ fontSize: 10, color: '#1e293b', marginBottom: 16 }}>{data.salutation}</Text>
 
         {/* Body */}
-        {data.body.map((paragraph: any, i: number) => (
+        {data.body.map((paragraph: string, i: number) => (
           <Text key={i} style={{ fontSize: 10, color: '#334155', lineHeight: 1.6, marginBottom: 12 }}>{paragraph}</Text>
         ))}
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.11] - 2026-03-23
+
+### Fixed
+- Edge runtime crash: detection now uses `import.meta.url` instead of `process.versions.node`, fixing environments where `nodejs_compat` polyfills process globals ([#1](https://github.com/danmolitor/forme/issues/1))
+
+### Changed
+- Templates imported from shared `@formepdf/templates` package
+
+## [0.7.10] - 2026-03-18
+
+_Dependency bump only._
+
 ## [0.7.9] - 2026-03-17
 
 _Dependency bump only._

@@ -2,6 +2,20 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.11] - 2026-03-23
+
+### Added
+- `@formepdf/templates`: New shared package for built-in PDF templates and Zod schemas
+- Templates use `<QrCode>` for shipping label tracking (replaces fake barcode rectangles)
+- `@formepdf/templates/schemas` sub-export for Zod schemas with descriptions, fields, and examples
+- Root `templates/letter.tsx` demo for `forme dev`
+
+### Fixed
+- **Cloudflare Workers crash**: `@formepdf/hono` and `@formepdf/next` now detect edge runtimes via `import.meta.url` instead of `process.versions.node`, fixing `TypeError: The "path" argument must be of type string` when `nodejs_compat` is enabled ([#1](https://github.com/danmolitor/forme/issues/1))
+
+### Changed
+- `@formepdf/hono`, `@formepdf/next`, `@formepdf/resend`, `@formepdf/mcp` now import templates from `@formepdf/templates` (single source of truth)
+
 ## [0.7.10] - 2026-03-18
 
 ### Added

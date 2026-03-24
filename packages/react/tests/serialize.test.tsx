@@ -495,6 +495,59 @@ describe('Document structure', () => {
   });
 });
 
+// ─── Wrapper component resolution ───────────────────────────────────
+
+describe('Wrapper component resolution', () => {
+  it('resolves a function component that returns <Document>', () => {
+    function MyReport({ title }: { title: string }) {
+      return (
+        <Document title={title}>
+          <Text>Hello</Text>
+        </Document>
+      );
+    }
+    const doc = serialize(<MyReport title="Test" />);
+    expect(doc.metadata).toEqual({ title: 'Test' });
+    expect(doc.children[0].kind).toEqual({ type: 'Text', content: 'Hello' });
+  });
+
+  it('resolves nested wrapper components', () => {
+    function Inner() {
+      return (
+        <Document>
+          <Text>Nested</Text>
+        </Document>
+      );
+    }
+    function Outer() {
+      return <Inner />;
+    }
+    const doc = serialize(<Outer />);
+    expect(doc.children[0].kind).toEqual({ type: 'Text', content: 'Nested' });
+  });
+
+  it('resolves user components inside the tree', () => {
+    function MyHeader() {
+      return <Text>Header</Text>;
+    }
+    const doc = serialize(
+      <Document>
+        <MyHeader />
+        <Text>Body</Text>
+      </Document>
+    );
+    expect(doc.children[0].kind).toEqual({ type: 'Text', content: 'Header' });
+    expect(doc.children[1].kind).toEqual({ type: 'Text', content: 'Body' });
+  });
+
+  it('throws for non-Document top-level after resolution', () => {
+    function MyView() {
+      return <View><Text>Hi</Text></View>;
+    }
+    expect(() => serialize(<MyView />)).toThrow('Top-level element must be <Document>');
+  });
+});
+
 // ─── Edge cases ─────────────────────────────────────────────────────
 
 describe('Edge cases', () => {
