@@ -4,7 +4,7 @@ import { readFile, unlink, mkdir } from 'node:fs/promises';
 import { renderPdf } from '../src/tools/render-pdf.js';
 import { renderCustom } from '../src/tools/render-custom.js';
 import { extractPdf } from '../src/tools/extract-pdf.js';
-import { invoiceExample } from '../src/schemas/invoice.js';
+import { invoiceExample } from '@formepdf/templates/schemas';
 
 // Write test outputs into a .test-output dir within cwd (passes path validation)
 const testDir = join(process.cwd(), '.test-output');
