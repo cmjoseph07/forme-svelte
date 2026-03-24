@@ -2,6 +2,11 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.12] - 2026-03-24
+
+### Fixed
+- **Edge runtime support in `@formepdf/core`**: Added `worker`, `edge-light`, `deno`, `react-native`, and `browser` conditional exports so `import { renderDocument } from '@formepdf/core'` automatically resolves to the browser entry point in Cloudflare Workers, Vercel Edge, Deno Deploy, Netlify Edge, Astro edge routes, React Native/Expo, and other non-Node runtimes ([#1](https://github.com/danmolitor/forme/issues/1))
+
 ## [0.7.11] - 2026-03-23
 
 ### Added

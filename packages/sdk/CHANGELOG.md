@@ -1,3 +1,7 @@
+## [0.7.12] - 2026-03-24
+
+_Dependency bump only._
+
 ## [0.7.11] - 2026-03-23
 
 _Dependency bump only._

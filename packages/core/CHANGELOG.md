@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.12] - 2026-03-24
+
+### Fixed
+- Added `worker`, `edge-light`, `deno`, `react-native`, and `browser` conditional exports so edge runtimes (Cloudflare Workers, Vercel Edge, Deno Deploy, Netlify Edge, React Native/Expo) automatically resolve to the browser entry point — no manual `@formepdf/core/browser` import needed
+
 ## [0.7.11] - 2026-03-23
 
 _Dependency bump only._

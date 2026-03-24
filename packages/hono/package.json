@@ -1,6 +1,6 @@
 {
   "name": "@formepdf/hono",
-  "version": "0.7.11",
+  "version": "0.7.12",
   "description": "PDF middleware and responses for Hono — works on Workers, Deno, Bun, Node",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,9 +13,9 @@
     "dist"
   ],
   "dependencies": {
-    "@formepdf/react": "0.7.11",
-    "@formepdf/core": "0.7.11",
-    "@formepdf/templates": "0.7.11"
+    "@formepdf/react": "0.7.12",
+    "@formepdf/core": "0.7.12",
+    "@formepdf/templates": "0.7.12"
   },
   "peerDependencies": {
     "hono": ">=4.0.0"
