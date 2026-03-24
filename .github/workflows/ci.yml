@@ -40,6 +40,9 @@ jobs:
       - name: Build React package
         working-directory: packages/react
         run: npm run build
+      - name: Build Templates
+        working-directory: packages/templates
+        run: npm run build
       - name: Build Core (WASM + TS)
         working-directory: packages/core
         run: npm run build
