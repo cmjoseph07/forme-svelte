@@ -81,7 +81,7 @@ function parseTypography(cls: string): Partial<FormeStyle> | null {
   if (cls.startsWith("text-")) {
     const rest = cls.substring(5);
     const def = textSizeDefaults[rest];
-    if (def) return { fontSize: def.fontSize, lineHeight: def.lineHeight };
+    if (def) return { fontSize: def.fontSize, lineHeight: def.lineHeight / def.fontSize };
 
     // text-left/center/right/justify
     if (rest === "left" || rest === "center" || rest === "right" || rest === "justify") {
@@ -107,7 +107,7 @@ function parseTypography(cls: string): Partial<FormeStyle> | null {
     const rest = cls.substring(8);
     if (namedLeading[rest] !== undefined) return { lineHeight: namedLeading[rest] };
     const n = parseFloat(rest);
-    if (!isNaN(n)) return { lineHeight: n * 4 };
+    if (!isNaN(n)) return { lineHeight: n * 0.25 };
     return null;
   }
 
