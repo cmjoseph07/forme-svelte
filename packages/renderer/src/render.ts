@@ -59,7 +59,7 @@ export async function renderFromCode(
   // Wrap the bundled code with a serialize re-export so it uses the same
   // @formepdf/react instance as the template (avoids dual-instance issues
   // when the renderer is bundled into a VS Code extension)
-  const wrappedCode = code + `\nexport { serialize as __formeSerialize } from '@formepdf/react';\n`;
+  const wrappedCode = code + `\nexport { serialize as __formeSerialize } from '@formepdf/react';\nexport { isValidElement as __formeIsValidElement } from 'react';\n`;
 
   // Write temp file in the source directory so Node resolves @formepdf/* from the user's node_modules
   const tmpDir = basePath ?? process.cwd();
@@ -83,6 +83,9 @@ export async function renderFromCode(
     elementOpts.data = options.data;
   } else if (options?.dataPath) {
     elementOpts.dataPath = options.dataPath;
+  }
+  if (typeof mod.__formeIsValidElement === 'function') {
+    elementOpts.isValidElement = mod.__formeIsValidElement as (obj: unknown) => boolean;
   }
 
   const element = await resolveElement(mod, elementOpts);

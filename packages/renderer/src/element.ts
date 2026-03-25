@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { isValidElement, type ReactElement } from 'react';
+import { isValidElement as defaultIsValidElement, type ReactElement } from 'react';
 
 export interface ResolveElementOptions {
   dataPath?: string;
   data?: unknown;
+  isValidElement?: (obj: unknown) => boolean;
 }
 
 /// Validate a module's default export and resolve it to a React element.
@@ -14,6 +15,7 @@ export async function resolveElement(
   mod: Record<string, unknown>,
   options?: ResolveElementOptions,
 ): Promise<ReactElement> {
+  const checkElement = options?.isValidElement ?? defaultIsValidElement;
   const exported = mod.default;
 
   if (exported === undefined) {
@@ -50,7 +52,7 @@ export async function resolveElement(
       );
     }
     const result = await (exported as (data: unknown) => ReactElement | Promise<ReactElement>)(data);
-    if (!isValidElement(result)) {
+    if (!checkElement(result)) {
       throw new Error(
         `Default export function did not return a valid Forme element.\n` +
         `  Got: ${typeof result}\n` +
@@ -60,14 +62,14 @@ export async function resolveElement(
     return result;
   }
 
-  if (isValidElement(exported)) {
+  if (checkElement(exported)) {
     if (options?.dataPath) {
       console.warn(
         `Warning: --data flag provided but default export is a static element, not a function.\n` +
         `  The data file will be ignored. Export a function to use --data.`
       );
     }
-    return exported;
+    return exported as ReactElement;
   }
 
   throw new Error(

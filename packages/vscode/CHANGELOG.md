@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.7.11] - 2026-03-24
+
+### Fixed
+- Fix React instance mismatch when previewing templates from external projects (e.g. Next.js apps with their own `node_modules/react`)
+
 ## [0.7.10] - 2026-03-24
 
 ### Fixed
