@@ -15,14 +15,12 @@ describe('resolveElement', () => {
     expect(result).toBe(el);
   });
 
-  it('calls a function default export with empty object when no data', async () => {
+  it('throws when function default export has no data', async () => {
     const el = React.createElement('div', null, 'from fn');
     const fn = vi.fn().mockReturnValue(el);
     const mod = { default: fn };
 
-    const result = await resolveElement(mod);
-    expect(fn).toHaveBeenCalledWith({});
-    expect(result).toBe(el);
+    await expect(resolveElement(mod)).rejects.toThrow('no data file was found');
   });
 
   it('calls a function default export with provided data', async () => {
@@ -50,7 +48,7 @@ describe('resolveElement', () => {
   it('throws when function returns non-element', async () => {
     const fn = vi.fn().mockReturnValue('not an element');
     const mod = { default: fn };
-    await expect(resolveElement(mod as any)).rejects.toThrow(
+    await expect(resolveElement(mod as any, { data: {} })).rejects.toThrow(
       'did not return a valid Forme element'
     );
   });
