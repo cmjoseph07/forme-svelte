@@ -33,11 +33,21 @@ export async function resolveElement(
   }
 
   if (typeof exported === 'function') {
-    let data: unknown = {};
+    let data: unknown;
     if (options?.data !== undefined) {
       data = options.data;
     } else if (options?.dataPath) {
       data = await loadJsonData(options.dataPath);
+    }
+    if (data === undefined) {
+      throw new Error(
+        `Default export is a function but no data file was found.\n\n` +
+        `  Create a companion data file next to your template:\n` +
+        `    • MyTemplate.data.json\n` +
+        `    • MyTemplate-data.json\n` +
+        `    • MyTemplate.json\n\n` +
+        `  The JSON will be passed as the first argument to your function.`
+      );
     }
     const result = await (exported as (data: unknown) => ReactElement | Promise<ReactElement>)(data);
     if (!isValidElement(result)) {

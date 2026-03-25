@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.10] - 2026-03-24
+
+### Fixed
+- Clear error message when a template exports a function but no companion data file is found (instead of crashing with "Cannot read properties of undefined")
+
+### Changed
+- Updated `@formepdf/renderer` to 0.7.12
+
 ## [0.7.9] - 2026-03-17
 
 ### Changed
