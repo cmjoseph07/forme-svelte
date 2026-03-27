@@ -61,6 +61,64 @@ Remove all globally registered fonts. Useful in tests.
 Font.clear();
 ```
 
+### Multiple weights in one call
+
+You can register multiple weights for the same family using the `fonts` array syntax:
+
+```tsx
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: './fonts/Inter-Regular.ttf', fontWeight: 400 },
+    { src: './fonts/Inter-Bold.ttf', fontWeight: 700 },
+    { src: './fonts/Inter-Italic.ttf', fontWeight: 400, fontStyle: 'italic' },
+  ],
+});
+```
+
+## Google Fonts
+
+You can register fonts directly from a URL. Google Fonts `.woff2` URLs work:
+
+```tsx
+import { Font, Document, Page, Text } from '@formepdf/react';
+
+Font.register({
+  family: 'Inter',
+  fonts: [
+    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiA.woff2', fontWeight: 400 },
+    { src: 'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuI6fAZ9hiA.woff2', fontWeight: 700 },
+  ],
+});
+
+export default function Doc(data) {
+  return (
+    <Document>
+      <Page>
+        <Text style={{ fontFamily: 'Inter', fontWeight: 700, fontSize: 24 }}>Bold heading</Text>
+        <Text style={{ fontFamily: 'Inter', fontSize: 12 }}>Regular body text</Text>
+      </Page>
+    </Document>
+  );
+}
+```
+
+<Tip>
+To find the direct `.woff2` URL for a Google Font, open `https://fonts.googleapis.com/css2?family=Inter:wght@400;700` in your browser and copy the `url()` value from the CSS.
+</Tip>
+
+## Font fallback chains
+
+Specify multiple font families separated by commas. Forme tries each family in order per character, so mixed-script text (e.g., English + Arabic) works automatically:
+
+```tsx
+<Text style={{ fontFamily: 'Inter, Noto Sans' }}>
+  English text and عربي in the same paragraph
+</Text>
+```
+
+If a character isn't covered by `Inter`, Forme tries `Noto Sans`. If no font in the chain covers the character, the builtin Noto Sans is used as a final fallback.
+
 ## Document fonts prop
 
 Register fonts per-document instead of globally:
@@ -126,3 +184,39 @@ const pdf = await renderDocument(
   </Document>
 );
 ```
+
+## Troubleshooting
+
+### Text renders in Helvetica instead of my custom font
+
+The `fontFamily` in your style must exactly match the `family` you passed to `Font.register()`. Font names are case-sensitive.
+
+```tsx
+// Registration
+Font.register({ family: 'Inter', src: './fonts/Inter-Regular.ttf' });
+
+// ✅ Correct
+<Text style={{ fontFamily: 'Inter' }}>Works</Text>
+
+// ❌ Wrong — case mismatch
+<Text style={{ fontFamily: 'inter' }}>Falls back to Helvetica</Text>
+```
+
+### Bold or italic text falls back to Helvetica
+
+You need to register each weight and style variant separately. If you register only the regular weight and use `fontWeight: 700`, Forme will look for a bold variant, not find one, and fall back.
+
+```tsx
+// Only regular registered — bold will fall back
+Font.register({ family: 'Inter', src: './fonts/Inter-Regular.ttf' });
+
+// Fix: register the bold variant too
+Font.register({ family: 'Inter', src: './fonts/Inter-Bold.ttf', fontWeight: 700 });
+```
+
+### Non-Latin characters show as boxes or question marks
+
+The font you're using doesn't cover those characters. Either:
+1. Register a font that covers them (e.g., Noto Sans for broad Unicode support)
+2. Use a [font fallback chain](#font-fallback-chains): `fontFamily: 'Inter, Noto Sans'`
+3. Do nothing — Forme's builtin Noto Sans provides automatic fallback for most scripts

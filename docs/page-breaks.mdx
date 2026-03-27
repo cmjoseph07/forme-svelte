@@ -118,6 +118,66 @@ Use `<Fixed>` to repeat content on every page. Fixed elements reduce the availab
 
 Fixed elements appear in the page margin area (between the page edge and the content boundary). They are drawn on every page that the parent `<Page>` produces.
 
+### Full example: header, footer with page numbers, and content
+
+```tsx
+import { Document, Page, View, Text, Fixed, Table, Row, Cell } from '@formepdf/react';
+
+export default function Report(data) {
+  return (
+    <Document>
+      <Page size="A4" margin={54}>
+        {/* Repeating header */}
+        <Fixed position="header">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingBottom: 12, borderWidth: { top: 0, right: 0, bottom: 1, left: 0 }, borderColor: '#e2e8f0' }}>
+            <Text style={{ fontSize: 10, fontWeight: 700, color: '#1e293b' }}>My Company</Text>
+            <Text style={{ fontSize: 9, color: '#94a3b8' }}>Confidential</Text>
+          </View>
+        </Fixed>
+
+        {/* Repeating footer with page numbers */}
+        <Fixed position="footer">
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingTop: 12, borderWidth: { top: 1, right: 0, bottom: 0, left: 0 }, borderColor: '#e2e8f0' }}>
+            <Text style={{ fontSize: 9, color: '#94a3b8' }}>formepdf.com</Text>
+            <Text style={{ fontSize: 9, color: '#94a3b8' }}>
+              Page {'{{pageNumber}}'} of {'{{totalPages}}'}
+            </Text>
+          </View>
+        </Fixed>
+
+        {/* Page content — flows across as many pages as needed */}
+        <Text style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Quarterly Report</Text>
+        <Table columns={[{ width: { fraction: 0.5 } }, { width: { fraction: 0.5 } }]}>
+          <Row header style={{ backgroundColor: '#1e293b' }}>
+            <Cell style={{ padding: 8 }}><Text style={{ color: '#fff', fontWeight: 700 }}>Item</Text></Cell>
+            <Cell style={{ padding: 8 }}><Text style={{ color: '#fff', fontWeight: 700 }}>Amount</Text></Cell>
+          </Row>
+          {data.items.map((item, i) => (
+            <Row key={i}>
+              <Cell style={{ padding: 8 }}><Text>{item.name}</Text></Cell>
+              <Cell style={{ padding: 8 }}><Text>{item.amount}</Text></Cell>
+            </Row>
+          ))}
+        </Table>
+      </Page>
+    </Document>
+  );
+}
+```
+
+The header and footer repeat on every page automatically. The content area between them is reduced accordingly, so you don't need to calculate available space.
+
+### Watermarks
+
+For text that appears behind content on every page, use the [`<Watermark>`](/components#watermark) component instead of `<Fixed>`:
+
+```tsx
+<Page>
+  <Watermark text="DRAFT" fontSize={60} color="rgba(0,0,0,0.08)" angle={-45} />
+  <Text>Content renders on top of the watermark.</Text>
+</Page>
+```
+
 ## Dynamic page numbers
 
 Use these placeholders in any `<Text>` element:

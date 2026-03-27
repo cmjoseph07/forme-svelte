@@ -33,6 +33,10 @@ import { Document, Page, View, Text } from '@formepdf/react';
 
 The `tw()` function returns a plain `FormeStyle` object. You can spread it, merge it, or pass it directly to `style`.
 
+<Note>
+`className` is **not** supported. Forme components don't have a DOM, so there's no CSS cascade. Use `tw()` to convert classes into a style object and pass it to the `style` prop.
+</Note>
+
 ## How it works
 
 `tw()` parses a space-separated string of Tailwind classes and returns the equivalent Forme style object. Unknown classes are silently ignored. When classes conflict, the last one wins.
