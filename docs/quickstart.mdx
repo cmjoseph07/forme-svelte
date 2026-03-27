@@ -61,7 +61,7 @@ export default (
 ## 3. Preview in the browser
 
 ```bash
-npx forme dev invoice.tsx
+npx @formepdf/cli dev invoice.tsx
 ```
 
 Open [http://localhost:4242](http://localhost:4242). You will see your invoice rendered as a PDF in the browser with live reload. Edit `invoice.tsx` and the preview updates instantly.
@@ -76,7 +76,7 @@ Click any element to inspect its computed styles and box model.
 ## 4. Build to PDF
 
 ```bash
-npx forme build invoice.tsx -o invoice.pdf
+npx @formepdf/cli build invoice.tsx -o invoice.pdf
 ```
 
 This writes a valid PDF file. Open it in any PDF viewer.
@@ -128,7 +128,7 @@ export default function Invoice(data: any) {
 Then pass data via the `--data` flag:
 
 ```bash
-npx forme build invoice.tsx --data data.json -o invoice.pdf
+npx @formepdf/cli build invoice.tsx --data data.json -o invoice.pdf
 ```
 
 ## 6. Render in the browser
