@@ -1,13 +1,17 @@
 ---
 title: Components
 sidebarTitle: Components
-description: All Forme React components for PDF generation - Document, Page, View, Text, Image, Table, Row, Cell, Fixed, PageBreak, Svg, QrCode, and Barcode.
+description: All Forme React components for PDF generation - Document, Page, View, Text, Image, Table, Row, Cell, Fixed, PageBreak, Svg, QrCode, Barcode, BarChart, LineChart, PieChart, AreaChart, DotPlot, Canvas, and Watermark.
 ---
 
-Forme provides 12 components for building PDF documents. All components are imported from `@formepdf/react`.
+Forme provides 19 components for building PDF documents. All components are imported from `@formepdf/react`.
 
 ```tsx
-import { Document, Page, View, Text, Image, Svg, QrCode, Barcode, Table, Row, Cell, Fixed, PageBreak } from '@formepdf/react';
+import {
+  Document, Page, View, Text, Image, Svg, QrCode, Barcode,
+  Table, Row, Cell, Fixed, PageBreak, Canvas, Watermark,
+  BarChart, LineChart, PieChart, AreaChart, DotPlot,
+} from '@formepdf/react';
 ```
 
 ---
@@ -529,7 +533,7 @@ Colors use 0-255 RGB values (like HTML Canvas). Content is clipped to the canvas
 
 ## BarChart
 
-A bar chart rendered as SVG with positioned text labels.
+Engine-native bar chart rendered directly to PDF vector graphics.
 
 ### Props
 
@@ -537,12 +541,12 @@ A bar chart rendered as SVG with positioned text labels.
 |------|------|---------|-------------|
 | `width` | `number` | — | Chart width in points. |
 | `height` | `number` | — | Chart height in points. |
-| `data` | `{ label: string; value: number }[]` | — | Data points. |
-| `color` | `string` | `'#1a365d'` | Bar color (hex). |
-| `barGap` | `number` | `4` | Gap between bars in points. |
+| `data` | `ChartDataPoint[]` | — | Data points (`{ label, value, color? }`). |
+| `color` | `string` | `'#1a365d'` | Default bar color (hex). Per-item `color` overrides this. |
+| `showLabels` | `boolean` | `true` | Show category labels on the X axis. |
 | `showGrid` | `boolean` | `false` | Show horizontal grid lines. |
 | `showValues` | `boolean` | `false` | Show value labels above bars. |
-| `yAxisTicks` | `number` | `5` | Number of Y-axis tick marks. |
+| `title` | `string` | — | Chart title displayed above the chart. |
 
 ### Example
 
@@ -565,7 +569,7 @@ A bar chart rendered as SVG with positioned text labels.
 
 ## LineChart
 
-A line chart rendered as SVG with optional dots and area fill.
+Engine-native multi-series line chart with optional data points and grid.
 
 ### Props
 
@@ -573,13 +577,11 @@ A line chart rendered as SVG with optional dots and area fill.
 |------|------|---------|-------------|
 | `width` | `number` | — | Chart width in points. |
 | `height` | `number` | — | Chart height in points. |
-| `data` | `{ label: string; value: number }[]` | — | Data points. |
-| `color` | `string` | `'#1a365d'` | Line color (hex). |
-| `strokeWidth` | `number` | `2` | Line thickness. |
+| `series` | `ChartSeries[]` | — | Data series (`{ name, data: number[], color? }`). |
+| `labels` | `string[]` | — | X-axis labels (one per data point). |
+| `showPoints` | `boolean` | `false` | Show dots at data points. |
 | `showGrid` | `boolean` | `false` | Show horizontal grid lines. |
-| `showDots` | `boolean` | `false` | Show dots at data points. |
-| `showArea` | `boolean` | `false` | Fill area under the line. |
-| `yAxisTicks` | `number` | `5` | Number of Y-axis tick marks. |
+| `title` | `string` | — | Chart title. |
 
 ### Example
 
@@ -587,15 +589,13 @@ A line chart rendered as SVG with optional dots and area fill.
 <LineChart
   width={400}
   height={200}
-  data={[
-    { label: 'W1', value: 120 },
-    { label: 'W2', value: 190 },
-    { label: 'W3', value: 160 },
+  series={[
+    { name: 'Revenue', data: [120, 190, 160, 220], color: '#3b82f6' },
+    { name: 'Expenses', data: [80, 110, 95, 130], color: '#ef4444' },
   ]}
-  color="#0f172a"
+  labels={['Q1', 'Q2', 'Q3', 'Q4']}
   showGrid
-  showDots
-  showArea
+  showPoints
 />
 ```
 
@@ -603,7 +603,7 @@ A line chart rendered as SVG with optional dots and area fill.
 
 ## PieChart
 
-A pie or donut chart rendered as SVG with optional labels.
+Engine-native pie or donut chart with optional legend.
 
 ### Props
 
@@ -611,9 +611,10 @@ A pie or donut chart rendered as SVG with optional labels.
 |------|------|---------|-------------|
 | `width` | `number` | — | Chart width in points. |
 | `height` | `number` | — | Chart height in points. |
-| `data` | `{ label: string; value: number; color: string }[]` | — | Slices with colors. |
-| `innerRadius` | `number` | `0` | Inner radius for donut chart. `0` = full pie. |
-| `showLabels` | `boolean` | `false` | Show labels outside the chart. |
+| `data` | `ChartDataPoint[]` | — | Slices (`{ label, value, color? }`). Each slice should have a `color`. |
+| `donut` | `boolean` | `false` | Cut out the center to create a donut chart. |
+| `showLegend` | `boolean` | `false` | Show a legend beside the chart. |
+| `title` | `string` | — | Chart title. |
 
 ### Example
 
@@ -626,8 +627,77 @@ A pie or donut chart rendered as SVG with optional labels.
     { label: 'Services', value: 28, color: '#0f172a' },
     { label: 'Other', value: 30, color: '#cbd5e1' },
   ]}
-  innerRadius={30}
-  showLabels
+  donut
+  showLegend
+/>
+```
+
+---
+
+## AreaChart
+
+Engine-native multi-series area chart — like LineChart with semi-transparent fill under each line.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `series` | `ChartSeries[]` | — | Data series (`{ name, data: number[], color? }`). |
+| `labels` | `string[]` | — | X-axis labels. |
+| `showGrid` | `boolean` | `false` | Show horizontal grid lines. |
+| `title` | `string` | — | Chart title. |
+
+### Example
+
+```tsx
+<AreaChart
+  width={400}
+  height={200}
+  series={[
+    { name: 'Organic', data: [500, 800, 1200, 1800], color: '#3b82f6' },
+    { name: 'Paid', data: [200, 400, 600, 900], color: '#f59e0b' },
+  ]}
+  labels={['Q1', 'Q2', 'Q3', 'Q4']}
+  showGrid
+  title="Traffic Sources"
+/>
+```
+
+---
+
+## DotPlot
+
+Engine-native scatter plot for (x, y) data with multiple groups.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `groups` | `DotPlotGroup[]` | — | Groups (`{ name, color?, data: [x, y][] }`). |
+| `xMin` / `xMax` | `number` | auto | X-axis range. |
+| `yMin` / `yMax` | `number` | auto | Y-axis range. |
+| `xLabel` | `string` | — | X-axis label. |
+| `yLabel` | `string` | — | Y-axis label. |
+| `showLegend` | `boolean` | `false` | Show legend. |
+| `dotSize` | `number` | `4` | Dot radius in points. |
+
+### Example
+
+```tsx
+<DotPlot
+  width={300}
+  height={200}
+  groups={[
+    { name: 'API v1', color: '#3b82f6', data: [[10, 45], [50, 120], [100, 230]] },
+    { name: 'API v2', color: '#10b981', data: [[10, 25], [50, 60], [100, 110]] },
+  ]}
+  xLabel="Requests"
+  yLabel="Latency (ms)"
+  showLegend
 />
 ```
 

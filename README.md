@@ -171,9 +171,11 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | `<QrCode>` | QR code. `data`, `size`, `color`. Vector-based. |
 | `<Barcode>` | 1D barcode. `data`, `format`, `width`, `height`, `color`. Code 128, Code 39, EAN-13, EAN-8, Codabar. |
 | `<Canvas>` | Arbitrary vector drawing via `draw` callback. |
-| `<BarChart>` | Bar chart. `data`, `color`, `showGrid`, `showValues`. |
-| `<LineChart>` | Line chart. `data`, `color`, `showDots`, `showArea`. |
-| `<PieChart>` | Pie/donut chart. `data`, `innerRadius`, `showLabels`. |
+| `<BarChart>` | Bar chart. `data`, `color`, `showGrid`, `showValues`, `title`. |
+| `<LineChart>` | Multi-series line chart. `series`, `labels`, `showPoints`, `showGrid`, `title`. |
+| `<PieChart>` | Pie/donut chart. `data`, `donut`, `showLegend`, `title`. |
+| `<AreaChart>` | Multi-series area chart. `series`, `labels`, `showGrid`, `title`. |
+| `<DotPlot>` | Scatter plot. `groups`, `xLabel`, `yLabel`, `showLegend`, `dotSize`. |
 | `<Watermark>` | Rotated text behind page content. `text`, `fontSize`, `color`, `angle`. |
 | `<Fixed>` | Repeating header or footer. |
 | `<PageBreak>` | Force a page break. |
@@ -198,7 +200,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Bookmarks | `bookmark` prop on any element | Yes | No |
 | QR codes | Built-in `<QrCode>` component | No | Via HTML/JS libraries |
 | Barcodes | Built-in `<Barcode>` (5 formats) | No | Via HTML/JS libraries |
-| Charts | Built-in BarChart, LineChart, PieChart | No | Via HTML/JS libraries |
+| Charts | Engine-native BarChart, LineChart, PieChart, AreaChart, DotPlot | No | Via HTML/JS libraries |
 | VS Code extension | Native sidebar panels | No | No |
 | Canvas drawing | `<Canvas draw={...}>` for custom vector graphics | No | HTML Canvas (raster) |
 | Watermarks | Built-in `<Watermark>` component | No | Manual positioning |
@@ -221,6 +223,7 @@ See the [templates/](./templates) directory for production-ready examples:
 - Shipping Label
 - Typography
 - Grid Dashboard
+- Charts Showcase
 - Event Ticket
 
 ## Tailwind CSS

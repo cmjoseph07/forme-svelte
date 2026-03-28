@@ -1,46 +1,191 @@
 ---
 title: "Charts"
 sidebarTitle: "Charts"
-description: "Built-in chart components and custom charts via SVG."
+description: "Engine-native chart components rendered as PDF vector graphics."
 ---
 
 # Charts
 
-Forme includes built-in chart components for common chart types. For more complex charts, you can use any library that outputs SVG strings.
+Forme includes five engine-native chart components that render directly to PDF vector graphics. Charts are processed by the Rust engine — no SVG intermediary, no external dependencies. The output is crisp at any zoom level and adds minimal file size.
 
 ## Built-in chart components
 
-Forme provides `<BarChart>`, `<LineChart>`, and `<PieChart>` components that render directly to PDF vector graphics. No external dependencies needed.
+```tsx
+import { BarChart, LineChart, PieChart, AreaChart, DotPlot } from '@formepdf/react';
+```
+
+### BarChart
+
+Simple category bar chart with optional grid, value labels, and title.
 
 ```tsx
-import { BarChart, LineChart, PieChart } from '@formepdf/react';
-
-const data = [
-  { label: 'Jan', value: 42 },
-  { label: 'Feb', value: 58 },
-  { label: 'Mar', value: 45 },
-];
-
-// Bar chart with grid lines and value labels
-<BarChart width={400} height={200} data={data} color="#3b82f6" showGrid showValues />
-
-// Line chart with dots and area fill
-<LineChart width={400} height={200} data={data} color="#0f172a" showGrid showDots showArea />
-
-// Donut chart with labels
-<PieChart
-  width={200} height={200}
+<BarChart
+  width={400}
+  height={200}
   data={[
-    { label: 'A', value: 40, color: '#3b82f6' },
-    { label: 'B', value: 30, color: '#0f172a' },
-    { label: 'C', value: 30, color: '#cbd5e1' },
+    { label: 'Q1', value: 142000 },
+    { label: 'Q2', value: 186000 },
+    { label: 'Q3', value: 164000 },
+    { label: 'Q4', value: 228000 },
   ]}
-  innerRadius={30}
+  color="#3b82f6"
   showLabels
+  showValues
+  showGrid
+  title="Revenue by Quarter"
 />
 ```
 
-See the [Components reference](/components#barchart) for full props documentation.
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `data` | `ChartDataPoint[]` | — | Data points (`{ label, value, color? }`). |
+| `color` | `string` | `"#1a365d"` | Default bar color (hex). Per-item `color` overrides this. |
+| `showLabels` | `boolean` | `true` | Show category labels on the X axis. |
+| `showGrid` | `boolean` | `false` | Show horizontal grid lines. |
+| `showValues` | `boolean` | `false` | Show value labels above each bar. |
+| `title` | `string` | — | Chart title displayed above the chart. |
+
+### LineChart
+
+Multi-series line chart with optional data points and grid.
+
+```tsx
+<LineChart
+  width={500}
+  height={200}
+  series={[
+    { name: 'Active Users', data: [1200, 1800, 2400, 3100, 3800, 4200], color: '#3b82f6' },
+    { name: 'New Signups', data: [400, 600, 800, 900, 1100, 1000], color: '#10b981' },
+  ]}
+  labels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']}
+  showPoints
+  showGrid
+  title="User Growth"
+/>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `series` | `ChartSeries[]` | — | Series array (`{ name, data: number[], color? }`). |
+| `labels` | `string[]` | — | X-axis labels (one per data point). |
+| `showPoints` | `boolean` | `false` | Show dots at data points. |
+| `showGrid` | `boolean` | `false` | Show horizontal grid lines. |
+| `title` | `string` | — | Chart title. |
+
+### PieChart
+
+Pie or donut chart with optional legend.
+
+```tsx
+<PieChart
+  width={200}
+  height={200}
+  data={[
+    { label: 'Subscriptions', value: 62, color: '#3b82f6' },
+    { label: 'Enterprise', value: 28, color: '#0f172a' },
+    { label: 'Services', value: 10, color: '#94a3b8' },
+  ]}
+  donut
+  showLegend
+  title="Revenue Split"
+/>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `data` | `ChartDataPoint[]` | — | Slices (`{ label, value, color? }`). Each slice should have a `color`. |
+| `donut` | `boolean` | `false` | Cut out the center to create a donut chart. |
+| `showLegend` | `boolean` | `false` | Show a legend beside the chart. |
+| `title` | `string` | — | Chart title. |
+
+### AreaChart
+
+Multi-series area chart — like LineChart but with semi-transparent fill under each line.
+
+```tsx
+<AreaChart
+  width={500}
+  height={200}
+  series={[
+    { name: 'Organic', data: [500, 800, 1200, 1800, 2600, 3200], color: '#3b82f6' },
+    { name: 'Paid', data: [200, 400, 600, 900, 1100, 1400], color: '#f59e0b' },
+    { name: 'Referral', data: [100, 150, 250, 400, 500, 600], color: '#10b981' },
+  ]}
+  labels={['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun']}
+  showGrid
+  title="Traffic Sources"
+/>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `series` | `ChartSeries[]` | — | Series array (`{ name, data: number[], color? }`). |
+| `labels` | `string[]` | — | X-axis labels. |
+| `showGrid` | `boolean` | `false` | Show horizontal grid lines. |
+| `title` | `string` | — | Chart title. |
+
+### DotPlot
+
+Scatter plot for (x, y) data with multiple groups and optional axis labels.
+
+```tsx
+<DotPlot
+  width={300}
+  height={200}
+  groups={[
+    { name: 'API v1', color: '#3b82f6', data: [[10, 45], [50, 120], [100, 230]] },
+    { name: 'API v2', color: '#10b981', data: [[10, 25], [50, 60], [100, 110]] },
+  ]}
+  xLabel="Concurrent Requests"
+  yLabel="Latency (ms)"
+  showLegend
+  dotSize={3.5}
+/>
+```
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `width` | `number` | — | Chart width in points. |
+| `height` | `number` | — | Chart height in points. |
+| `groups` | `DotPlotGroup[]` | — | Groups (`{ name, color?, data: [x, y][] }`). |
+| `xMin` / `xMax` | `number` | — | X-axis range (auto-computed if omitted). |
+| `yMin` / `yMax` | `number` | — | Y-axis range (auto-computed if omitted). |
+| `xLabel` | `string` | — | X-axis label. |
+| `yLabel` | `string` | — | Y-axis label. |
+| `showLegend` | `boolean` | `false` | Show legend. |
+| `dotSize` | `number` | `4` | Dot radius in points. |
+
+## Shared types
+
+```tsx
+interface ChartDataPoint {
+  label: string;
+  value: number;
+  color?: string;  // hex color, e.g. "#3b82f6"
+}
+
+interface ChartSeries {
+  name: string;
+  data: number[];
+  color?: string;
+}
+
+interface DotPlotGroup {
+  name: string;
+  color?: string;
+  data: [number, number][];  // [x, y] pairs
+}
+```
+
+See the [Components reference](/components#barchart) for the full prop tables.
 
 ## Custom charts with SVG
 
