@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.7.13] - 2026-03-28
+
+### Added
+- WASM rebuilt with engine-native chart support (BarChart, LineChart, PieChart, AreaChart, DotPlot)
+- `renderSerializedDoc()` and `renderSerializedDocWithLayout()` in browser entry point
+
 ## [0.7.12] - 2026-03-24
 
 ### Fixed

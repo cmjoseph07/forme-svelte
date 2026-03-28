@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.13] - 2026-03-28
+
+### Added
+- `<AreaChart>` component for multi-series area charts
+- `<DotPlot>` component for scatter plots with grouped (x, y) data
+- `ChartSeries`, `DotPlotGroup`, `AreaChartProps`, `DotPlotProps` type exports
+
+### Changed
+- `<BarChart>`, `<LineChart>`, `<PieChart>` are now engine-native intrinsic elements (serialized directly to engine JSON)
+- `<LineChart>` API: `series` + `labels` replace old `data` + `color` props (multi-series support)
+- `<PieChart>` API: `donut` boolean replaces `innerRadius`; `showLegend` replaces `showLabels`
+- Old SVG-based implementations renamed to `LegacyBarChart`, `LegacyLineChart`, `LegacyPieChart`
+
 ## [0.7.12] - 2026-03-24
 
 _Dependency bump only._

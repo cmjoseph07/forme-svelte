@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.7.13] - 2026-03-28
+
+### Added
+- `chart/` module with shared types (`ChartPrimitive`, `TextAnchor`) and per-type builders (`bar.rs`, `line.rs`, `pie.rs`, `area.rs`, `dot.rs`)
+- Five `NodeKind` variants: `BarChart`, `LineChart`, `PieChart`, `AreaChart`, `DotPlot`
+- `DrawCommand::Chart { primitives }` with PDF rendering (Y-flip transform, arc sector bezier approximation, Helvetica labels)
+- `ChartDataPoint`, `ChartSeries`, `DotPlotGroup` data structs
+- 10 integration tests for chart rendering
+
 ## [0.7.9] - 2026-03-17
 
 _Version bump only._

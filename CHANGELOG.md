@@ -2,6 +2,21 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.7.13] - 2026-03-28
+
+### Added
+- **Engine-native chart components**: `<BarChart>`, `<LineChart>`, `<PieChart>`, `<AreaChart>`, and `<DotPlot>` are now rendered directly by the Rust engine as PDF vector primitives — no SVG intermediary
+- **AreaChart**: New multi-series area chart with semi-transparent fill under each line
+- **DotPlot**: New scatter plot for (x, y) data with multiple groups and axis labels
+- **Multi-series LineChart**: `series` + `labels` props replace the old single-series `data` + `color` API
+- **PieChart donut mode**: `donut` boolean prop replaces `innerRadius`; `showLegend` replaces `showLabels`
+- Python SDK: `BarChart`, `LineChart`, `PieChart`, `AreaChart`, `DotPlot` classes
+- `renderSerializedDoc()` and `renderSerializedDocWithLayout()` in `@formepdf/core/browser` for rendering pre-serialized documents
+- `charts-showcase.tsx` template demonstrating all five chart types
+
+### Changed
+- Old SVG-based chart implementations preserved as `LegacyBarChart`, `LegacyLineChart`, `LegacyPieChart` for migration
+
 ## [0.7.12] - 2026-03-24
 
 ### Fixed
