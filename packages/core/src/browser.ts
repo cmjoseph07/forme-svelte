@@ -164,6 +164,41 @@ export async function renderDocumentWithLayout(
   return renderPdfWithLayout(JSON.stringify(doc));
 }
 
+// ── Serialized document rendering ────────────────────────────────────
+
+/**
+ * Render a pre-serialized document object (from `serialize()`) to PDF,
+ * resolving any HTTP image/font URLs to data URIs first.
+ *
+ * Use this when you have a serialized doc (e.g. from a web worker that
+ * calls `serialize()` directly) and need image resolution without going
+ * through the React element–based `renderDocument()`.
+ */
+export async function renderSerializedDoc(
+  doc: Record<string, unknown>,
+  options?: RenderDocumentOptions,
+): Promise<Uint8Array> {
+  if (options?.embedData !== undefined) {
+    doc.embeddedData = JSON.stringify(options.embedData);
+  }
+  await Promise.all([resolveFonts(doc), resolveImages(doc)]);
+  return renderPdf(JSON.stringify(doc));
+}
+
+/**
+ * Like `renderSerializedDoc` but also returns layout info for overlays.
+ */
+export async function renderSerializedDocWithLayout(
+  doc: Record<string, unknown>,
+  options?: RenderDocumentOptions,
+): Promise<RenderWithLayoutResult> {
+  if (options?.embedData !== undefined) {
+    doc.embeddedData = JSON.stringify(options.embedData);
+  }
+  await Promise.all([resolveFonts(doc), resolveImages(doc)]);
+  return renderPdfWithLayout(JSON.stringify(doc));
+}
+
 // ── Template rendering ──────────────────────────────────────────────
 
 export async function renderTemplate(
