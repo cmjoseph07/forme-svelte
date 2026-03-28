@@ -1,11 +1,44 @@
 import React from 'react';
 import { View, Text, Svg } from './components.js';
 import type {
-  BarChartProps,
-  LineChartProps,
-  PieChartProps,
   Style,
+  ChartDataPoint,
+  PieDataPoint,
 } from './types.js';
+
+// Legacy chart props — these match the old interface before engine-native charts.
+interface LegacyBarChartProps {
+  width: number;
+  height: number;
+  data: ChartDataPoint[];
+  color?: string;
+  barGap?: number;
+  showGrid?: boolean;
+  showValues?: boolean;
+  yAxisTicks?: number;
+  style?: Style;
+}
+
+interface LegacyLineChartProps {
+  width: number;
+  height: number;
+  data: ChartDataPoint[];
+  color?: string;
+  strokeWidth?: number;
+  showDots?: boolean;
+  showGrid?: boolean;
+  showArea?: boolean;
+  style?: Style;
+}
+
+interface LegacyPieChartProps {
+  width: number;
+  height: number;
+  data: PieDataPoint[];
+  showLabels?: boolean;
+  innerRadius?: number;
+  style?: Style;
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -64,7 +97,7 @@ const X_AXIS_HEIGHT = 20;
  *   color="#1a365d" showGrid showValues />
  * ```
  */
-export function BarChart(props: BarChartProps): React.ReactElement {
+export function LegacyBarChart(props: LegacyBarChartProps): React.ReactElement {
   const {
     width, height, data,
     color = '#1a365d',
@@ -191,7 +224,7 @@ export function BarChart(props: BarChartProps): React.ReactElement {
  *   color="#2b6cb0" showDots showGrid showArea />
  * ```
  */
-export function LineChart(props: LineChartProps): React.ReactElement {
+export function LegacyLineChart(props: LegacyLineChartProps): React.ReactElement {
   const {
     width, height, data,
     color = '#2b6cb0',
@@ -330,7 +363,7 @@ export function LineChart(props: LineChartProps): React.ReactElement {
  *   showLabels />
  * ```
  */
-export function PieChart(props: PieChartProps): React.ReactElement {
+export function LegacyPieChart(props: LegacyPieChartProps): React.ReactElement {
   const {
     width, height, data,
     showLabels = false,

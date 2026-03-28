@@ -283,17 +283,35 @@ export interface BarcodeProps {
   style?: Style;
 }
 
-/** Data point for bar and line charts. */
+/** Data point for bar and pie charts. */
 export interface ChartDataPoint {
   label: string;
   value: number;
+  /** Optional per-item color (hex string). */
+  color?: string;
 }
 
-/** Data point for pie charts with per-slice color. */
+/** @deprecated Use ChartDataPoint instead (color is now optional on ChartDataPoint). */
 export interface PieDataPoint {
   label: string;
   value: number;
   color: string;
+}
+
+/** A data series for multi-series line and area charts. */
+export interface ChartSeries {
+  name: string;
+  data: number[];
+  /** Optional series color (hex string). */
+  color?: string;
+}
+
+/** A group of (x, y) data points for dot plots. */
+export interface DotPlotGroup {
+  name: string;
+  /** Optional group color (hex string). */
+  color?: string;
+  data: [number, number][];
 }
 
 export interface BarChartProps {
@@ -302,42 +320,81 @@ export interface BarChartProps {
   data: ChartDataPoint[];
   /** Bar color. Default: "#1a365d". */
   color?: string;
-  /** Gap between bars in points. Default: 4. */
-  barGap?: number;
+  /** Show X-axis labels below bars. Default: true. */
+  showLabels?: boolean;
   /** Show horizontal grid lines. Default: false. */
   showGrid?: boolean;
   /** Show value labels above bars. Default: false. */
   showValues?: boolean;
-  /** Number of Y-axis ticks. Default: 5. */
-  yAxisTicks?: number;
+  /** Chart title. */
+  title?: string;
   style?: Style;
 }
 
 export interface LineChartProps {
   width: number;
   height: number;
-  data: ChartDataPoint[];
-  /** Line color. Default: "#2b6cb0". */
-  color?: string;
-  /** Line stroke width. Default: 2. */
-  strokeWidth?: number;
+  /** Multi-series data. */
+  series: ChartSeries[];
+  /** X-axis labels. */
+  labels: string[];
   /** Show dots at data points. Default: false. */
-  showDots?: boolean;
+  showPoints?: boolean;
   /** Show horizontal grid lines. Default: false. */
   showGrid?: boolean;
-  /** Show filled area under the line. Default: false. */
-  showArea?: boolean;
+  /** Chart title. */
+  title?: string;
   style?: Style;
 }
 
 export interface PieChartProps {
   width: number;
   height: number;
-  data: PieDataPoint[];
-  /** Show labels outside slices. Default: false. */
-  showLabels?: boolean;
-  /** Inner radius for donut charts. Default: 0 (full pie). */
-  innerRadius?: number;
+  data: ChartDataPoint[];
+  /** Render as donut chart. Default: false. */
+  donut?: boolean;
+  /** Show legend. Default: false. */
+  showLegend?: boolean;
+  /** Chart title. */
+  title?: string;
+  style?: Style;
+}
+
+export interface AreaChartProps {
+  width: number;
+  height: number;
+  /** Multi-series data. */
+  series: ChartSeries[];
+  /** X-axis labels. */
+  labels: string[];
+  /** Show horizontal grid lines. Default: false. */
+  showGrid?: boolean;
+  /** Chart title. */
+  title?: string;
+  style?: Style;
+}
+
+export interface DotPlotProps {
+  width: number;
+  height: number;
+  /** Groups of (x, y) data points. */
+  groups: DotPlotGroup[];
+  /** Minimum X value. Auto-computed if omitted. */
+  xMin?: number;
+  /** Maximum X value. Auto-computed if omitted. */
+  xMax?: number;
+  /** Minimum Y value. Auto-computed if omitted. */
+  yMin?: number;
+  /** Maximum Y value. Auto-computed if omitted. */
+  yMax?: number;
+  /** X-axis label. */
+  xLabel?: string;
+  /** Y-axis label. */
+  yLabel?: string;
+  /** Show legend. Default: false. */
+  showLegend?: boolean;
+  /** Dot radius in points. Default: 4. */
+  dotSize?: number;
   style?: Style;
 }
 
@@ -489,6 +546,11 @@ export type FormeNodeKind =
   | { type: 'QrCode'; data: string; size?: number }
   | { type: 'Barcode'; data: string; format: BarcodeFormat; width?: number; height: number }
   | { type: 'Canvas'; width: number; height: number; operations: CanvasOp[] }
+  | { type: 'BarChart'; data: ChartDataPoint[]; width: number; height: number; color?: string; show_labels: boolean; show_values: boolean; show_grid: boolean; title?: string }
+  | { type: 'LineChart'; series: ChartSeries[]; labels: string[]; width: number; height: number; show_points: boolean; show_grid: boolean; title?: string }
+  | { type: 'PieChart'; data: ChartDataPoint[]; width: number; height: number; donut: boolean; show_legend: boolean; title?: string }
+  | { type: 'AreaChart'; series: ChartSeries[]; labels: string[]; width: number; height: number; show_grid: boolean; title?: string }
+  | { type: 'DotPlot'; groups: DotPlotGroup[]; width: number; height: number; x_min?: number; x_max?: number; y_min?: number; y_max?: number; x_label?: string; y_label?: string; show_legend: boolean; dot_size: number }
   | { type: 'Watermark'; text: string; font_size: number; angle: number }
   | { type: 'PageBreak' };
 

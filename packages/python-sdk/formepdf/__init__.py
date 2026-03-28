@@ -16,6 +16,11 @@ from .templates import (
     PageBreak,
     Fixed,
     Watermark,
+    BarChart,
+    LineChart,
+    PieChart,
+    AreaChart,
+    DotPlot,
 )
 
 __all__ = [
@@ -37,4 +42,10 @@ __all__ = [
     "PageBreak",
     "Fixed",
     "Watermark",
+    # Charts
+    "BarChart",
+    "LineChart",
+    "PieChart",
+    "AreaChart",
+    "DotPlot",
 ]

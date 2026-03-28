@@ -465,6 +465,123 @@ pub enum NodeKind {
         size: Option<f64>,
     },
 
+    /// A bar chart rendered as native vector graphics.
+    BarChart {
+        /// Data points with labels and values.
+        data: Vec<ChartDataPoint>,
+        /// Chart width in points.
+        width: f64,
+        /// Chart height in points.
+        height: f64,
+        /// Bar color (hex string). Defaults to "#1a365d".
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        color: Option<String>,
+        /// Show X-axis labels below bars.
+        #[serde(default = "default_true")]
+        show_labels: bool,
+        /// Show value labels above bars.
+        #[serde(default)]
+        show_values: bool,
+        /// Show horizontal grid lines.
+        #[serde(default)]
+        show_grid: bool,
+        /// Optional chart title.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
+
+    /// A line chart rendered as native vector graphics.
+    LineChart {
+        /// Data series (each with name, data points, optional color).
+        series: Vec<ChartSeries>,
+        /// X-axis labels.
+        labels: Vec<String>,
+        /// Chart width in points.
+        width: f64,
+        /// Chart height in points.
+        height: f64,
+        /// Show dots at data points.
+        #[serde(default)]
+        show_points: bool,
+        /// Show horizontal grid lines.
+        #[serde(default)]
+        show_grid: bool,
+        /// Optional chart title.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
+
+    /// A pie chart rendered as native vector graphics.
+    PieChart {
+        /// Data points with labels, values, and optional colors.
+        data: Vec<ChartDataPoint>,
+        /// Chart width in points.
+        width: f64,
+        /// Chart height in points.
+        height: f64,
+        /// Whether to render as donut (hollow center).
+        #[serde(default)]
+        donut: bool,
+        /// Show legend.
+        #[serde(default)]
+        show_legend: bool,
+        /// Optional chart title.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
+
+    /// An area chart rendered as native vector graphics.
+    AreaChart {
+        /// Data series (each with name, data points, optional color).
+        series: Vec<ChartSeries>,
+        /// X-axis labels.
+        labels: Vec<String>,
+        /// Chart width in points.
+        width: f64,
+        /// Chart height in points.
+        height: f64,
+        /// Show horizontal grid lines.
+        #[serde(default)]
+        show_grid: bool,
+        /// Optional chart title.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        title: Option<String>,
+    },
+
+    /// A dot plot (scatter plot) rendered as native vector graphics.
+    DotPlot {
+        /// Groups of data points.
+        groups: Vec<DotPlotGroup>,
+        /// Chart width in points.
+        width: f64,
+        /// Chart height in points.
+        height: f64,
+        /// Minimum X value. Auto-computed if not set.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        x_min: Option<f64>,
+        /// Maximum X value. Auto-computed if not set.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        x_max: Option<f64>,
+        /// Minimum Y value. Auto-computed if not set.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        y_min: Option<f64>,
+        /// Maximum Y value. Auto-computed if not set.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        y_max: Option<f64>,
+        /// X-axis label.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        x_label: Option<String>,
+        /// Y-axis label.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        y_label: Option<String>,
+        /// Show legend.
+        #[serde(default)]
+        show_legend: bool,
+        /// Dot radius in points.
+        #[serde(default = "default_dot_size")]
+        dot_size: f64,
+    },
+
     /// A watermark rendered as rotated text behind page content.
     Watermark {
         /// The watermark text (e.g. "DRAFT", "CONFIDENTIAL").
@@ -476,6 +593,33 @@ pub enum NodeKind {
         #[serde(default = "default_watermark_angle")]
         angle: f64,
     },
+}
+
+/// A data point for bar charts and pie charts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartDataPoint {
+    pub label: String,
+    pub value: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+/// A data series for line charts and area charts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChartSeries {
+    pub name: String,
+    pub data: Vec<f64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+}
+
+/// A group of data points for dot plots.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DotPlotGroup {
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    pub data: Vec<(f64, f64)>,
 }
 
 /// A canvas drawing operation.
@@ -584,6 +728,10 @@ fn default_barcode_height() -> f64 {
     60.0
 }
 
+fn default_dot_size() -> f64 {
+    4.0
+}
+
 fn default_watermark_font_size() -> f64 {
     60.0
 }
@@ -686,6 +834,11 @@ impl Node {
             NodeKind::Canvas { .. } => false,
             NodeKind::Barcode { .. } => false,
             NodeKind::QrCode { .. } => false,
+            NodeKind::BarChart { .. } => false,
+            NodeKind::LineChart { .. } => false,
+            NodeKind::PieChart { .. } => false,
+            NodeKind::AreaChart { .. } => false,
+            NodeKind::DotPlot { .. } => false,
             NodeKind::Watermark { .. } => false,
             NodeKind::PageBreak => false,
             NodeKind::Fixed { .. } => false,

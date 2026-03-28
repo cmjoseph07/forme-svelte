@@ -1015,6 +1015,32 @@ impl PdfWriter {
                 }
                 return;
             }
+
+            DrawCommand::Chart { primitives } => {
+                *element_counter += 1;
+                let _ = writeln!(stream, "q");
+                // Set up coordinate transform: Y-flip so chart primitives use top-left origin
+                let _ = writeln!(
+                    stream,
+                    "1 0 0 -1 {:.4} {:.4} cm",
+                    element.x,
+                    page_height - element.y
+                );
+
+                for prim in primitives {
+                    write_chart_primitive(stream, prim, element.height, builder);
+                }
+
+                let _ = writeln!(stream, "Q");
+                if tagged_mcid.is_some() {
+                    let _ = writeln!(stream, "EMC");
+                    if let Some(ref mut tb) = tag_builder {
+                        tb.end_element();
+                    }
+                }
+                return;
+            }
+
             DrawCommand::Watermark {
                 lines,
                 color,
@@ -1501,6 +1527,15 @@ impl PdfWriter {
                     if *opacity < 1.0 =>
                 {
                     opacities.push(*opacity);
+                }
+                DrawCommand::Chart { primitives } => {
+                    for prim in primitives {
+                        if let crate::chart::ChartPrimitive::FilledPath { opacity, .. } = prim {
+                            if *opacity < 1.0 {
+                                opacities.push(*opacity);
+                            }
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -2234,6 +2269,245 @@ impl PdfWriter {
 
         output
     }
+}
+
+/// Write a single chart drawing primitive to the PDF content stream.
+///
+/// Called within a Y-flipped coordinate system (1 0 0 -1 x page_h-y cm),
+/// so chart primitives use top-left origin (Y increases downward).
+fn write_chart_primitive(
+    stream: &mut String,
+    prim: &crate::chart::ChartPrimitive,
+    _chart_height: f64,
+    builder: &PdfBuilder,
+) {
+    use crate::chart::{ChartPrimitive, TextAnchor};
+    use crate::font::metrics::unicode_to_winansi;
+
+    match prim {
+        ChartPrimitive::Rect { x, y, w, h, fill } => {
+            let _ = writeln!(stream, "{:.3} {:.3} {:.3} rg", fill.r, fill.g, fill.b);
+            let _ = writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re f", x, y, w, h);
+        }
+
+        ChartPrimitive::Line {
+            x1,
+            y1,
+            x2,
+            y2,
+            stroke,
+            width,
+        } => {
+            let _ = writeln!(stream, "{:.3} {:.3} {:.3} RG", stroke.r, stroke.g, stroke.b);
+            let _ = writeln!(stream, "{:.2} w", width);
+            let _ = writeln!(stream, "{:.2} {:.2} m {:.2} {:.2} l S", x1, y1, x2, y2);
+        }
+
+        ChartPrimitive::Polyline {
+            points,
+            stroke,
+            width,
+        } => {
+            if points.len() < 2 {
+                return;
+            }
+            let _ = writeln!(stream, "{:.3} {:.3} {:.3} RG", stroke.r, stroke.g, stroke.b);
+            let _ = writeln!(stream, "{:.2} w", width);
+            let _ = writeln!(stream, "{:.2} {:.2} m", points[0].0, points[0].1);
+            for &(px, py) in &points[1..] {
+                let _ = writeln!(stream, "{:.2} {:.2} l", px, py);
+            }
+            let _ = writeln!(stream, "S");
+        }
+
+        ChartPrimitive::FilledPath {
+            points,
+            fill,
+            opacity,
+        } => {
+            if points.len() < 3 {
+                return;
+            }
+            let _ = writeln!(stream, "q");
+            // Set opacity via ExtGState if available
+            if *opacity < 1.0 {
+                if let Some((_, gs_name)) = builder.ext_gstate_map.get(&opacity.to_bits()) {
+                    let _ = writeln!(stream, "/{} gs", gs_name);
+                }
+            }
+            let _ = writeln!(stream, "{:.3} {:.3} {:.3} rg", fill.r, fill.g, fill.b);
+            let _ = writeln!(stream, "{:.2} {:.2} m", points[0].0, points[0].1);
+            for &(px, py) in &points[1..] {
+                let _ = writeln!(stream, "{:.2} {:.2} l", px, py);
+            }
+            let _ = writeln!(stream, "h f");
+            let _ = writeln!(stream, "Q");
+        }
+
+        ChartPrimitive::Circle { cx, cy, r, fill } => {
+            // Approximate circle with 4 cubic bezier curves
+            let kappa: f64 = 0.5523;
+            let kr = kappa * r;
+            let _ = writeln!(stream, "{:.3} {:.3} {:.3} rg", fill.r, fill.g, fill.b);
+            let _ = writeln!(stream, "{:.2} {:.2} m", cx + r, cy);
+            let _ = writeln!(
+                stream,
+                "{:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c",
+                cx + r,
+                cy + kr,
+                cx + kr,
+                cy + r,
+                cx,
+                cy + r
+            );
+            let _ = writeln!(
+                stream,
+                "{:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c",
+                cx - kr,
+                cy + r,
+                cx - r,
+                cy + kr,
+                cx - r,
+                cy
+            );
+            let _ = writeln!(
+                stream,
+                "{:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c",
+                cx - r,
+                cy - kr,
+                cx - kr,
+                cy - r,
+                cx,
+                cy - r
+            );
+            let _ = writeln!(
+                stream,
+                "{:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c",
+                cx + kr,
+                cy - r,
+                cx + r,
+                cy - kr,
+                cx + r,
+                cy
+            );
+            let _ = writeln!(stream, "f");
+        }
+
+        ChartPrimitive::ArcSector {
+            cx,
+            cy,
+            r,
+            start_angle,
+            end_angle,
+            fill,
+        } => {
+            let _ = writeln!(stream, "{:.3} {:.3} {:.3} rg", fill.r, fill.g, fill.b);
+            // Move to center
+            let _ = writeln!(stream, "{:.2} {:.2} m", cx, cy);
+            // Line to arc start
+            let sx = cx + r * start_angle.cos();
+            let sy = cy + r * start_angle.sin();
+            let _ = writeln!(stream, "{:.2} {:.2} l", sx, sy);
+
+            // Approximate arc with cubic bezier segments (max 90° per segment)
+            let mut angle = *start_angle;
+            let total = end_angle - start_angle;
+            let segments = ((total.abs() / std::f64::consts::FRAC_PI_2).ceil() as usize).max(1);
+            let step = total / segments as f64;
+
+            for _ in 0..segments {
+                let a1 = angle;
+                let a2 = angle + step;
+                let alpha = 4.0 / 3.0 * ((a2 - a1) / 4.0).tan();
+
+                let p1x = cx + r * a1.cos();
+                let p1y = cy + r * a1.sin();
+                let p2x = cx + r * a2.cos();
+                let p2y = cy + r * a2.sin();
+
+                let cp1x = p1x - alpha * r * a1.sin();
+                let cp1y = p1y + alpha * r * a1.cos();
+                let cp2x = p2x + alpha * r * a2.sin();
+                let cp2y = p2y - alpha * r * a2.cos();
+
+                let _ = writeln!(
+                    stream,
+                    "{:.4} {:.4} {:.4} {:.4} {:.4} {:.4} c",
+                    cp1x, cp1y, cp2x, cp2y, p2x, p2y
+                );
+                angle = a2;
+            }
+
+            // Close path back to center and fill
+            let _ = writeln!(stream, "h f");
+        }
+
+        ChartPrimitive::Label {
+            text,
+            x,
+            y,
+            font_size,
+            color,
+            anchor,
+        } => {
+            // Measure text width for anchor alignment
+            let metrics = crate::font::StandardFont::Helvetica.metrics();
+            let text_width = metrics.measure_string(text, *font_size, 0.0);
+            let x_offset = match anchor {
+                TextAnchor::Left => 0.0,
+                TextAnchor::Center => -text_width / 2.0,
+                TextAnchor::Right => -text_width,
+            };
+
+            // Find Helvetica font index in font_objects
+            let font_idx = builder
+                .font_objects
+                .iter()
+                .enumerate()
+                .find(|(_, (key, _))| key.family == "Helvetica" && key.weight == 400 && !key.italic)
+                .map(|(i, _)| i)
+                .unwrap_or(0);
+
+            // Encode text to WinAnsi
+            let encoded: String = text
+                .chars()
+                .map(|ch| {
+                    if let Some(code) = unicode_to_winansi(ch) {
+                        code as char
+                    } else if (ch as u32) >= 32 && (ch as u32) <= 255 {
+                        ch
+                    } else {
+                        '?'
+                    }
+                })
+                .collect();
+            let escaped = pdf_escape_string(&encoded);
+
+            // Undo Y-flip for text rendering, then position
+            let _ = writeln!(stream, "q");
+            let _ = writeln!(stream, "1 0 0 -1 {:.4} {:.4} cm", x + x_offset, *y);
+            let _ = writeln!(
+                stream,
+                "BT /F{} {:.1} Tf {:.3} {:.3} {:.3} rg 0 0 Td ({}) Tj ET",
+                font_idx, font_size, color.r, color.g, color.b, escaped
+            );
+            let _ = writeln!(stream, "Q");
+        }
+    }
+}
+
+/// Escape a string for use in a PDF text string (parentheses and backslash).
+fn pdf_escape_string(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for ch in s.chars() {
+        match ch {
+            '(' => out.push_str("\\("),
+            ')' => out.push_str("\\)"),
+            '\\' => out.push_str("\\\\"),
+            _ => out.push(ch),
+        }
+    }
+    out
 }
 
 #[cfg(test)]

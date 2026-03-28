@@ -896,6 +896,236 @@ class Watermark(_Component):
         }
 
 
+class BarChart(_Component):
+    """A bar chart rendered as native vector graphics."""
+
+    def __init__(
+        self,
+        data: list,
+        *,
+        width: float = 400.0,
+        height: float = 200.0,
+        color: Optional[str] = None,
+        show_labels: bool = True,
+        show_values: bool = False,
+        show_grid: bool = False,
+        title: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.data = data
+        self.width = width
+        self.height = height
+        self.color = color
+        self.show_labels = show_labels
+        self.show_values = show_values
+        self.show_grid = show_grid
+        self.title = title
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "BarChart",
+            "data": self.data,
+            "width": self.width,
+            "height": self.height,
+            "show_labels": self.show_labels,
+            "show_values": self.show_values,
+            "show_grid": self.show_grid,
+        }
+        if self.color is not None:
+            kind["color"] = self.color
+        if self.title is not None:
+            kind["title"] = self.title
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class LineChart(_Component):
+    """A line chart rendered as native vector graphics."""
+
+    def __init__(
+        self,
+        series: list,
+        labels: list,
+        *,
+        width: float = 400.0,
+        height: float = 200.0,
+        show_points: bool = False,
+        show_grid: bool = False,
+        title: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.series = series
+        self.labels = labels
+        self.width = width
+        self.height = height
+        self.show_points = show_points
+        self.show_grid = show_grid
+        self.title = title
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "LineChart",
+            "series": self.series,
+            "labels": self.labels,
+            "width": self.width,
+            "height": self.height,
+            "show_points": self.show_points,
+            "show_grid": self.show_grid,
+        }
+        if self.title is not None:
+            kind["title"] = self.title
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class PieChart(_Component):
+    """A pie/donut chart rendered as native vector graphics."""
+
+    def __init__(
+        self,
+        data: list,
+        *,
+        width: float = 200.0,
+        height: float = 200.0,
+        donut: bool = False,
+        show_legend: bool = False,
+        title: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.data = data
+        self.width = width
+        self.height = height
+        self.donut = donut
+        self.show_legend = show_legend
+        self.title = title
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "PieChart",
+            "data": self.data,
+            "width": self.width,
+            "height": self.height,
+            "donut": self.donut,
+            "show_legend": self.show_legend,
+        }
+        if self.title is not None:
+            kind["title"] = self.title
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class AreaChart(_Component):
+    """An area chart rendered as native vector graphics."""
+
+    def __init__(
+        self,
+        series: list,
+        labels: list,
+        *,
+        width: float = 400.0,
+        height: float = 200.0,
+        show_grid: bool = False,
+        title: Optional[str] = None,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.series = series
+        self.labels = labels
+        self.width = width
+        self.height = height
+        self.show_grid = show_grid
+        self.title = title
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "AreaChart",
+            "series": self.series,
+            "labels": self.labels,
+            "width": self.width,
+            "height": self.height,
+            "show_grid": self.show_grid,
+        }
+        if self.title is not None:
+            kind["title"] = self.title
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class DotPlot(_Component):
+    """A dot plot (scatter plot) rendered as native vector graphics."""
+
+    def __init__(
+        self,
+        groups: list,
+        *,
+        width: float = 400.0,
+        height: float = 300.0,
+        x_min: Optional[float] = None,
+        x_max: Optional[float] = None,
+        y_min: Optional[float] = None,
+        y_max: Optional[float] = None,
+        x_label: Optional[str] = None,
+        y_label: Optional[str] = None,
+        show_legend: bool = False,
+        dot_size: float = 4.0,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.groups = groups
+        self.width = width
+        self.height = height
+        self.x_min = x_min
+        self.x_max = x_max
+        self.y_min = y_min
+        self.y_max = y_max
+        self.x_label = x_label
+        self.y_label = y_label
+        self.show_legend = show_legend
+        self.dot_size = dot_size
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "DotPlot",
+            "groups": self.groups,
+            "width": self.width,
+            "height": self.height,
+            "show_legend": self.show_legend,
+            "dot_size": self.dot_size,
+        }
+        if self.x_min is not None:
+            kind["x_min"] = self.x_min
+        if self.x_max is not None:
+            kind["x_max"] = self.x_max
+        if self.y_min is not None:
+            kind["y_min"] = self.y_min
+        if self.y_max is not None:
+            kind["y_max"] = self.y_max
+        if self.x_label is not None:
+            kind["x_label"] = self.x_label
+        if self.y_label is not None:
+            kind["y_label"] = self.y_label
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
 class Page(_Component):
     """A page with size and margin configuration."""
 

@@ -347,6 +347,7 @@ impl LayoutInfo {
                     DrawCommand::Svg { .. } => "Svg",
                     DrawCommand::Barcode { .. } => "Barcode",
                     DrawCommand::QrCode { .. } => "QrCode",
+                    DrawCommand::Chart { .. } => "Chart",
                     DrawCommand::Watermark { .. } => "Watermark",
                 };
                 let text_content = match &elem.draw {
@@ -467,6 +468,11 @@ fn node_kind_name(kind: &NodeKind) -> &'static str {
         NodeKind::Canvas { .. } => "Canvas",
         NodeKind::Barcode { .. } => "Barcode",
         NodeKind::QrCode { .. } => "QrCode",
+        NodeKind::BarChart { .. } => "BarChart",
+        NodeKind::LineChart { .. } => "LineChart",
+        NodeKind::PieChart { .. } => "PieChart",
+        NodeKind::AreaChart { .. } => "AreaChart",
+        NodeKind::DotPlot { .. } => "DotPlot",
         NodeKind::Watermark { .. } => "Watermark",
     }
 }
@@ -517,6 +523,10 @@ pub enum DrawCommand {
         modules: Vec<Vec<bool>>,
         module_size: f64,
         color: Color,
+    },
+    /// Draw a chart as a list of drawing primitives.
+    Chart {
+        primitives: Vec<crate::chart::ChartPrimitive>,
     },
     /// Draw a watermark (rotated text with opacity).
     Watermark {
@@ -1068,6 +1078,133 @@ impl LayoutEngine {
                     *canvas_w,
                     *canvas_h,
                     operations,
+                );
+            }
+
+            NodeKind::BarChart {
+                data,
+                width: chart_w,
+                height: chart_h,
+                color,
+                show_labels,
+                show_values,
+                show_grid,
+                title,
+            } => {
+                let config = crate::chart::bar::BarChartConfig {
+                    color: color.clone(),
+                    show_labels: *show_labels,
+                    show_values: *show_values,
+                    show_grid: *show_grid,
+                    title: title.clone(),
+                };
+                let primitives = crate::chart::bar::build(*chart_w, *chart_h, data, &config);
+                self.layout_chart(
+                    node, &style, cursor, pages, x, *chart_w, *chart_h, primitives, "BarChart",
+                );
+            }
+
+            NodeKind::LineChart {
+                series,
+                labels,
+                width: chart_w,
+                height: chart_h,
+                show_points,
+                show_grid,
+                title,
+            } => {
+                let config = crate::chart::line::LineChartConfig {
+                    show_points: *show_points,
+                    show_grid: *show_grid,
+                    title: title.clone(),
+                };
+                let primitives =
+                    crate::chart::line::build(*chart_w, *chart_h, series, labels, &config);
+                self.layout_chart(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    *chart_w,
+                    *chart_h,
+                    primitives,
+                    "LineChart",
+                );
+            }
+
+            NodeKind::PieChart {
+                data,
+                width: chart_w,
+                height: chart_h,
+                donut,
+                show_legend,
+                title,
+            } => {
+                let config = crate::chart::pie::PieChartConfig {
+                    donut: *donut,
+                    show_legend: *show_legend,
+                    title: title.clone(),
+                };
+                let primitives = crate::chart::pie::build(*chart_w, *chart_h, data, &config);
+                self.layout_chart(
+                    node, &style, cursor, pages, x, *chart_w, *chart_h, primitives, "PieChart",
+                );
+            }
+
+            NodeKind::AreaChart {
+                series,
+                labels,
+                width: chart_w,
+                height: chart_h,
+                show_grid,
+                title,
+            } => {
+                let config = crate::chart::area::AreaChartConfig {
+                    show_grid: *show_grid,
+                    title: title.clone(),
+                };
+                let primitives =
+                    crate::chart::area::build(*chart_w, *chart_h, series, labels, &config);
+                self.layout_chart(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    *chart_w,
+                    *chart_h,
+                    primitives,
+                    "AreaChart",
+                );
+            }
+
+            NodeKind::DotPlot {
+                groups,
+                width: chart_w,
+                height: chart_h,
+                x_min,
+                x_max,
+                y_min,
+                y_max,
+                x_label,
+                y_label,
+                show_legend,
+                dot_size,
+            } => {
+                let config = crate::chart::dot::DotPlotConfig {
+                    x_min: *x_min,
+                    x_max: *x_max,
+                    y_min: *y_min,
+                    y_max: *y_max,
+                    x_label: x_label.clone(),
+                    y_label: y_label.clone(),
+                    show_legend: *show_legend,
+                    dot_size: *dot_size,
+                };
+                let primitives = crate::chart::dot::build(*chart_w, *chart_h, groups, &config);
+                self.layout_chart(
+                    node, &style, cursor, pages, x, *chart_w, *chart_h, primitives, "DotPlot",
                 );
             }
         }
@@ -3741,6 +3878,52 @@ impl LayoutEngine {
 
     /// Layout a 1D barcode as a row of vector rectangles.
     #[allow(clippy::too_many_arguments)]
+    /// Layout a chart as a single unbreakable block of drawing primitives.
+    #[allow(clippy::too_many_arguments)]
+    fn layout_chart(
+        &self,
+        node: &Node,
+        style: &ResolvedStyle,
+        cursor: &mut PageCursor,
+        pages: &mut Vec<LayoutPage>,
+        x: f64,
+        chart_width: f64,
+        chart_height: f64,
+        primitives: Vec<crate::chart::ChartPrimitive>,
+        node_type_name: &str,
+    ) {
+        let margin = &style.margin.to_edges();
+        let total_height = chart_height + margin.vertical();
+
+        if total_height > cursor.remaining_height() {
+            pages.push(cursor.finalize());
+            *cursor = cursor.new_page();
+        }
+
+        cursor.y += margin.top;
+
+        let draw = DrawCommand::Chart { primitives };
+
+        cursor.elements.push(LayoutElement {
+            x: x + margin.left,
+            y: cursor.content_y + cursor.y,
+            width: chart_width,
+            height: chart_height,
+            draw,
+            children: vec![],
+            node_type: Some(node_type_name.to_string()),
+            resolved_style: Some(style.clone()),
+            source_location: node.source_location.clone(),
+            href: node.href.clone(),
+            bookmark: node.bookmark.clone(),
+            alt: node.alt.clone(),
+            is_header_row: false,
+            overflow: style.overflow,
+        });
+
+        cursor.y += chart_height + margin.bottom;
+    }
+
     fn layout_barcode(
         &self,
         node: &Node,
@@ -3947,6 +4130,11 @@ impl LayoutEngine {
                 display_size + style.margin.vertical()
             }
             NodeKind::Canvas { height, .. } => *height + style.margin.vertical(),
+            NodeKind::BarChart { height, .. }
+            | NodeKind::LineChart { height, .. }
+            | NodeKind::PieChart { height, .. }
+            | NodeKind::AreaChart { height, .. }
+            | NodeKind::DotPlot { height, .. } => *height + style.margin.vertical(),
             NodeKind::Watermark { .. } => 0.0, // Watermarks take zero layout height
             _ => {
                 // If a fixed height is specified, use it directly
@@ -4223,6 +4411,13 @@ impl LayoutEngine {
                 display_size + style.padding.horizontal() + style.margin.horizontal()
             }
             NodeKind::Canvas { width, .. } => {
+                *width + style.padding.horizontal() + style.margin.horizontal()
+            }
+            NodeKind::BarChart { width, .. }
+            | NodeKind::LineChart { width, .. }
+            | NodeKind::PieChart { width, .. }
+            | NodeKind::AreaChart { width, .. }
+            | NodeKind::DotPlot { width, .. } => {
                 *width + style.padding.horizontal() + style.margin.horizontal()
             }
             NodeKind::Watermark { .. } => 0.0, // Watermarks take zero width

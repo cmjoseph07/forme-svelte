@@ -13,6 +13,11 @@ import type {
   BarcodeProps,
   CanvasProps,
   WatermarkProps,
+  BarChartProps,
+  LineChartProps,
+  PieChartProps,
+  AreaChartProps,
+  DotPlotProps,
 } from './types.js';
 
 /**
@@ -331,5 +336,77 @@ export function Watermark(_props: WatermarkProps): null {
  * ```
  */
 export function PageBreak(_props: object): null {
+  return null;
+}
+
+/**
+ * A bar chart rendered as native vector graphics in the PDF.
+ *
+ * @param props.data - Array of { label, value, color? } data points
+ * @param props.width - Chart width in points
+ * @param props.height - Chart height in points
+ * @param props.color - Default bar color (hex). Default: "#1a365d"
+ * @param props.showLabels - Show X-axis labels. Default: true
+ * @param props.showValues - Show value labels above bars. Default: false
+ * @param props.showGrid - Show horizontal grid lines. Default: false
+ * @param props.title - Chart title
+ */
+export function BarChart(_props: BarChartProps): null {
+  return null;
+}
+
+/**
+ * A line chart rendered as native vector graphics in the PDF.
+ *
+ * @param props.series - Array of { name, data: number[], color? } series
+ * @param props.labels - X-axis labels
+ * @param props.width - Chart width in points
+ * @param props.height - Chart height in points
+ * @param props.showPoints - Show dots at data points. Default: false
+ * @param props.showGrid - Show horizontal grid lines. Default: false
+ * @param props.title - Chart title
+ */
+export function LineChart(_props: LineChartProps): null {
+  return null;
+}
+
+/**
+ * A pie chart rendered as native vector graphics in the PDF.
+ *
+ * @param props.data - Array of { label, value, color? } data points
+ * @param props.width - Chart width in points
+ * @param props.height - Chart height in points
+ * @param props.donut - Render as donut chart. Default: false
+ * @param props.showLegend - Show legend. Default: false
+ * @param props.title - Chart title
+ */
+export function PieChart(_props: PieChartProps): null {
+  return null;
+}
+
+/**
+ * An area chart rendered as native vector graphics in the PDF.
+ *
+ * @param props.series - Array of { name, data: number[], color? } series
+ * @param props.labels - X-axis labels
+ * @param props.width - Chart width in points
+ * @param props.height - Chart height in points
+ * @param props.showGrid - Show horizontal grid lines. Default: false
+ * @param props.title - Chart title
+ */
+export function AreaChart(_props: AreaChartProps): null {
+  return null;
+}
+
+/**
+ * A dot plot (scatter plot) rendered as native vector graphics in the PDF.
+ *
+ * @param props.groups - Array of { name, color?, data: [x, y][] } groups
+ * @param props.width - Chart width in points
+ * @param props.height - Chart height in points
+ * @param props.dotSize - Dot radius. Default: 4
+ * @param props.showLegend - Show legend. Default: false
+ */
+export function DotPlot(_props: DotPlotProps): null {
   return null;
 }

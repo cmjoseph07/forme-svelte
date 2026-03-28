@@ -5753,3 +5753,319 @@ fn auto_margin_deserializes_from_json() {
         expected_x
     );
 }
+
+// ── Chart Tests ─────────────────────────────────────────────────────
+
+#[test]
+fn test_bar_chart_renders_to_pdf() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "BarChart",
+                "data": [
+                    { "label": "Q1", "value": 100 },
+                    { "label": "Q2", "value": 150 },
+                    { "label": "Q3", "value": 80 },
+                    { "label": "Q4", "value": 200 },
+                    { "label": "Q5", "value": 120 }
+                ],
+                "width": 400,
+                "height": 200,
+                "show_labels": true,
+                "show_values": true,
+                "show_grid": true
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("BarChart should render");
+    assert!(pdf.starts_with(b"%PDF"));
+    assert!(pdf.len() > 200);
+}
+
+#[test]
+fn test_line_chart_renders_to_pdf() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "LineChart",
+                "series": [
+                    { "name": "Revenue", "data": [100, 150, 130, 200], "color": "#2b6cb0" },
+                    { "name": "Expenses", "data": [80, 120, 100, 160], "color": "#e53e3e" }
+                ],
+                "labels": ["Q1", "Q2", "Q3", "Q4"],
+                "width": 400,
+                "height": 200,
+                "show_points": true,
+                "show_grid": true
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("LineChart should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_pie_chart_renders_to_pdf() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "PieChart",
+                "data": [
+                    { "label": "A", "value": 40, "color": "#1a365d" },
+                    { "label": "B", "value": 30, "color": "#2b6cb0" },
+                    { "label": "C", "value": 20, "color": "#63b3ed" },
+                    { "label": "D", "value": 10, "color": "#90cdf4" }
+                ],
+                "width": 200,
+                "height": 200,
+                "donut": false,
+                "show_legend": true
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("PieChart should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_pie_chart_donut_renders_to_pdf() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "PieChart",
+                "data": [
+                    { "label": "Yes", "value": 70 },
+                    { "label": "No", "value": 30 }
+                ],
+                "width": 200,
+                "height": 200,
+                "donut": true,
+                "show_legend": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("PieChart donut should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_area_chart_renders_to_pdf() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "AreaChart",
+                "series": [
+                    { "name": "Users", "data": [10, 50, 80, 120, 160], "color": "#38a169" },
+                    { "name": "Revenue", "data": [5, 30, 60, 90, 140], "color": "#805ad5" }
+                ],
+                "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
+                "width": 400,
+                "height": 200,
+                "show_grid": true
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("AreaChart should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_dot_plot_renders_to_pdf() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "DotPlot",
+                "groups": [
+                    { "name": "Group A", "color": "#1a365d", "data": [[1, 2], [3, 4], [5, 6], [7, 8]] },
+                    { "name": "Group B", "color": "#e53e3e", "data": [[2, 3], [4, 5], [6, 7], [8, 9]] },
+                    { "name": "Group C", "color": "#38a169", "data": [[1, 5], [3, 7], [5, 3], [7, 1]] },
+                    { "name": "Group D", "color": "#805ad5", "data": [[2, 6], [4, 2], [6, 8], [8, 4]] }
+                ],
+                "width": 400,
+                "height": 300,
+                "show_legend": true,
+                "dot_size": 4
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("DotPlot should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_chart_with_title() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "BarChart",
+                "data": [
+                    { "label": "A", "value": 50 },
+                    { "label": "B", "value": 75 }
+                ],
+                "width": 300,
+                "height": 200,
+                "show_labels": true,
+                "show_values": false,
+                "show_grid": false,
+                "title": "Sales Report"
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("Chart with title should render");
+    assert!(pdf.starts_with(b"%PDF"));
+    assert!(
+        pdf.len() > 200,
+        "PDF should have content for chart with title"
+    );
+}
+
+#[test]
+fn test_chart_respects_custom_colors() {
+    let json = r##"{
+        "children": [{
+            "kind": {
+                "type": "BarChart",
+                "data": [
+                    { "label": "A", "value": 50, "color": "#ff0000" },
+                    { "label": "B", "value": 75, "color": "#00ff00" }
+                ],
+                "width": 300,
+                "height": 200,
+                "show_labels": true,
+                "show_values": false,
+                "show_grid": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("Chart with custom colors should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}
+
+#[test]
+fn test_bar_chart_layout_dimensions() {
+    let doc = Document {
+        children: vec![Node {
+            kind: NodeKind::BarChart {
+                data: vec![
+                    forme::model::ChartDataPoint {
+                        label: "A".into(),
+                        value: 100.0,
+                        color: None,
+                    },
+                    forme::model::ChartDataPoint {
+                        label: "B".into(),
+                        value: 200.0,
+                        color: None,
+                    },
+                ],
+                width: 350.0,
+                height: 250.0,
+                color: None,
+                show_labels: true,
+                show_values: false,
+                show_grid: false,
+                title: None,
+            },
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+    };
+
+    let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
+    assert!(pdf.starts_with(b"%PDF"));
+    assert_eq!(layout.pages.len(), 1);
+    let elem = &layout.pages[0].elements[0];
+    assert!((elem.width - 350.0).abs() < 0.1);
+    assert!((elem.height - 250.0).abs() < 0.1);
+}
+
+#[test]
+fn test_multiple_charts_on_same_page() {
+    let json = r##"{
+        "children": [
+            {
+                "kind": {
+                    "type": "BarChart",
+                    "data": [{ "label": "A", "value": 50 }],
+                    "width": 300,
+                    "height": 150,
+                    "show_labels": true,
+                    "show_values": false,
+                    "show_grid": false
+                },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "LineChart",
+                    "series": [{ "name": "S1", "data": [10, 20, 30] }],
+                    "labels": ["A", "B", "C"],
+                    "width": 300,
+                    "height": 150,
+                    "show_points": false,
+                    "show_grid": false
+                },
+                "style": {},
+                "children": []
+            }
+        ],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"##;
+    let pdf = forme::render_json(json).expect("Multiple charts should render");
+    assert!(pdf.starts_with(b"%PDF"));
+}

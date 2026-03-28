@@ -1,5 +1,5 @@
 import { type ReactElement, isValidElement, Children, Fragment } from 'react';
-import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak } from './components.js';
+import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
   isRefMarker, getRefPath,
@@ -39,6 +39,11 @@ import type {
   CanvasOp,
   CanvasContext,
   WatermarkProps,
+  BarChartProps,
+  LineChartProps,
+  PieChartProps,
+  AreaChartProps,
+  DotPlotProps,
 } from './types.js';
 
 // ─── Nesting validation ──────────────────────────────────────────────
@@ -293,6 +298,21 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
   }
   if (element.type === Watermark) {
     return serializeWatermark(element);
+  }
+  if (element.type === BarChart) {
+    return serializeBarChart(element);
+  }
+  if (element.type === LineChart) {
+    return serializeLineChart(element);
+  }
+  if (element.type === PieChart) {
+    return serializePieChart(element);
+  }
+  if (element.type === AreaChart) {
+    return serializeAreaChart(element);
+  }
+  if (element.type === DotPlot) {
+    return serializeDotPlot(element);
   }
   if (element.type === PageBreak) {
     return {
@@ -595,6 +615,109 @@ function serializeWatermark(element: ReactElement): FormeNode {
   return {
     kind: { type: 'Watermark', text: props.text, font_size: fontSize, angle },
     style,
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeBarChart(element: ReactElement): FormeNode {
+  const props = element.props as BarChartProps;
+  const kind: FormeNodeKind = {
+    type: 'BarChart',
+    data: props.data.map(d => ({ label: d.label, value: d.value, color: d.color })),
+    width: props.width,
+    height: props.height,
+    show_labels: props.showLabels ?? true,
+    show_values: props.showValues ?? false,
+    show_grid: props.showGrid ?? false,
+  } as FormeNodeKind;
+  if (props.color !== undefined) (kind as Record<string, unknown>).color = props.color;
+  if (props.title !== undefined) (kind as Record<string, unknown>).title = props.title;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeLineChart(element: ReactElement): FormeNode {
+  const props = element.props as LineChartProps;
+  const kind: FormeNodeKind = {
+    type: 'LineChart',
+    series: props.series.map(s => ({ name: s.name, data: s.data, color: s.color })),
+    labels: props.labels,
+    width: props.width,
+    height: props.height,
+    show_points: props.showPoints ?? false,
+    show_grid: props.showGrid ?? false,
+  } as FormeNodeKind;
+  if (props.title !== undefined) (kind as Record<string, unknown>).title = props.title;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializePieChart(element: ReactElement): FormeNode {
+  const props = element.props as PieChartProps;
+  const kind: FormeNodeKind = {
+    type: 'PieChart',
+    data: props.data.map(d => ({ label: d.label, value: d.value, color: d.color })),
+    width: props.width,
+    height: props.height,
+    donut: props.donut ?? false,
+    show_legend: props.showLegend ?? false,
+  } as FormeNodeKind;
+  if (props.title !== undefined) (kind as Record<string, unknown>).title = props.title;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeAreaChart(element: ReactElement): FormeNode {
+  const props = element.props as AreaChartProps;
+  const kind: FormeNodeKind = {
+    type: 'AreaChart',
+    series: props.series.map(s => ({ name: s.name, data: s.data, color: s.color })),
+    labels: props.labels,
+    width: props.width,
+    height: props.height,
+    show_grid: props.showGrid ?? false,
+  } as FormeNodeKind;
+  if (props.title !== undefined) (kind as Record<string, unknown>).title = props.title;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeDotPlot(element: ReactElement): FormeNode {
+  const props = element.props as DotPlotProps;
+  const kind: FormeNodeKind = {
+    type: 'DotPlot',
+    groups: props.groups.map(g => ({ name: g.name, color: g.color, data: g.data })),
+    width: props.width,
+    height: props.height,
+    show_legend: props.showLegend ?? false,
+    dot_size: props.dotSize ?? 4,
+  } as FormeNodeKind;
+  if (props.xMin !== undefined) (kind as Record<string, unknown>).x_min = props.xMin;
+  if (props.xMax !== undefined) (kind as Record<string, unknown>).x_max = props.xMax;
+  if (props.yMin !== undefined) (kind as Record<string, unknown>).y_min = props.yMin;
+  if (props.yMax !== undefined) (kind as Record<string, unknown>).y_max = props.yMax;
+  if (props.xLabel !== undefined) (kind as Record<string, unknown>).x_label = props.xLabel;
+  if (props.yLabel !== undefined) (kind as Record<string, unknown>).y_label = props.yLabel;
+  return {
+    kind,
+    style: mapStyle(props.style),
     children: [],
     sourceLocation: extractSourceLocation(element),
   };
@@ -1391,6 +1514,11 @@ function serializeTemplateChild(child: unknown, parent: ParentContext = null): u
   if (element.type === Barcode) return serializeBarcode(element);
   if (element.type === Canvas) return serializeCanvas(element);
   if (element.type === Watermark) return serializeWatermark(element);
+  if (element.type === BarChart) return serializeBarChart(element);
+  if (element.type === LineChart) return serializeLineChart(element);
+  if (element.type === PieChart) return serializePieChart(element);
+  if (element.type === AreaChart) return serializeAreaChart(element);
+  if (element.type === DotPlot) return serializeDotPlot(element);
   if (element.type === PageBreak) {
     return { kind: { type: 'PageBreak' }, style: {}, children: [] };
   }

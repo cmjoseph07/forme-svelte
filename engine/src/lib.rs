@@ -27,6 +27,7 @@
 //! ```
 
 pub mod barcode;
+pub mod chart;
 pub mod error;
 pub mod font;
 pub mod image_loader;

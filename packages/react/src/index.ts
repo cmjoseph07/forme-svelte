@@ -1,6 +1,6 @@
 // Components
-export { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak } from './components.js';
-export { BarChart, LineChart, PieChart } from './charts.js';
+export { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot } from './components.js';
+export { LegacyBarChart, LegacyLineChart, LegacyPieChart } from './charts.js';
 
 // Serialization
 export { serialize, serializeTemplate, mapStyle, mapDimension, parseColor, expandEdges, expandCorners } from './serialize.js';
@@ -47,9 +47,13 @@ export type {
   WatermarkProps,
   ChartDataPoint,
   PieDataPoint,
+  ChartSeries,
+  DotPlotGroup,
   BarChartProps,
   LineChartProps,
   PieChartProps,
+  AreaChartProps,
+  DotPlotProps,
   TextRun,
   // Forme JSON output
   FormeDocument,
