@@ -3924,6 +3924,7 @@ impl LayoutEngine {
         cursor.y += chart_height + margin.bottom;
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn layout_barcode(
         &self,
         node: &Node,
