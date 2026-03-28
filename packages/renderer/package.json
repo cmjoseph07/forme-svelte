@@ -17,8 +17,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@formepdf/core": "0.7.12",
-    "@formepdf/react": "0.7.12",
+    "@formepdf/core": "0.7.13",
+    "@formepdf/react": "0.7.13",
     "esbuild": "^0.24.0"
   },
   "peerDependencies": {

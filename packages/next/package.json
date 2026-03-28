@@ -13,9 +13,9 @@
     "dist"
   ],
   "dependencies": {
-    "@formepdf/react": "0.7.12",
-    "@formepdf/core": "0.7.12",
-    "@formepdf/templates": "0.7.12"
+    "@formepdf/react": "0.7.13",
+    "@formepdf/core": "0.7.13",
+    "@formepdf/templates": "0.7.13"
   },
   "peerDependencies": {
     "next": ">=14.0.0"

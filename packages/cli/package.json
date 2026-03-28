@@ -14,7 +14,7 @@
     "dist"
   ],
   "dependencies": {
-    "@formepdf/renderer": "0.7.12",
+    "@formepdf/renderer": "0.7.13",
     "chokidar": "^4.0.0",
     "ws": "^8.18.0",
     "open": "^10.1.0"
