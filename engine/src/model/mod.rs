@@ -51,6 +51,12 @@ pub struct Document {
     /// Enables round-tripping structured data through PDF files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub embedded_data: Option<String>,
+
+    /// When true, form field values are rendered as static content and no
+    /// interactive AcroForm widgets are emitted. The resulting PDF has no
+    /// fillable fields.
+    #[serde(default)]
+    pub flatten_forms: bool,
 }
 
 /// PDF/A conformance level.
@@ -593,6 +599,99 @@ pub enum NodeKind {
         #[serde(default = "default_watermark_angle")]
         angle: f64,
     },
+
+    /// An interactive text input field (PDF AcroForm widget).
+    TextField {
+        /// Field name, used for data extraction.
+        name: String,
+        /// Default/current value.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+        /// Placeholder text displayed when empty.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        placeholder: Option<String>,
+        /// Field width in points.
+        width: f64,
+        /// Field height in points. Default: 24.
+        #[serde(default = "default_form_field_height")]
+        height: f64,
+        /// Allow multiple lines of input.
+        #[serde(default)]
+        multiline: bool,
+        /// Mask input as password dots.
+        #[serde(default)]
+        password: bool,
+        /// Prevent editing.
+        #[serde(default)]
+        read_only: bool,
+        /// Maximum number of characters.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        max_length: Option<u32>,
+        /// Font size in points. Default: 12.
+        #[serde(default = "default_form_font_size")]
+        font_size: f64,
+    },
+
+    /// An interactive checkbox (PDF AcroForm widget).
+    Checkbox {
+        /// Field name, used for data extraction.
+        name: String,
+        /// Default checked state.
+        #[serde(default)]
+        checked: bool,
+        /// Checkbox width in points. Default: 14.
+        #[serde(default = "default_checkbox_size")]
+        width: f64,
+        /// Checkbox height in points. Default: 14.
+        #[serde(default = "default_checkbox_size")]
+        height: f64,
+        /// Prevent editing.
+        #[serde(default)]
+        read_only: bool,
+    },
+
+    /// An interactive dropdown/combo box (PDF AcroForm widget).
+    Dropdown {
+        /// Field name, used for data extraction.
+        name: String,
+        /// Available options.
+        options: Vec<String>,
+        /// Default selected value.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        value: Option<String>,
+        /// Field width in points.
+        width: f64,
+        /// Field height in points. Default: 24.
+        #[serde(default = "default_form_field_height")]
+        height: f64,
+        /// Prevent editing.
+        #[serde(default)]
+        read_only: bool,
+        /// Font size in points. Default: 12.
+        #[serde(default = "default_form_font_size")]
+        font_size: f64,
+    },
+
+    /// An interactive radio button (PDF AcroForm widget).
+    /// Multiple RadioButtons with the same `name` form a mutually exclusive group.
+    RadioButton {
+        /// Group name shared by all buttons in the group.
+        name: String,
+        /// This button's export value.
+        value: String,
+        /// Default selected state.
+        #[serde(default)]
+        checked: bool,
+        /// Button width in points. Default: 14.
+        #[serde(default = "default_checkbox_size")]
+        width: f64,
+        /// Button height in points. Default: 14.
+        #[serde(default = "default_checkbox_size")]
+        height: f64,
+        /// Prevent editing.
+        #[serde(default)]
+        read_only: bool,
+    },
 }
 
 /// A data point for bar charts and pie charts.
@@ -740,6 +839,18 @@ fn default_watermark_angle() -> f64 {
     -45.0
 }
 
+fn default_form_field_height() -> f64 {
+    24.0
+}
+
+fn default_form_font_size() -> f64 {
+    12.0
+}
+
+fn default_checkbox_size() -> f64 {
+    14.0
+}
+
 /// Column definition for tables.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ColumnDef {
@@ -840,6 +951,10 @@ impl Node {
             NodeKind::AreaChart { .. } => false,
             NodeKind::DotPlot { .. } => false,
             NodeKind::Watermark { .. } => false,
+            NodeKind::TextField { .. } => false,
+            NodeKind::Checkbox { .. } => false,
+            NodeKind::Dropdown { .. } => false,
+            NodeKind::RadioButton { .. } => false,
             NodeKind::PageBreak => false,
             NodeKind::Fixed { .. } => false,
             NodeKind::Page { .. } => true,

@@ -349,6 +349,7 @@ impl LayoutInfo {
                     DrawCommand::QrCode { .. } => "QrCode",
                     DrawCommand::Chart { .. } => "Chart",
                     DrawCommand::Watermark { .. } => "Watermark",
+                    DrawCommand::FormField { .. } => "FormField",
                 };
                 let text_content = match &elem.draw {
                     DrawCommand::Text { lines, .. } => {
@@ -474,7 +475,40 @@ fn node_kind_name(kind: &NodeKind) -> &'static str {
         NodeKind::AreaChart { .. } => "AreaChart",
         NodeKind::DotPlot { .. } => "DotPlot",
         NodeKind::Watermark { .. } => "Watermark",
+        NodeKind::TextField { .. } => "TextField",
+        NodeKind::Checkbox { .. } => "Checkbox",
+        NodeKind::Dropdown { .. } => "Dropdown",
+        NodeKind::RadioButton { .. } => "RadioButton",
     }
+}
+
+/// Configuration for an interactive PDF form field.
+#[derive(Debug, Clone)]
+pub enum FormFieldType {
+    TextField {
+        value: Option<String>,
+        placeholder: Option<String>,
+        multiline: bool,
+        password: bool,
+        read_only: bool,
+        max_length: Option<u32>,
+        font_size: f64,
+    },
+    Checkbox {
+        checked: bool,
+        read_only: bool,
+    },
+    Dropdown {
+        options: Vec<String>,
+        value: Option<String>,
+        read_only: bool,
+        font_size: f64,
+    },
+    RadioButton {
+        value: String,
+        checked: bool,
+        read_only: bool,
+    },
 }
 
 /// What to actually draw for this element.
@@ -536,6 +570,11 @@ pub enum DrawCommand {
         angle_rad: f64,
         /// Font family used (for PDF font registration).
         font_family: String,
+    },
+    /// An interactive PDF form field (AcroForm widget annotation).
+    FormField {
+        field_type: FormFieldType,
+        name: String,
     },
 }
 
@@ -935,6 +974,126 @@ impl LayoutEngine {
             NodeKind::Watermark { .. } => {
                 // Watermarks take zero layout height — just store on cursor for injection
                 cursor.watermarks.push(node.clone());
+            }
+
+            NodeKind::TextField {
+                name,
+                value,
+                placeholder,
+                width: field_w,
+                height: field_h,
+                multiline,
+                password,
+                read_only,
+                max_length,
+                font_size,
+            } => {
+                self.layout_form_field(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    *field_w,
+                    *field_h,
+                    DrawCommand::FormField {
+                        field_type: FormFieldType::TextField {
+                            value: value.clone(),
+                            placeholder: placeholder.clone(),
+                            multiline: *multiline,
+                            password: *password,
+                            read_only: *read_only,
+                            max_length: *max_length,
+                            font_size: *font_size,
+                        },
+                        name: name.clone(),
+                    },
+                    "TextField",
+                );
+            }
+
+            NodeKind::Checkbox {
+                name,
+                checked,
+                width: field_w,
+                height: field_h,
+                read_only,
+            } => {
+                self.layout_form_field(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    *field_w,
+                    *field_h,
+                    DrawCommand::FormField {
+                        field_type: FormFieldType::Checkbox {
+                            checked: *checked,
+                            read_only: *read_only,
+                        },
+                        name: name.clone(),
+                    },
+                    "Checkbox",
+                );
+            }
+
+            NodeKind::Dropdown {
+                name,
+                options,
+                value,
+                width: field_w,
+                height: field_h,
+                read_only,
+                font_size,
+            } => {
+                self.layout_form_field(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    *field_w,
+                    *field_h,
+                    DrawCommand::FormField {
+                        field_type: FormFieldType::Dropdown {
+                            options: options.clone(),
+                            value: value.clone(),
+                            read_only: *read_only,
+                            font_size: *font_size,
+                        },
+                        name: name.clone(),
+                    },
+                    "Dropdown",
+                );
+            }
+
+            NodeKind::RadioButton {
+                name,
+                value,
+                checked,
+                width: field_w,
+                height: field_h,
+                read_only,
+            } => {
+                self.layout_form_field(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    *field_w,
+                    *field_h,
+                    DrawCommand::FormField {
+                        field_type: FormFieldType::RadioButton {
+                            value: value.clone(),
+                            checked: *checked,
+                            read_only: *read_only,
+                        },
+                        name: name.clone(),
+                    },
+                    "RadioButton",
+                );
             }
 
             NodeKind::Text {
@@ -3924,6 +4083,50 @@ impl LayoutEngine {
         cursor.y += chart_height + margin.bottom;
     }
 
+    /// Layout a form field as a fixed-size leaf node.
+    #[allow(clippy::too_many_arguments)]
+    fn layout_form_field(
+        &self,
+        node: &Node,
+        style: &ResolvedStyle,
+        cursor: &mut PageCursor,
+        pages: &mut Vec<LayoutPage>,
+        x: f64,
+        field_width: f64,
+        field_height: f64,
+        draw: DrawCommand,
+        node_type_name: &str,
+    ) {
+        let margin = &style.margin.to_edges();
+        let total_height = field_height + margin.vertical();
+
+        if total_height > cursor.remaining_height() {
+            pages.push(cursor.finalize());
+            *cursor = cursor.new_page();
+        }
+
+        cursor.y += margin.top;
+
+        cursor.elements.push(LayoutElement {
+            x: x + margin.left,
+            y: cursor.content_y + cursor.y,
+            width: field_width,
+            height: field_height,
+            draw,
+            children: vec![],
+            node_type: Some(node_type_name.to_string()),
+            resolved_style: Some(style.clone()),
+            source_location: node.source_location.clone(),
+            href: node.href.clone(),
+            bookmark: node.bookmark.clone(),
+            alt: node.alt.clone(),
+            is_header_row: false,
+            overflow: style.overflow,
+        });
+
+        cursor.y += field_height + margin.bottom;
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn layout_barcode(
         &self,
@@ -4136,6 +4339,10 @@ impl LayoutEngine {
             | NodeKind::PieChart { height, .. }
             | NodeKind::AreaChart { height, .. }
             | NodeKind::DotPlot { height, .. } => *height + style.margin.vertical(),
+            NodeKind::TextField { height, .. }
+            | NodeKind::Checkbox { height, .. }
+            | NodeKind::Dropdown { height, .. }
+            | NodeKind::RadioButton { height, .. } => *height + style.margin.vertical(),
             NodeKind::Watermark { .. } => 0.0, // Watermarks take zero layout height
             _ => {
                 // If a fixed height is specified, use it directly
@@ -4419,6 +4626,12 @@ impl LayoutEngine {
             | NodeKind::PieChart { width, .. }
             | NodeKind::AreaChart { width, .. }
             | NodeKind::DotPlot { width, .. } => {
+                *width + style.padding.horizontal() + style.margin.horizontal()
+            }
+            NodeKind::TextField { width, .. } | NodeKind::Dropdown { width, .. } => {
+                *width + style.padding.horizontal() + style.margin.horizontal()
+            }
+            NodeKind::Checkbox { width, .. } | NodeKind::RadioButton { width, .. } => {
                 *width + style.padding.horizontal() + style.margin.horizontal()
             }
             NodeKind::Watermark { .. } => 0.0, // Watermarks take zero width
@@ -5227,6 +5440,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5282,6 +5496,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5338,6 +5553,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5405,6 +5621,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5551,6 +5768,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5617,6 +5835,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5695,6 +5914,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5751,6 +5971,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5818,6 +6039,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5896,6 +6118,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5973,6 +6196,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6044,6 +6268,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6107,6 +6332,7 @@ mod tests {
             pdfa: None,
             default_style: None,
             embedded_data: None,
+            flatten_forms: false,
         };
 
         let pages = engine.layout(&doc, &font_context);

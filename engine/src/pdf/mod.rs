@@ -58,6 +58,17 @@ struct PdfBookmark {
     y_pdf: f64,
 }
 
+/// A form field annotation collected during layout traversal.
+struct FormFieldData {
+    field_type: FormFieldType,
+    name: String,
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+    page_idx: usize,
+}
+
 pub struct PdfWriter;
 
 /// Embedding data for a custom TrueType font.
@@ -121,6 +132,7 @@ impl PdfWriter {
     }
 
     /// Write laid-out pages to a PDF byte vector.
+    #[allow(clippy::too_many_arguments)]
     pub fn write(
         &self,
         pages: &[LayoutPage],
@@ -129,6 +141,7 @@ impl PdfWriter {
         tagged: bool,
         pdfa: Option<&PdfAConformance>,
         embedded_data: Option<&str>,
+        flatten_forms: bool,
     ) -> Result<Vec<u8>, FormeError> {
         let mut builder = PdfBuilder {
             objects: Vec::new(),
@@ -194,6 +207,7 @@ impl PdfWriter {
         let mut per_page_content_obj_ids: Vec<usize> = Vec::new();
         let mut per_page_annotations: Vec<Vec<LinkAnnotation>> = Vec::new();
         let mut per_page_resources: Vec<String> = Vec::new();
+        let mut all_form_fields: Vec<FormFieldData> = Vec::new();
 
         // Pass 1: content streams, page objects (without /Annots), bookmarks
         for (page_idx, page) in pages.iter().enumerate() {
@@ -204,6 +218,7 @@ impl PdfWriter {
                 page_idx + 1,
                 pages.len(),
                 tag_builder.as_mut(),
+                flatten_forms,
             );
             let compressed = compress_to_vec_zlib(content.as_bytes(), 6);
 
@@ -226,6 +241,9 @@ impl PdfWriter {
             let mut annotations: Vec<LinkAnnotation> = Vec::new();
             Self::collect_link_annotations(&page.elements, page.height, &mut annotations);
             per_page_annotations.push(annotations);
+
+            // Collect form field annotations
+            Self::collect_form_fields(&page.elements, page.height, page_idx, &mut all_form_fields);
 
             // Reserve page object (placeholder — filled in pass 2)
             let page_obj_id = builder.objects.len();
@@ -445,8 +463,533 @@ impl PdfWriter {
             None
         };
 
+        // Build AcroForm for interactive form fields
+        let acroform_obj_id = if !all_form_fields.is_empty() && !flatten_forms {
+            // Find the Helvetica font object ID for AcroForm /DR
+            let helv_obj_id = builder
+                .font_objects
+                .iter()
+                .find(|(key, _)| key.family == "Helvetica" && key.weight == 400 && !key.italic)
+                .map(|(_, id)| *id);
+
+            // Separate radio buttons from other fields
+            let mut radio_groups: HashMap<String, Vec<usize>> = HashMap::new(); // name -> indices
+            let mut non_radio_indices: Vec<usize> = Vec::new();
+            for (i, field) in all_form_fields.iter().enumerate() {
+                if matches!(field.field_type, FormFieldType::RadioButton { .. }) {
+                    radio_groups.entry(field.name.clone()).or_default().push(i);
+                } else {
+                    non_radio_indices.push(i);
+                }
+            }
+
+            // Pre-allocate parent field objects for radio groups
+            let mut radio_parent_ids: HashMap<String, usize> = HashMap::new();
+            for group_name in radio_groups.keys() {
+                let parent_id = builder.objects.len();
+                builder.objects.push(PdfObject {
+                    id: parent_id,
+                    data: vec![], // placeholder — filled after kids are created
+                });
+                radio_parent_ids.insert(group_name.clone(), parent_id);
+            }
+
+            // Create appearance streams for checkboxes and radio buttons
+            // Checkbox checked: X mark
+            let checkbox_yes_stream_id = builder.objects.len();
+            {
+                let stream_content =
+                    b"1 0 0 1 0 0 cm\n0.2 0.2 0.2 RG\n1 w\n0 0 m 14 14 l S\n14 0 m 0 14 l S\n";
+                let mut data: Vec<u8> = Vec::new();
+                let _ = write!(
+                    data,
+                    "<< /Type /XObject /Subtype /Form /BBox [0 0 14 14] /Length {} >>\nstream\n",
+                    stream_content.len()
+                );
+                data.extend_from_slice(stream_content);
+                data.extend_from_slice(b"\nendstream");
+                builder.objects.push(PdfObject {
+                    id: checkbox_yes_stream_id,
+                    data,
+                });
+            }
+            // Checkbox unchecked: empty
+            let checkbox_off_stream_id = builder.objects.len();
+            {
+                let stream_content = b"";
+                let mut data: Vec<u8> = Vec::new();
+                let _ = write!(
+                    data,
+                    "<< /Type /XObject /Subtype /Form /BBox [0 0 14 14] /Length {} >>\nstream\n",
+                    stream_content.len()
+                );
+                data.extend_from_slice(stream_content);
+                data.extend_from_slice(b"\nendstream");
+                builder.objects.push(PdfObject {
+                    id: checkbox_off_stream_id,
+                    data,
+                });
+            }
+            // Radio selected: filled circle (bezier approximation)
+            let radio_on_stream_id = builder.objects.len();
+            {
+                // Circle centered at (7,7) radius 5 using 4-segment bezier
+                let k = 2.761; // 5 * 0.5523 (magic number for circle approximation)
+                let stream_content = format!(
+                    "0.2 0.2 0.2 rg\n\
+                     7 12 m {:.2} 12 12 {:.2} 12 7 c\n\
+                     12 {:.2} {:.2} 2 7 2 c\n\
+                     {:.2} 2 2 {:.2} 2 7 c\n\
+                     2 {:.2} {:.2} 12 7 12 c f\n",
+                    7.0 + k,
+                    7.0 + k, // top-right
+                    7.0 - k,
+                    7.0 - k, // bottom-right
+                    7.0 - k,
+                    7.0 - k, // bottom-left
+                    7.0 + k,
+                    7.0 + k, // top-left
+                );
+                let stream_bytes = stream_content.as_bytes();
+                let mut data: Vec<u8> = Vec::new();
+                let _ = write!(
+                    data,
+                    "<< /Type /XObject /Subtype /Form /BBox [0 0 14 14] /Length {} >>\nstream\n",
+                    stream_bytes.len()
+                );
+                data.extend_from_slice(stream_bytes);
+                data.extend_from_slice(b"\nendstream");
+                builder.objects.push(PdfObject {
+                    id: radio_on_stream_id,
+                    data,
+                });
+            }
+            // Radio unselected: empty
+            let radio_off_stream_id = builder.objects.len();
+            {
+                let stream_content = b"";
+                let mut data: Vec<u8> = Vec::new();
+                let _ = write!(
+                    data,
+                    "<< /Type /XObject /Subtype /Form /BBox [0 0 14 14] /Length {} >>\nstream\n",
+                    stream_content.len()
+                );
+                data.extend_from_slice(stream_content);
+                data.extend_from_slice(b"\nendstream");
+                builder.objects.push(PdfObject {
+                    id: radio_off_stream_id,
+                    data,
+                });
+            }
+
+            // Create widget annotation objects per page
+            let mut acroform_field_ids: Vec<usize> = Vec::new();
+            let mut per_page_widget_ids: Vec<Vec<usize>> = vec![Vec::new(); pages.len()];
+            let mut radio_kid_ids: HashMap<String, Vec<usize>> = HashMap::new();
+
+            for field in all_form_fields.iter() {
+                let rect = format!(
+                    "[{:.2} {:.2} {:.2} {:.2}]",
+                    field.x,
+                    field.y,
+                    field.x + field.width,
+                    field.y + field.height
+                );
+                let page_ref = format!("{} 0 R", page_obj_ids[field.page_idx]);
+
+                match &field.field_type {
+                    FormFieldType::TextField {
+                        value,
+                        multiline,
+                        password,
+                        read_only,
+                        max_length,
+                        font_size,
+                        ..
+                    } => {
+                        let mut flags: u32 = 0;
+                        if *multiline {
+                            flags |= 1 << 12; // bit 13 (0-indexed bit 12)
+                        }
+                        if *password {
+                            flags |= 1 << 13; // bit 14
+                        }
+                        if *read_only {
+                            flags |= 1; // bit 1
+                        }
+                        let da = if let Some(helv_id) = helv_obj_id {
+                            let _ = helv_id; // used in /DR, not /DA
+                            format!("/Helv {} Tf 0 g", font_size)
+                        } else {
+                            format!("/Helv {} Tf 0 g", font_size)
+                        };
+                        let v_str = if let Some(ref v) = value {
+                            format!(
+                                " /V ({}) /DV ({})",
+                                Self::escape_pdf_string(v),
+                                Self::escape_pdf_string(v)
+                            )
+                        } else {
+                            String::new()
+                        };
+                        let max_len_str = if let Some(ml) = max_length {
+                            format!(" /MaxLen {}", ml)
+                        } else {
+                            String::new()
+                        };
+                        // Build appearance stream for the text field
+                        let ap_w = field.width;
+                        let ap_h = field.height;
+                        let text_y = if *multiline {
+                            ap_h - *font_size - 2.0
+                        } else {
+                            (ap_h - *font_size) / 2.0
+                        };
+                        let ap_content = if let Some(ref v) = value {
+                            format!(
+                                "1 1 1 rg 0 0 {} {} re f \
+                                 0.6 0.6 0.6 RG 0.5 w 0 0 {} {} re S \
+                                 BT /Helv {} Tf 0 g 2 {} Td ({}) Tj ET",
+                                ap_w,
+                                ap_h,
+                                ap_w,
+                                ap_h,
+                                font_size,
+                                text_y,
+                                Self::escape_pdf_string(v)
+                            )
+                        } else {
+                            format!(
+                                "1 1 1 rg 0 0 {} {} re f \
+                                 0.6 0.6 0.6 RG 0.5 w 0 0 {} {} re S",
+                                ap_w, ap_h, ap_w, ap_h
+                            )
+                        };
+                        let ap_stream_id = builder.objects.len();
+                        let ap_stream = format!(
+                            "<< /Type /XObject /Subtype /Form /BBox [0 0 {} {}] \
+                             /Resources << /Font << /Helv {} 0 R >> >> /Length {} >>\nstream\n{}\nendstream",
+                            ap_w, ap_h,
+                            helv_obj_id.unwrap_or(0),
+                            ap_content.len(),
+                            ap_content
+                        );
+                        builder.objects.push(PdfObject {
+                            id: ap_stream_id,
+                            data: ap_stream.into_bytes(),
+                        });
+
+                        let widget_obj_id = builder.objects.len();
+                        let widget_dict = format!(
+                            "<< /Type /Annot /Subtype /Widget /FT /Tx \
+                             /T ({}) /Rect {} /P {}\
+                             {} /DA ({}) /Ff {}{} \
+                             /MK << /BC [0.6 0.6 0.6] /BG [1 1 1] >> \
+                             /AP << /N {} 0 R >> >>",
+                            Self::escape_pdf_string(&field.name),
+                            rect,
+                            page_ref,
+                            v_str,
+                            da,
+                            flags,
+                            max_len_str,
+                            ap_stream_id
+                        );
+                        builder.objects.push(PdfObject {
+                            id: widget_obj_id,
+                            data: widget_dict.into_bytes(),
+                        });
+                        per_page_widget_ids[field.page_idx].push(widget_obj_id);
+                        acroform_field_ids.push(widget_obj_id);
+                    }
+
+                    FormFieldType::Checkbox {
+                        checked, read_only, ..
+                    } => {
+                        let state = if *checked { "Yes" } else { "Off" };
+                        let mut flags: u32 = 0;
+                        if *read_only {
+                            flags |= 1;
+                        }
+                        let ff_str = if flags > 0 {
+                            format!(" /Ff {}", flags)
+                        } else {
+                            String::new()
+                        };
+                        let widget_obj_id = builder.objects.len();
+                        let widget_dict = format!(
+                            "<< /Type /Annot /Subtype /Widget /FT /Btn \
+                             /T ({}) /Rect {} /P {} \
+                             /V /{} /AS /{}{} \
+                             /MK << /BC [0.6 0.6 0.6] /CA (4) >> \
+                             /AP << /N << /Yes {} 0 R /Off {} 0 R >> >> >>",
+                            Self::escape_pdf_string(&field.name),
+                            rect,
+                            page_ref,
+                            state,
+                            state,
+                            ff_str,
+                            checkbox_yes_stream_id,
+                            checkbox_off_stream_id,
+                        );
+                        builder.objects.push(PdfObject {
+                            id: widget_obj_id,
+                            data: widget_dict.into_bytes(),
+                        });
+                        per_page_widget_ids[field.page_idx].push(widget_obj_id);
+                        acroform_field_ids.push(widget_obj_id);
+                    }
+
+                    FormFieldType::Dropdown {
+                        options,
+                        value,
+                        read_only,
+                        font_size,
+                        ..
+                    } => {
+                        let mut flags: u32 = 1 << 17; // bit 18 = combo box
+                        if *read_only {
+                            flags |= 1;
+                        }
+                        let opts_str: String = options
+                            .iter()
+                            .map(|o| format!("({})", Self::escape_pdf_string(o)))
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let v_str = if let Some(ref v) = value {
+                            format!(" /V ({})", Self::escape_pdf_string(v))
+                        } else {
+                            String::new()
+                        };
+                        // Build appearance stream for the dropdown
+                        let ap_w = field.width;
+                        let ap_h = field.height;
+                        let text_y = (ap_h - *font_size) / 2.0;
+                        let ap_content = if let Some(ref v) = value {
+                            format!(
+                                "1 1 1 rg 0 0 {} {} re f \
+                                 0.6 0.6 0.6 RG 0.5 w 0 0 {} {} re S \
+                                 BT /Helv {} Tf 0 g 2 {} Td ({}) Tj ET",
+                                ap_w,
+                                ap_h,
+                                ap_w,
+                                ap_h,
+                                font_size,
+                                text_y,
+                                Self::escape_pdf_string(v)
+                            )
+                        } else {
+                            format!(
+                                "1 1 1 rg 0 0 {} {} re f \
+                                 0.6 0.6 0.6 RG 0.5 w 0 0 {} {} re S",
+                                ap_w, ap_h, ap_w, ap_h
+                            )
+                        };
+                        let ap_stream_id = builder.objects.len();
+                        let ap_stream = format!(
+                            "<< /Type /XObject /Subtype /Form /BBox [0 0 {} {}] \
+                             /Resources << /Font << /Helv {} 0 R >> >> /Length {} >>\nstream\n{}\nendstream",
+                            ap_w, ap_h,
+                            helv_obj_id.unwrap_or(0),
+                            ap_content.len(),
+                            ap_content
+                        );
+                        builder.objects.push(PdfObject {
+                            id: ap_stream_id,
+                            data: ap_stream.into_bytes(),
+                        });
+
+                        let widget_obj_id = builder.objects.len();
+                        let widget_dict = format!(
+                            "<< /Type /Annot /Subtype /Widget /FT /Ch \
+                             /T ({}) /Rect {} /P {} \
+                             /Opt [{}]{} \
+                             /DA (/Helv {} Tf 0 g) /Ff {} \
+                             /MK << /BC [0.6 0.6 0.6] /BG [1 1 1] >> \
+                             /AP << /N {} 0 R >> >>",
+                            Self::escape_pdf_string(&field.name),
+                            rect,
+                            page_ref,
+                            opts_str,
+                            v_str,
+                            font_size,
+                            flags,
+                            ap_stream_id
+                        );
+                        builder.objects.push(PdfObject {
+                            id: widget_obj_id,
+                            data: widget_dict.into_bytes(),
+                        });
+                        per_page_widget_ids[field.page_idx].push(widget_obj_id);
+                        acroform_field_ids.push(widget_obj_id);
+                    }
+
+                    FormFieldType::RadioButton {
+                        value,
+                        checked,
+                        read_only: _,
+                    } => {
+                        // Radio kid widget — parent reference is critical
+                        let parent_id = radio_parent_ids[&field.name];
+                        let as_value = if *checked { value.as_str() } else { "Off" };
+                        let widget_obj_id = builder.objects.len();
+                        let widget_dict = format!(
+                            "<< /Type /Annot /Subtype /Widget \
+                             /Parent {} 0 R \
+                             /Rect {} /P {} \
+                             /AS /{} \
+                             /AP << /N << /{} {} 0 R /Off {} 0 R >> >> \
+                             /MK << /BC [0.6 0.6 0.6] >> >>",
+                            parent_id,
+                            rect,
+                            page_ref,
+                            Self::escape_pdf_string(as_value),
+                            Self::escape_pdf_string(value),
+                            radio_on_stream_id,
+                            radio_off_stream_id,
+                        );
+                        builder.objects.push(PdfObject {
+                            id: widget_obj_id,
+                            data: widget_dict.into_bytes(),
+                        });
+                        per_page_widget_ids[field.page_idx].push(widget_obj_id);
+                        // Kids go in page /Annots, NOT in /AcroForm /Fields
+                        radio_kid_ids
+                            .entry(field.name.clone())
+                            .or_default()
+                            .push(widget_obj_id);
+                    }
+                }
+            }
+
+            // Fill in radio parent field objects
+            for (group_name, kid_indices) in &radio_kid_ids {
+                let parent_id = radio_parent_ids[group_name];
+                // Find the checked value in this group
+                let checked_value = all_form_fields
+                    .iter()
+                    .filter(|f| f.name == *group_name)
+                    .find_map(|f| {
+                        if let FormFieldType::RadioButton {
+                            ref value, checked, ..
+                        } = f.field_type
+                        {
+                            if checked {
+                                Some(value.clone())
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_else(|| "Off".to_string());
+
+                let kids_refs: String = kid_indices
+                    .iter()
+                    .map(|id| format!("{} 0 R", id))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                let mut flags: u32 = (1 << 14) | (1 << 15); // radio + noToggleToOff
+                                                            // Check if read_only on any button in group
+                let is_read_only = all_form_fields
+                    .iter()
+                    .filter(|f| f.name == *group_name)
+                    .any(|f| {
+                        matches!(
+                            f.field_type,
+                            FormFieldType::RadioButton {
+                                read_only: true,
+                                ..
+                            }
+                        )
+                    });
+                if is_read_only {
+                    flags |= 1;
+                }
+
+                let parent_dict = format!(
+                    "<< /FT /Btn /T ({}) /Ff {} /Kids [{}] /V /{} >>",
+                    Self::escape_pdf_string(group_name),
+                    flags,
+                    kids_refs,
+                    Self::escape_pdf_string(&checked_value),
+                );
+                builder.objects[parent_id].data = parent_dict.into_bytes();
+                acroform_field_ids.push(parent_id);
+            }
+
+            // Now add form widget IDs to the existing page annotation arrays
+            // We need to update the already-written page dicts to include form widgets
+            // Rebuild page dicts with form widget annotations included
+            for (page_idx, widget_ids) in per_page_widget_ids.iter().enumerate() {
+                if widget_ids.is_empty() {
+                    continue;
+                }
+                let page_obj_id = page_obj_ids[page_idx];
+                let existing_page_data =
+                    String::from_utf8_lossy(&builder.objects[page_obj_id].data).to_string();
+
+                // If the page already has /Annots, append to it; otherwise add it
+                let new_refs: String = widget_ids
+                    .iter()
+                    .map(|id| format!("{} 0 R", id))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                let updated = if let Some(pos) = existing_page_data.find("/Annots [") {
+                    // Insert before the closing ]
+                    let bracket_end = existing_page_data[pos..].find(']').unwrap() + pos;
+                    format!(
+                        "{} {}{}",
+                        &existing_page_data[..bracket_end],
+                        new_refs,
+                        &existing_page_data[bracket_end..]
+                    )
+                } else {
+                    // Add /Annots before the final >>
+                    let end = existing_page_data.rfind(">>").unwrap();
+                    format!(
+                        "{} /Annots [{}]{}",
+                        &existing_page_data[..end],
+                        new_refs,
+                        &existing_page_data[end..]
+                    )
+                };
+                builder.objects[page_obj_id].data = updated.into_bytes();
+            }
+
+            // Create AcroForm dictionary
+            let acroform_id = builder.objects.len();
+            let fields_refs: String = acroform_field_ids
+                .iter()
+                .map(|id| format!("{} 0 R", id))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let dr_str = if let Some(helv_id) = helv_obj_id {
+                format!(" /DR << /Font << /Helv {} 0 R >> >>", helv_id)
+            } else {
+                String::new()
+            };
+            let acroform_dict = format!(
+                "<< /Fields [{}] /NeedAppearances true{} /DA (/Helv 0 Tf 0 g) >>",
+                fields_refs, dr_str
+            );
+            builder.objects.push(PdfObject {
+                id: acroform_id,
+                data: acroform_dict.into_bytes(),
+            });
+            Some(acroform_id)
+        } else {
+            None
+        };
+
         // Write Catalog (object 1)
         let mut catalog = String::from("<< /Type /Catalog /Pages 2 0 R");
+        if let Some(acroform_id) = acroform_obj_id {
+            write!(catalog, " /AcroForm {} 0 R", acroform_id).unwrap();
+        }
         if let Some(outlines_id) = outlines_obj_id {
             write!(
                 catalog,
@@ -518,6 +1061,7 @@ impl PdfWriter {
     }
 
     /// Build the PDF content stream for a single page.
+    #[allow(clippy::too_many_arguments)]
     fn build_content_stream_for_page(
         &self,
         page: &LayoutPage,
@@ -526,6 +1070,7 @@ impl PdfWriter {
         page_number: usize,
         total_pages: usize,
         mut tag_builder: Option<&mut tagged::TagBuilder>,
+        flatten_forms: bool,
     ) -> String {
         let mut stream = String::new();
         let page_height = page.height;
@@ -542,6 +1087,7 @@ impl PdfWriter {
                 page_number,
                 total_pages,
                 tag_builder.as_deref_mut(),
+                flatten_forms,
             );
         }
 
@@ -561,6 +1107,7 @@ impl PdfWriter {
         page_number: usize,
         total_pages: usize,
         mut tag_builder: Option<&mut tagged::TagBuilder>,
+        flatten_forms: bool,
     ) {
         // Tagged PDF: emit BDC (begin marked content) for elements with a node_type
         let tagged_mcid = if let Some(ref mut tb) = tag_builder {
@@ -1127,6 +1674,222 @@ impl PdfWriter {
                 }
                 return;
             }
+
+            DrawCommand::FormField { field_type, .. } => {
+                // Draw a visual placeholder so form fields are visible in previews
+                // and non-form-aware viewers. When flatten_forms is true, also render
+                // the field value as static text and skip interactive widgets.
+                let pdf_x = element.x;
+                let pdf_y = page_height - element.y - element.height;
+                let w = element.width;
+                let h = element.height;
+                let _ = writeln!(stream, "q");
+                match field_type {
+                    FormFieldType::Checkbox { checked, .. }
+                    | FormFieldType::RadioButton { checked, .. } => {
+                        // Draw a border square/circle
+                        let _ = writeln!(stream, "0.6 0.6 0.6 RG"); // grey stroke
+                        let _ = writeln!(stream, "0.5 w");
+                        let _ =
+                            writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re S", pdf_x, pdf_y, w, h);
+                        if *checked {
+                            // Draw an X for checked state
+                            let _ = writeln!(stream, "0.2 0.2 0.2 RG");
+                            let _ = writeln!(stream, "1 w");
+                            let inset = w * 0.2;
+                            let _ = writeln!(
+                                stream,
+                                "{:.2} {:.2} m {:.2} {:.2} l S",
+                                pdf_x + inset,
+                                pdf_y + inset,
+                                pdf_x + w - inset,
+                                pdf_y + h - inset
+                            );
+                            let _ = writeln!(
+                                stream,
+                                "{:.2} {:.2} m {:.2} {:.2} l S",
+                                pdf_x + w - inset,
+                                pdf_y + inset,
+                                pdf_x + inset,
+                                pdf_y + h - inset
+                            );
+                        }
+                    }
+                    FormFieldType::TextField {
+                        value,
+                        font_size,
+                        multiline,
+                        password,
+                        ..
+                    } => {
+                        // White fill + grey border
+                        let _ = writeln!(stream, "1 1 1 rg");
+                        let _ = writeln!(stream, "0.6 0.6 0.6 RG");
+                        let _ = writeln!(stream, "0.5 w");
+                        let _ =
+                            writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re B", pdf_x, pdf_y, w, h);
+                        // Render value text when flattening
+                        if flatten_forms {
+                            if let Some(ref val) = value {
+                                if !val.is_empty() {
+                                    let display_text = if *password {
+                                        "\u{2022}".repeat(val.len())
+                                    } else {
+                                        val.clone()
+                                    };
+                                    let font_idx = builder
+                                        .font_objects
+                                        .iter()
+                                        .enumerate()
+                                        .find(|(_, (key, _))| {
+                                            key.family == "Helvetica"
+                                                && key.weight == 400
+                                                && !key.italic
+                                        })
+                                        .map(|(i, _)| i)
+                                        .unwrap_or(0);
+                                    if *multiline {
+                                        // Simple word-wrap for multiline
+                                        let metrics =
+                                            crate::font::StandardFont::Helvetica.metrics();
+                                        let max_w = w - 4.0;
+                                        let mut lines: Vec<String> = Vec::new();
+                                        for paragraph in display_text.split('\n') {
+                                            let mut line = String::new();
+                                            let mut line_w = 0.0;
+                                            for word in paragraph.split_whitespace() {
+                                                let word_w =
+                                                    metrics.measure_string(word, *font_size, 0.0);
+                                                let space_w = if line.is_empty() {
+                                                    0.0
+                                                } else {
+                                                    metrics.measure_string(" ", *font_size, 0.0)
+                                                };
+                                                // Word wider than field — break at character boundary
+                                                if word_w > max_w {
+                                                    let mut char_line = String::new();
+                                                    let mut char_w = 0.0;
+                                                    for ch in word.chars() {
+                                                        let cw = metrics.char_width(ch, *font_size);
+                                                        if !char_line.is_empty()
+                                                            && char_w + cw > max_w
+                                                        {
+                                                            if !line.is_empty() {
+                                                                lines.push(line.clone());
+                                                                line.clear();
+                                                                line_w = 0.0;
+                                                            }
+                                                            lines.push(char_line.clone());
+                                                            char_line.clear();
+                                                            char_w = 0.0;
+                                                        }
+                                                        char_line.push(ch);
+                                                        char_w += cw;
+                                                    }
+                                                    // Remaining chars join the current line
+                                                    if !char_line.is_empty() {
+                                                        if !line.is_empty() {
+                                                            line.push(' ');
+                                                            line_w += metrics.measure_string(
+                                                                " ", *font_size, 0.0,
+                                                            );
+                                                        }
+                                                        line.push_str(&char_line);
+                                                        line_w += char_w;
+                                                    }
+                                                    continue;
+                                                }
+                                                if !line.is_empty()
+                                                    && line_w + space_w + word_w > max_w
+                                                {
+                                                    lines.push(line.clone());
+                                                    line.clear();
+                                                    line_w = 0.0;
+                                                }
+                                                if !line.is_empty() {
+                                                    line.push(' ');
+                                                    line_w += space_w;
+                                                }
+                                                line.push_str(word);
+                                                line_w += word_w;
+                                            }
+                                            if !line.is_empty() {
+                                                lines.push(line);
+                                            }
+                                        }
+                                        let text_y = pdf_y + h - font_size - 2.0;
+                                        for (i, line_text) in lines.iter().enumerate() {
+                                            let ly = text_y - (i as f64) * (font_size * 1.2);
+                                            if ly < pdf_y {
+                                                break;
+                                            }
+                                            let esc = Self::encode_winansi_text(line_text);
+                                            let _ =
+                                                writeln!(
+                                                stream,
+                                                "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
+                                                font_idx, font_size, pdf_x + 2.0, ly, esc
+                                            );
+                                        }
+                                    } else {
+                                        let escaped = Self::encode_winansi_text(&display_text);
+                                        let text_y = pdf_y + (h - font_size) / 2.0;
+                                        let _ = writeln!(
+                                            stream,
+                                            "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
+                                            font_idx,
+                                            font_size,
+                                            pdf_x + 2.0,
+                                            text_y,
+                                            escaped
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    FormFieldType::Dropdown {
+                        value, font_size, ..
+                    } => {
+                        // White fill + grey border
+                        let _ = writeln!(stream, "1 1 1 rg");
+                        let _ = writeln!(stream, "0.6 0.6 0.6 RG");
+                        let _ = writeln!(stream, "0.5 w");
+                        let _ =
+                            writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re B", pdf_x, pdf_y, w, h);
+                        // Render selected value text when flattening
+                        if flatten_forms {
+                            if let Some(ref val) = value {
+                                if !val.is_empty() {
+                                    let font_idx = builder
+                                        .font_objects
+                                        .iter()
+                                        .enumerate()
+                                        .find(|(_, (key, _))| {
+                                            key.family == "Helvetica"
+                                                && key.weight == 400
+                                                && !key.italic
+                                        })
+                                        .map(|(i, _)| i)
+                                        .unwrap_or(0);
+                                    let escaped = Self::encode_winansi_text(val);
+                                    let text_y = pdf_y + (h - font_size) / 2.0;
+                                    let _ = writeln!(
+                                        stream,
+                                        "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
+                                        font_idx,
+                                        font_size,
+                                        pdf_x + 2.0,
+                                        text_y,
+                                        escaped
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+                let _ = writeln!(stream, "Q");
+            }
         }
 
         // Overflow clipping: wrap children in q/clip/Q when overflow is Hidden
@@ -1154,6 +1917,7 @@ impl PdfWriter {
                 page_number,
                 total_pages,
                 tag_builder.as_deref_mut(),
+                flatten_forms,
             );
         }
 
@@ -2087,6 +2851,34 @@ impl PdfWriter {
         }
     }
 
+    /// Collect form field annotations from layout elements.
+    fn collect_form_fields(
+        elements: &[LayoutElement],
+        page_height: f64,
+        page_idx: usize,
+        fields: &mut Vec<FormFieldData>,
+    ) {
+        for element in elements {
+            if let DrawCommand::FormField {
+                ref field_type,
+                ref name,
+            } = element.draw
+            {
+                let pdf_y = page_height - element.y - element.height;
+                fields.push(FormFieldData {
+                    field_type: field_type.clone(),
+                    name: name.clone(),
+                    x: element.x,
+                    y: pdf_y,
+                    width: element.width,
+                    height: element.height,
+                    page_idx,
+                });
+            }
+            Self::collect_form_fields(&element.children, page_height, page_idx, fields);
+        }
+    }
+
     /// Collect bookmarks from layout elements.
     fn collect_bookmarks(
         elements: &[LayoutElement],
@@ -2226,6 +3018,25 @@ impl PdfWriter {
         s.replace('\\', "\\\\")
             .replace('(', "\\(")
             .replace(')', "\\)")
+    }
+
+    /// Encode a string for use in a PDF content stream with WinAnsi encoding.
+    /// Characters outside WinAnsi range are replaced with '?'.
+    fn encode_winansi_text(s: &str) -> String {
+        let mut result = String::with_capacity(s.len());
+        for ch in s.chars() {
+            let b = Self::unicode_to_winansi(ch).unwrap_or(b'?');
+            match b {
+                b'\\' => result.push_str("\\\\"),
+                b'(' => result.push_str("\\("),
+                b')' => result.push_str("\\)"),
+                0x20..=0x7E => result.push(b as char),
+                _ => {
+                    let _ = write!(result, "\\{:03o}", b);
+                }
+            }
+        }
+        result
     }
 
     /// Map a Unicode codepoint to a WinAnsiEncoding byte value.
@@ -2539,7 +3350,7 @@ mod tests {
         }];
         let metadata = Metadata::default();
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None)
+            .write(&pages, &metadata, &font_context, false, None, None, false)
             .unwrap();
 
         assert!(bytes.starts_with(b"%PDF-1.7"));
@@ -2569,7 +3380,7 @@ mod tests {
             lang: None,
         };
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None)
+            .write(&pages, &metadata, &font_context, false, None, None, false)
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
 
@@ -2682,7 +3493,7 @@ mod tests {
 
         let metadata = Metadata::default();
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None)
+            .write(&pages, &metadata, &font_context, false, None, None, false)
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
 
@@ -2839,7 +3650,7 @@ mod tests {
 
         let metadata = Metadata::default();
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None)
+            .write(&pages, &metadata, &font_context, false, None, None, false)
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
 

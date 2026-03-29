@@ -75,6 +75,7 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
         tagged,
         document.pdfa.as_ref(),
         document.embedded_data.as_deref(),
+        document.flatten_forms,
     )
 }
 
@@ -97,6 +98,7 @@ pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), 
         tagged,
         document.pdfa.as_ref(),
         document.embedded_data.as_deref(),
+        document.flatten_forms,
     )?;
     Ok((pdf, layout_info))
 }
