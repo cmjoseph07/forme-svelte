@@ -1,5 +1,5 @@
 import { type ReactElement, isValidElement, Children, Fragment } from 'react';
-import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot } from './components.js';
+import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
   isRefMarker, getRefPath,
@@ -44,6 +44,10 @@ import type {
   PieChartProps,
   AreaChartProps,
   DotPlotProps,
+  TextFieldProps,
+  CheckboxProps,
+  DropdownProps,
+  RadioButtonProps,
 } from './types.js';
 
 // ─── Nesting validation ──────────────────────────────────────────────
@@ -292,6 +296,18 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
   }
   if (element.type === Barcode) {
     return serializeBarcode(element);
+  }
+  if (element.type === TextField) {
+    return serializeTextField(element);
+  }
+  if (element.type === Checkbox) {
+    return serializeCheckbox(element);
+  }
+  if (element.type === Dropdown) {
+    return serializeDropdown(element);
+  }
+  if (element.type === RadioButton) {
+    return serializeRadioButton(element);
   }
   if (element.type === Canvas) {
     return serializeCanvas(element);
@@ -542,6 +558,86 @@ function serializeBarcode(element: ReactElement): FormeNode {
   return {
     kind,
     style,
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeTextField(element: ReactElement): FormeNode {
+  const props = element.props as TextFieldProps;
+  const kind: FormeNodeKind = {
+    type: 'TextField',
+    name: props.name,
+    width: props.width,
+    height: props.height ?? 24,
+    multiline: props.multiline ?? false,
+    password: props.password ?? false,
+    read_only: props.readOnly ?? false,
+    font_size: props.fontSize ?? 12,
+  } as FormeNodeKind;
+  if (props.value !== undefined) (kind as Record<string, unknown>).value = props.value;
+  if (props.placeholder !== undefined) (kind as Record<string, unknown>).placeholder = props.placeholder;
+  if (props.maxLength !== undefined) (kind as Record<string, unknown>).max_length = props.maxLength;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeCheckbox(element: ReactElement): FormeNode {
+  const props = element.props as CheckboxProps;
+  const kind: FormeNodeKind = {
+    type: 'Checkbox',
+    name: props.name,
+    checked: props.checked ?? false,
+    width: props.width ?? 14,
+    height: props.height ?? 14,
+    read_only: props.readOnly ?? false,
+  } as FormeNodeKind;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeDropdown(element: ReactElement): FormeNode {
+  const props = element.props as DropdownProps;
+  const kind: FormeNodeKind = {
+    type: 'Dropdown',
+    name: props.name,
+    options: props.options,
+    width: props.width,
+    height: props.height ?? 24,
+    read_only: props.readOnly ?? false,
+    font_size: props.fontSize ?? 12,
+  } as FormeNodeKind;
+  if (props.value !== undefined) (kind as Record<string, unknown>).value = props.value;
+  return {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+}
+
+function serializeRadioButton(element: ReactElement): FormeNode {
+  const props = element.props as RadioButtonProps;
+  const kind: FormeNodeKind = {
+    type: 'RadioButton',
+    name: props.name,
+    value: props.value,
+    checked: props.checked ?? false,
+    width: props.width ?? 14,
+    height: props.height ?? 14,
+    read_only: props.readOnly ?? false,
+  } as FormeNodeKind;
+  return {
+    kind,
+    style: mapStyle(props.style),
     children: [],
     sourceLocation: extractSourceLocation(element),
   };
@@ -1512,6 +1608,10 @@ function serializeTemplateChild(child: unknown, parent: ParentContext = null): u
   if (element.type === Svg) return serializeSvg(element);
   if (element.type === QrCode) return serializeQrCode(element);
   if (element.type === Barcode) return serializeBarcode(element);
+  if (element.type === TextField) return serializeTextField(element);
+  if (element.type === Checkbox) return serializeCheckbox(element);
+  if (element.type === Dropdown) return serializeDropdown(element);
+  if (element.type === RadioButton) return serializeRadioButton(element);
   if (element.type === Canvas) return serializeCanvas(element);
   if (element.type === Watermark) return serializeWatermark(element);
   if (element.type === BarChart) return serializeBarChart(element);

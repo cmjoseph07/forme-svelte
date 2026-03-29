@@ -1126,6 +1126,179 @@ class DotPlot(_Component):
         }
 
 
+class TextField(_Component):
+    """An interactive text input field (PDF AcroForm widget)."""
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        value: Optional[str] = None,
+        placeholder: Optional[str] = None,
+        width: float = 200.0,
+        height: float = 24.0,
+        multiline: bool = False,
+        password: bool = False,
+        read_only: bool = False,
+        max_length: Optional[int] = None,
+        font_size: float = 12.0,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.name = name
+        self.value = value
+        self.placeholder = placeholder
+        self.width = width
+        self.height = height
+        self.multiline = multiline
+        self.password = password
+        self.read_only = read_only
+        self.max_length = max_length
+        self.font_size = font_size
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "TextField",
+            "name": self.name,
+            "width": self.width,
+            "height": self.height,
+            "multiline": self.multiline,
+            "password": self.password,
+            "read_only": self.read_only,
+            "font_size": self.font_size,
+        }
+        if self.value is not None:
+            kind["value"] = self.value
+        if self.placeholder is not None:
+            kind["placeholder"] = self.placeholder
+        if self.max_length is not None:
+            kind["max_length"] = self.max_length
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class Checkbox(_Component):
+    """An interactive checkbox (PDF AcroForm widget)."""
+
+    def __init__(
+        self,
+        name: str,
+        *,
+        checked: bool = False,
+        width: float = 14.0,
+        height: float = 14.0,
+        read_only: bool = False,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.name = name
+        self.checked = checked
+        self.width = width
+        self.height = height
+        self.read_only = read_only
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": {
+                "type": "Checkbox",
+                "name": self.name,
+                "checked": self.checked,
+                "width": self.width,
+                "height": self.height,
+                "read_only": self.read_only,
+            },
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class Dropdown(_Component):
+    """An interactive dropdown / combo box (PDF AcroForm widget)."""
+
+    def __init__(
+        self,
+        name: str,
+        options: List[str],
+        *,
+        value: Optional[str] = None,
+        width: float = 200.0,
+        height: float = 24.0,
+        read_only: bool = False,
+        font_size: float = 12.0,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.name = name
+        self.options = options
+        self.value = value
+        self.width = width
+        self.height = height
+        self.read_only = read_only
+        self.font_size = font_size
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        kind: Dict[str, Any] = {
+            "type": "Dropdown",
+            "name": self.name,
+            "options": self.options,
+            "width": self.width,
+            "height": self.height,
+            "read_only": self.read_only,
+            "font_size": self.font_size,
+        }
+        if self.value is not None:
+            kind["value"] = self.value
+        return {
+            "kind": kind,
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
+class RadioButton(_Component):
+    """An interactive radio button (PDF AcroForm widget).
+
+    Multiple RadioButtons with the same ``name`` form a mutually exclusive group.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        value: str,
+        *,
+        checked: bool = False,
+        width: float = 14.0,
+        height: float = 14.0,
+        read_only: bool = False,
+        style: Optional[Dict[str, Any]] = None,
+    ):
+        self.name = name
+        self.value = value
+        self.checked = checked
+        self.width = width
+        self.height = height
+        self.read_only = read_only
+        self.style = style
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "kind": {
+                "type": "RadioButton",
+                "name": self.name,
+                "value": self.value,
+                "checked": self.checked,
+                "width": self.width,
+                "height": self.height,
+                "read_only": self.read_only,
+            },
+            "style": _map_style(self.style),
+            "children": [],
+        }
+
+
 class Page(_Component):
     """A page with size and margin configuration."""
 
@@ -1221,11 +1394,12 @@ class Document(_Component):
         """Serialize to a JSON string."""
         return json.dumps(self.to_dict(), **kwargs)
 
-    def render(self, *, embed_data: Any = None) -> bytes:
+    def render(self, *, embed_data: Any = None, flatten_forms: bool = False) -> bytes:
         """Render to PDF bytes using the local WASM engine.
 
         Args:
             embed_data: Optional data to embed in the PDF as a JSON attachment.
+            flatten_forms: When True, form fields are rendered as static text.
 
         Returns:
             Raw PDF file bytes.
@@ -1239,4 +1413,6 @@ class Document(_Component):
         doc = self.to_dict()
         if embed_data is not None:
             doc["embedded_data"] = json.dumps(embed_data)
+        if flatten_forms:
+            doc["flattenForms"] = True
         return render_pdf(json.dumps(doc))

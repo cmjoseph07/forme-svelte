@@ -18,6 +18,10 @@ import type {
   PieChartProps,
   AreaChartProps,
   DotPlotProps,
+  TextFieldProps,
+  CheckboxProps,
+  DropdownProps,
+  RadioButtonProps,
 } from './types.js';
 
 /**
@@ -408,5 +412,88 @@ export function AreaChart(_props: AreaChartProps): null {
  * @param props.showLegend - Show legend. Default: false
  */
 export function DotPlot(_props: DotPlotProps): null {
+  return null;
+}
+
+/**
+ * An interactive text input field (PDF AcroForm widget).
+ *
+ * @param props.name - Unique field name (PDF field identifier)
+ * @param props.width - Field width in points
+ * @param props.height - Field height in points. Default: 24
+ * @param props.value - Pre-filled value
+ * @param props.placeholder - Placeholder text shown when empty
+ * @param props.multiline - Allow multi-line input. Default: false
+ * @param props.password - Mask input. Default: false
+ * @param props.readOnly - Prevent editing. Default: false
+ * @param props.maxLength - Maximum character count
+ * @param props.fontSize - Font size in points. Default: 12
+ *
+ * @example
+ * ```tsx
+ * <TextField name="full_name" width={200} placeholder="Enter your name" />
+ * ```
+ */
+export function TextField(_props: TextFieldProps): null {
+  return null;
+}
+
+/**
+ * An interactive checkbox (PDF AcroForm widget).
+ *
+ * @param props.name - Unique field name
+ * @param props.checked - Whether checked. Default: false
+ * @param props.width - Display width in points. Default: 14
+ * @param props.height - Display height in points. Default: 14
+ * @param props.readOnly - Prevent editing. Default: false
+ *
+ * @example
+ * ```tsx
+ * <Checkbox name="agree_terms" checked={false} />
+ * ```
+ */
+export function Checkbox(_props: CheckboxProps): null {
+  return null;
+}
+
+/**
+ * An interactive dropdown / combo box (PDF AcroForm widget).
+ *
+ * @param props.name - Unique field name
+ * @param props.options - List of selectable options
+ * @param props.value - Pre-selected value
+ * @param props.width - Field width in points
+ * @param props.height - Field height in points. Default: 24
+ * @param props.readOnly - Prevent editing. Default: false
+ * @param props.fontSize - Font size in points. Default: 12
+ *
+ * @example
+ * ```tsx
+ * <Dropdown name="country" options={["US", "UK", "CA"]} width={200} />
+ * ```
+ */
+export function Dropdown(_props: DropdownProps): null {
+  return null;
+}
+
+/**
+ * An interactive radio button (PDF AcroForm widget).
+ * Multiple RadioButtons with the same `name` form a mutually exclusive group.
+ *
+ * @param props.name - Group name (shared by all buttons in the group)
+ * @param props.value - The value this button represents
+ * @param props.checked - Whether selected. Default: false
+ * @param props.width - Display width in points. Default: 14
+ * @param props.height - Display height in points. Default: 14
+ * @param props.readOnly - Prevent editing. Default: false
+ *
+ * @example
+ * ```tsx
+ * <RadioButton name="plan" value="free" checked />
+ * <RadioButton name="plan" value="pro" />
+ * <RadioButton name="plan" value="team" />
+ * ```
+ */
+export function RadioButton(_props: RadioButtonProps): null {
   return null;
 }

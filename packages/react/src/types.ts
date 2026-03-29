@@ -398,6 +398,78 @@ export interface DotPlotProps {
   style?: Style;
 }
 
+export interface TextFieldProps {
+  /** Unique field name (used as the PDF field identifier). */
+  name: string;
+  /** Pre-filled value. */
+  value?: string;
+  /** Placeholder text shown when empty. */
+  placeholder?: string;
+  /** Field width in points. */
+  width: number;
+  /** Field height in points. Default: 24. */
+  height?: number;
+  /** Allow multi-line input. Default: false. */
+  multiline?: boolean;
+  /** Mask input as password. Default: false. */
+  password?: boolean;
+  /** Prevent editing. Default: false. */
+  readOnly?: boolean;
+  /** Maximum number of characters. */
+  maxLength?: number;
+  /** Font size in points. Default: 12. */
+  fontSize?: number;
+  style?: Style;
+}
+
+export interface CheckboxProps {
+  /** Unique field name. */
+  name: string;
+  /** Whether the checkbox is checked. Default: false. */
+  checked?: boolean;
+  /** Display width in points. Default: 14. */
+  width?: number;
+  /** Display height in points. Default: 14. */
+  height?: number;
+  /** Prevent editing. Default: false. */
+  readOnly?: boolean;
+  style?: Style;
+}
+
+export interface DropdownProps {
+  /** Unique field name. */
+  name: string;
+  /** List of selectable options. */
+  options: string[];
+  /** Pre-selected value. */
+  value?: string;
+  /** Field width in points. */
+  width: number;
+  /** Field height in points. Default: 24. */
+  height?: number;
+  /** Prevent editing. Default: false. */
+  readOnly?: boolean;
+  /** Font size in points. Default: 12. */
+  fontSize?: number;
+  style?: Style;
+}
+
+export interface RadioButtonProps {
+  /** Field name — multiple RadioButtons with the same name form a group. */
+  name: string;
+  /** The value this button represents within the group. */
+  value: string;
+  /** Whether this button is selected. Default: false. */
+  checked?: boolean;
+  /** Display width in points. Default: 14. */
+  width?: number;
+  /** Display height in points. Default: 14. */
+  height?: number;
+  /** Prevent editing. Default: false. */
+  readOnly?: boolean;
+  style?: Style;
+}
+
 export interface WatermarkProps {
   /** The watermark text (e.g. "DRAFT", "CONFIDENTIAL"). */
   text: string;
@@ -488,6 +560,7 @@ export interface FormeDocument {
   fonts?: FormeFont[];
   tagged?: boolean;
   pdfa?: '2a' | '2b';
+  flattenForms?: boolean;
 }
 
 export interface FormeMetadata {
@@ -552,6 +625,10 @@ export type FormeNodeKind =
   | { type: 'AreaChart'; series: ChartSeries[]; labels: string[]; width: number; height: number; show_grid: boolean; title?: string }
   | { type: 'DotPlot'; groups: DotPlotGroup[]; width: number; height: number; x_min?: number; x_max?: number; y_min?: number; y_max?: number; x_label?: string; y_label?: string; show_legend: boolean; dot_size: number }
   | { type: 'Watermark'; text: string; font_size: number; angle: number }
+  | { type: 'TextField'; name: string; width: number; height: number; value?: string; placeholder?: string; multiline: boolean; password: boolean; read_only: boolean; max_length?: number; font_size: number }
+  | { type: 'Checkbox'; name: string; width: number; height: number; checked: boolean; read_only: boolean }
+  | { type: 'Dropdown'; name: string; options: string[]; width: number; height: number; value?: string; read_only: boolean; font_size: number }
+  | { type: 'RadioButton'; name: string; value: string; width: number; height: number; checked: boolean; read_only: boolean }
   | { type: 'PageBreak' };
 
 export interface FormeColumnDef {

@@ -21,6 +21,10 @@ from .templates import (
     PieChart,
     AreaChart,
     DotPlot,
+    TextField,
+    Checkbox,
+    Dropdown,
+    RadioButton,
 )
 
 __all__ = [
@@ -48,4 +52,9 @@ __all__ = [
     "PieChart",
     "AreaChart",
     "DotPlot",
+    # Form fields
+    "TextField",
+    "Checkbox",
+    "Dropdown",
+    "RadioButton",
 ]

@@ -147,6 +147,9 @@ export async function renderDocument(
   if (options?.embedData !== undefined) {
     doc.embeddedData = JSON.stringify(options.embedData);
   }
+  if (options?.flattenForms) {
+    doc.flattenForms = true;
+  }
   await Promise.all([resolveFonts(doc), resolveImages(doc)]);
   return renderPdf(JSON.stringify(doc));
 }
@@ -159,6 +162,9 @@ export async function renderDocumentWithLayout(
   const doc = serialize(element) as unknown as Record<string, unknown>;
   if (options?.embedData !== undefined) {
     doc.embeddedData = JSON.stringify(options.embedData);
+  }
+  if (options?.flattenForms) {
+    doc.flattenForms = true;
   }
   await Promise.all([resolveFonts(doc), resolveImages(doc)]);
   return renderPdfWithLayout(JSON.stringify(doc));
@@ -181,6 +187,9 @@ export async function renderSerializedDoc(
   if (options?.embedData !== undefined) {
     doc.embeddedData = JSON.stringify(options.embedData);
   }
+  if (options?.flattenForms) {
+    doc.flattenForms = true;
+  }
   await Promise.all([resolveFonts(doc), resolveImages(doc)]);
   return renderPdf(JSON.stringify(doc));
 }
@@ -194,6 +203,9 @@ export async function renderSerializedDocWithLayout(
 ): Promise<RenderWithLayoutResult> {
   if (options?.embedData !== undefined) {
     doc.embeddedData = JSON.stringify(options.embedData);
+  }
+  if (options?.flattenForms) {
+    doc.flattenForms = true;
   }
   await Promise.all([resolveFonts(doc), resolveImages(doc)]);
   return renderPdfWithLayout(JSON.stringify(doc));

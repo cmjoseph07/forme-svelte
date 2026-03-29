@@ -163,6 +163,8 @@ export async function renderPdfWithLayout(json: string): Promise<RenderWithLayou
 export interface RenderDocumentOptions {
   /** Data to embed as a hidden JSON attachment in the PDF. */
   embedData?: unknown;
+  /** When true, form field values are rendered as static text. No interactive fields in output. */
+  flattenForms?: boolean;
 }
 
 export async function renderDocument(element: ReactElement, options?: RenderDocumentOptions): Promise<Uint8Array> {
@@ -170,6 +172,9 @@ export async function renderDocument(element: ReactElement, options?: RenderDocu
   const doc = serialize(element) as unknown as Record<string, unknown>;
   if (options?.embedData !== undefined) {
     doc.embeddedData = JSON.stringify(options.embedData);
+  }
+  if (options?.flattenForms) {
+    doc.flattenForms = true;
   }
   await Promise.all([resolveFonts(doc), resolveImages(doc)]);
   return renderPdf(JSON.stringify(doc));
@@ -180,6 +185,9 @@ export async function renderDocumentWithLayout(element: ReactElement, options?: 
   const doc = serialize(element) as unknown as Record<string, unknown>;
   if (options?.embedData !== undefined) {
     doc.embeddedData = JSON.stringify(options.embedData);
+  }
+  if (options?.flattenForms) {
+    doc.flattenForms = true;
   }
   await Promise.all([resolveFonts(doc), resolveImages(doc)]);
   return renderPdfWithLayout(JSON.stringify(doc));
