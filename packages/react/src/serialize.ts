@@ -96,6 +96,23 @@ function extractSourceLocation(element: ReactElement): { file: string; line: num
   return undefined;
 }
 
+// ─── Version-independent type checks ─────────────────────────────────
+
+/**
+ * Check if a component type is `Document`, even across different package versions.
+ * Uses `__formeType` marker first (survives minification), then falls back to
+ * `displayName` / `name` for legacy builds without the marker.
+ */
+function isDocumentType(type: unknown): boolean {
+  if (type === Document) return true;
+  if (typeof type === 'function') {
+    return (type as any).__formeType === 'Document'
+      || (type as any).displayName === 'Document'
+      || (type as any).name === 'Document';
+  }
+  return false;
+}
+
 // ─── Component resolution ────────────────────────────────────────────
 
 /**
@@ -106,7 +123,7 @@ function extractSourceLocation(element: ReactElement): { file: string; line: num
  */
 function resolveElement(element: ReactElement): ReactElement {
   let resolved = element;
-  for (let i = 0; i < 10 && typeof resolved.type === 'function' && resolved.type !== Document; i++) {
+  for (let i = 0; i < 10 && typeof resolved.type === 'function' && !isDocumentType(resolved.type); i++) {
     const result = (resolved.type as (props: unknown) => ReactElement)(resolved.props);
     if (!isValidElement(result)) break;
     resolved = result;
@@ -123,7 +140,7 @@ function resolveElement(element: ReactElement): ReactElement {
 export function serialize(element: ReactElement): FormeDocument {
   element = resolveElement(element);
 
-  if (element.type !== Document) {
+  if (!isDocumentType(element.type)) {
     throw new Error('Top-level element must be <Document>');
   }
 
@@ -342,7 +359,7 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
     validateNesting('Page', parent);
     return serializePage(element);
   }
-  if (element.type === Document) {
+  if (isDocumentType(element.type)) {
     // Nested Document — just serialize its children
     const props = element.props as { children?: unknown };
     const childElements = flattenChildren(props.children);
@@ -1454,7 +1471,7 @@ function mergeFonts(
 export function serializeTemplate(element: ReactElement): Record<string, unknown> {
   element = resolveElement(element);
 
-  if (element.type !== Document) {
+  if (!isDocumentType(element.type)) {
     throw new Error('Top-level element must be <Document>');
   }
 

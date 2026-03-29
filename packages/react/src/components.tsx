@@ -46,6 +46,8 @@ import type {
 export function Document(_props: DocumentProps): null {
   return null;
 }
+/** Stable marker for cross-version identity checks (survives minification). */
+(Document as any).__formeType = 'Document';
 
 /**
  * A page boundary with explicit size and margin configuration.

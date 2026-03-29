@@ -546,6 +546,24 @@ describe('Wrapper component resolution', () => {
     }
     expect(() => serialize(<MyView />)).toThrow('Top-level element must be <Document>');
   });
+
+  it('accepts Document with __formeType marker (version mismatch)', () => {
+    // Simulate a different instance of Document from another package version
+    function AnotherDocument(_props: any): null { return null; }
+    (AnotherDocument as any).__formeType = 'Document';
+    const element = React.createElement(AnotherDocument, null,
+      React.createElement(Text, null, 'Hello'),
+    );
+    const doc = serialize(element);
+    expect(doc.children).toHaveLength(1);
+  });
+
+  it('rejects component without Document marker', () => {
+    function NotADocument(_props: any): null { return null; }
+    Object.defineProperty(NotADocument, 'name', { value: 'MyComponent' });
+    const element = React.createElement(NotADocument, null);
+    expect(() => serialize(element)).toThrow('Top-level element must be <Document>');
+  });
 });
 
 // ─── Edge cases ─────────────────────────────────────────────────────
