@@ -237,6 +237,7 @@ fn visual_invoice() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -271,6 +272,7 @@ fn visual_multi_page_text() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -401,6 +403,7 @@ fn visual_table_header_repetition() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -421,7 +424,7 @@ fn visual_flex_layout() {
                     )),
                     width: Some(Dimension::Pt(150.0)),
                     height: Some(Dimension::Pt(80.0)),
-                    margin: Some(Edges::uniform(8.0)),
+                    margin: Some(MarginEdges::from_edges(Edges::uniform(8.0))),
                     ..Default::default()
                 },
                 vec![make_text_node(&format!("Box {}", i + 1), 14.0)],
@@ -452,6 +455,7 @@ fn visual_flex_layout() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -503,6 +507,7 @@ fn visual_justified_text() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -578,6 +583,7 @@ fn visual_line_breaking_greedy_vs_optimal() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -592,10 +598,10 @@ fn visual_text_alignment() {
     let make_aligned = |align: TextAlign, label: &str| {
         make_view_node(
             Style {
-                margin: Some(Edges {
+                margin: Some(MarginEdges::from_edges(Edges {
                     bottom: 12.0,
                     ..Default::default()
-                }),
+                })),
                 ..Default::default()
             },
             vec![
@@ -655,6 +661,7 @@ fn visual_text_alignment() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -682,6 +689,7 @@ fn visual_tagged_no_visual_change() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let doc_tagged = Document {
@@ -697,6 +705,7 @@ fn visual_tagged_no_visual_change() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf_untagged = forme::render(&doc_untagged).unwrap();
@@ -720,4 +729,134 @@ fn visual_tagged_no_visual_change() {
             diff * 100.0
         );
     }
+}
+
+#[test]
+fn visual_flattened_forms() {
+    fn make_form_node(kind: NodeKind) -> Node {
+        Node {
+            kind,
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }
+    }
+
+    let doc = Document {
+        children: vec![Node::page(
+            PageConfig::default(),
+            Style::default(),
+            vec![
+                make_text_node("Flattened Forms Test", 16.0),
+                // TextField with value
+                make_text_node("Name:", 10.0),
+                make_form_node(NodeKind::TextField {
+                    name: "name".to_string(),
+                    value: Some("Jane Smith".to_string()),
+                    placeholder: None,
+                    width: 200.0,
+                    height: 24.0,
+                    multiline: false,
+                    password: false,
+                    read_only: false,
+                    max_length: None,
+                    font_size: 12.0,
+                }),
+                // Password field
+                make_text_node("Password:", 10.0),
+                make_form_node(NodeKind::TextField {
+                    name: "pw".to_string(),
+                    value: Some("secret".to_string()),
+                    placeholder: None,
+                    width: 200.0,
+                    height: 24.0,
+                    multiline: false,
+                    password: true,
+                    read_only: false,
+                    max_length: None,
+                    font_size: 12.0,
+                }),
+                // Checkbox checked
+                make_text_node("Agree:", 10.0),
+                make_form_node(NodeKind::Checkbox {
+                    name: "agree".to_string(),
+                    checked: true,
+                    width: 14.0,
+                    height: 14.0,
+                    read_only: false,
+                }),
+                // Checkbox unchecked
+                make_text_node("Opt-in:", 10.0),
+                make_form_node(NodeKind::Checkbox {
+                    name: "optin".to_string(),
+                    checked: false,
+                    width: 14.0,
+                    height: 14.0,
+                    read_only: false,
+                }),
+                // Dropdown with selected value
+                make_text_node("Size:", 10.0),
+                make_form_node(NodeKind::Dropdown {
+                    name: "size".to_string(),
+                    options: vec![
+                        "Small".to_string(),
+                        "Medium".to_string(),
+                        "Large".to_string(),
+                    ],
+                    value: Some("Medium".to_string()),
+                    width: 150.0,
+                    height: 24.0,
+                    read_only: false,
+                    font_size: 12.0,
+                }),
+                // RadioButton group
+                make_text_node("Color:", 10.0),
+                make_form_node(NodeKind::RadioButton {
+                    name: "color".to_string(),
+                    value: "red".to_string(),
+                    checked: true,
+                    width: 14.0,
+                    height: 14.0,
+                    read_only: false,
+                }),
+                make_form_node(NodeKind::RadioButton {
+                    name: "color".to_string(),
+                    value: "blue".to_string(),
+                    checked: false,
+                    width: 14.0,
+                    height: 14.0,
+                    read_only: false,
+                }),
+                // Empty TextField
+                make_text_node("Empty field:", 10.0),
+                make_form_node(NodeKind::TextField {
+                    name: "empty".to_string(),
+                    value: None,
+                    placeholder: None,
+                    width: 200.0,
+                    height: 24.0,
+                    multiline: false,
+                    password: false,
+                    read_only: false,
+                    max_length: None,
+                    font_size: 12.0,
+                }),
+            ],
+        )],
+        metadata: Default::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: true,
+    };
+
+    let pdf = forme::render(&doc).unwrap();
+    assert_visual_match(&pdf, "visual_flattened_forms", 0.01);
 }

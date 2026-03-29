@@ -116,6 +116,7 @@ fn default_doc(children: Vec<Node>) -> Document {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     }
 }
 
@@ -536,6 +537,7 @@ fn test_metadata_in_output() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -673,6 +675,7 @@ fn render_with_custom_font(font_data: &[u8], text: &str) -> Vec<u8> {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let engine = LayoutEngine::new();
@@ -686,6 +689,7 @@ fn render_with_custom_font(font_data: &[u8], text: &str) -> Vec<u8> {
             doc.tagged,
             doc.pdfa.as_ref(),
             doc.embedded_data.as_deref(),
+            doc.flatten_forms,
         )
         .unwrap()
 }
@@ -821,13 +825,22 @@ fn test_mixed_standard_and_custom_fonts() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let engine = LayoutEngine::new();
     let pages = engine.layout(&doc, &font_context);
     let writer = PdfWriter::new();
     let bytes = writer
-        .write(&pages, &doc.metadata, &font_context, false, None, None)
+        .write(
+            &pages,
+            &doc.metadata,
+            &font_context,
+            false,
+            None,
+            None,
+            false,
+        )
         .unwrap();
 
     assert_valid_pdf(&bytes);
@@ -3120,6 +3133,7 @@ fn test_breakable_view_with_background_splits_across_pages() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3196,6 +3210,7 @@ fn test_breakable_view_background_does_not_overlap_footer() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3263,6 +3278,7 @@ fn test_breakable_view_without_visual_stays_unwrapped() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3590,6 +3606,7 @@ fn test_breakable_view_continuation_page_has_top_padding() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3943,6 +3960,7 @@ fn test_document_lang_in_pdf_catalog() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -4180,6 +4198,7 @@ fn test_justified_text_produces_valid_pdf() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).expect("Should render justified text");
@@ -4233,6 +4252,7 @@ fn test_lang_inherits_to_text_nodes() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     // Just verify it renders without error — lang cascading is tested at the unit level
@@ -4301,6 +4321,7 @@ fn test_per_node_lang_override() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).expect("Should render with per-node lang override");
@@ -4324,6 +4345,7 @@ fn test_tagged_pdf_has_struct_tree_root() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4377,6 +4399,7 @@ fn test_tagged_pdf_parent_tree_consistency() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4448,6 +4471,7 @@ fn test_tagged_pdf_nested_text_roles() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4541,6 +4565,7 @@ fn test_tagged_pdf_table_th_td() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4591,6 +4616,7 @@ fn test_tagged_pdf_figure_alt_text() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4856,6 +4882,7 @@ fn test_qrcode_renders_to_pdf() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).expect("QR code should render to PDF");
@@ -4886,6 +4913,7 @@ fn test_qrcode_with_explicit_size() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -4928,6 +4956,7 @@ fn test_qrcode_page_break() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -4982,6 +5011,7 @@ fn test_font_fallback_chain_in_document() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).expect("Fallback chain should render");
@@ -5057,6 +5087,7 @@ fn test_text_overflow_ellipsis_single_line() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5427,6 +5458,7 @@ fn test_document_default_style() {
             ..Default::default()
         }),
         embedded_data: None,
+        flatten_forms: false,
     };
     let pdf = render_to_pdf(&doc);
     let pdf_str = String::from_utf8_lossy(&pdf);
@@ -5454,6 +5486,7 @@ fn test_embedded_data_round_trip() {
         pdfa: None,
         default_style: None,
         embedded_data: Some(data.to_string()),
+        flatten_forms: false,
     };
     let pdf = render_to_pdf(&doc);
     assert_valid_pdf(&pdf);
@@ -5538,6 +5571,7 @@ fn test_barcode_renders_to_pdf() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let pdf = forme::render(&doc).expect("Barcode should render to PDF");
@@ -5602,6 +5636,7 @@ fn test_barcode_layout_dimensions() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5651,6 +5686,7 @@ fn auto_margin_horizontal_centers_child() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5704,6 +5740,7 @@ fn auto_margin_left_pushes_right() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -6021,6 +6058,7 @@ fn test_bar_chart_layout_dimensions() {
         pdfa: None,
         default_style: None,
         embedded_data: None,
+        flatten_forms: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -6068,4 +6106,684 @@ fn test_multiple_charts_on_same_page() {
     }"##;
     let pdf = forme::render_json(json).expect("Multiple charts should render");
     assert!(pdf.starts_with(b"%PDF"));
+}
+
+// ─── Form Field Tests ──────────────────────────────────────────────
+
+#[test]
+fn test_text_field_renders_to_pdf() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField",
+                "name": "full_name",
+                "width": 200,
+                "height": 24,
+                "multiline": false,
+                "password": false,
+                "read_only": false,
+                "font_size": 12
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("TextField should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/AcroForm"),
+        "PDF should contain AcroForm dictionary"
+    );
+    assert!(
+        pdf_str.contains("/FT /Tx"),
+        "PDF should contain text field type"
+    );
+    assert!(
+        pdf_str.contains("/T (full_name)"),
+        "PDF should contain field name"
+    );
+}
+
+#[test]
+fn test_checkbox_renders_to_pdf() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "Checkbox",
+                "name": "agree_terms",
+                "checked": true,
+                "width": 14,
+                "height": 14,
+                "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Checkbox should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/AcroForm"),
+        "PDF should contain AcroForm dictionary"
+    );
+    assert!(
+        pdf_str.contains("/FT /Btn"),
+        "PDF should contain button field type"
+    );
+    assert!(
+        pdf_str.contains("/T (agree_terms)"),
+        "PDF should contain field name"
+    );
+    assert!(
+        pdf_str.contains("/V /Yes"),
+        "Checked checkbox should have /V /Yes"
+    );
+}
+
+#[test]
+fn test_dropdown_renders_to_pdf() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "Dropdown",
+                "name": "country",
+                "options": ["US", "UK", "CA"],
+                "width": 200,
+                "height": 24,
+                "read_only": false,
+                "font_size": 12
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Dropdown should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/AcroForm"),
+        "PDF should contain AcroForm dictionary"
+    );
+    assert!(
+        pdf_str.contains("/FT /Ch"),
+        "PDF should contain choice field type"
+    );
+    assert!(
+        pdf_str.contains("/T (country)"),
+        "PDF should contain field name"
+    );
+    assert!(pdf_str.contains("/Opt"), "PDF should contain options array");
+}
+
+#[test]
+fn test_radio_button_group_renders_to_pdf() {
+    let json = r#"{
+        "children": [
+            {
+                "kind": {
+                    "type": "RadioButton",
+                    "name": "plan",
+                    "value": "free",
+                    "checked": true,
+                    "width": 14,
+                    "height": 14,
+                    "read_only": false
+                },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "RadioButton",
+                    "name": "plan",
+                    "value": "pro",
+                    "checked": false,
+                    "width": 14,
+                    "height": 14,
+                    "read_only": false
+                },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "RadioButton",
+                    "name": "plan",
+                    "value": "team",
+                    "checked": false,
+                    "width": 14,
+                    "height": 14,
+                    "read_only": false
+                },
+                "style": {},
+                "children": []
+            }
+        ],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("RadioButton group should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/AcroForm"),
+        "PDF should contain AcroForm dictionary"
+    );
+    assert!(
+        pdf_str.contains("/T (plan)"),
+        "PDF should contain radio group name"
+    );
+    assert!(
+        pdf_str.contains("/Ff 49152"),
+        "Radio parent should have radio+noToggleToOff flags"
+    );
+    assert!(
+        pdf_str.contains("/Kids"),
+        "Radio parent should have /Kids array"
+    );
+    assert!(
+        pdf_str.contains("/V /free"),
+        "Radio group should have /V /free (checked value)"
+    );
+}
+
+#[test]
+fn test_mixed_form_fields_on_same_page() {
+    let json = r#"{
+        "children": [
+            {
+                "kind": {
+                    "type": "TextField",
+                    "name": "name",
+                    "width": 200,
+                    "height": 24,
+                    "multiline": false,
+                    "password": false,
+                    "read_only": false,
+                    "font_size": 12
+                },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": { "type": "Text", "content": "Some text between fields" },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "Checkbox",
+                    "name": "agree",
+                    "checked": false,
+                    "width": 14,
+                    "height": 14,
+                    "read_only": false
+                },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "Dropdown",
+                    "name": "color",
+                    "options": ["Red", "Green", "Blue"],
+                    "width": 150,
+                    "height": 24,
+                    "read_only": false,
+                    "font_size": 12
+                },
+                "style": {},
+                "children": []
+            }
+        ],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Mixed form fields should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(pdf_str.contains("/AcroForm"), "PDF should contain AcroForm");
+    assert!(pdf_str.contains("/FT /Tx"), "PDF should contain text field");
+    assert!(pdf_str.contains("/FT /Btn"), "PDF should contain checkbox");
+    assert!(
+        pdf_str.contains("/FT /Ch"),
+        "PDF should contain choice field"
+    );
+}
+
+#[test]
+fn test_no_form_fields_no_acroform() {
+    let json = r#"{
+        "children": [{
+            "kind": { "type": "Text", "content": "Hello, no forms here" },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Should render without form fields");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "PDF without form fields should not have /AcroForm"
+    );
+}
+
+#[test]
+fn test_text_field_with_value_and_placeholder() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField",
+                "name": "email",
+                "value": "test@example.com",
+                "placeholder": "Enter email",
+                "width": 250,
+                "height": 30,
+                "multiline": false,
+                "password": false,
+                "read_only": false,
+                "font_size": 14
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("TextField with value should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/V (test@example.com)"),
+        "PDF should contain field value"
+    );
+}
+
+#[test]
+fn test_text_field_multiline_flag() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField",
+                "name": "notes",
+                "width": 300,
+                "height": 100,
+                "multiline": true,
+                "password": false,
+                "read_only": false,
+                "font_size": 12
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Multiline text field should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    // Multiline flag is bit 13 (4096) in the /Ff field
+    assert!(
+        pdf_str.contains("/Ff 4096"),
+        "Multiline text field should have bit 13 set"
+    );
+}
+
+#[test]
+fn test_dropdown_with_selected_value() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "Dropdown",
+                "name": "size",
+                "options": ["Small", "Medium", "Large"],
+                "value": "Medium",
+                "width": 150,
+                "height": 24,
+                "read_only": false,
+                "font_size": 12
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Dropdown with value should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/V (Medium)"),
+        "Dropdown should have selected value"
+    );
+}
+
+// ─── Form flattening tests ───────────────────────────────────────────
+
+#[test]
+fn test_flatten_text_field_with_value() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField", "name": "name", "width": 200, "height": 24,
+                "value": "Jane Smith", "font_size": 12,
+                "multiline": false, "password": false, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened text field should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    // No AcroForm in flattened output
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    // No interactive widget annotations
+    assert!(
+        !pdf_str.contains("/FT /Tx"),
+        "Flattened PDF should not contain text field widgets"
+    );
+    // Valid PDF structure
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+}
+
+#[test]
+fn test_flatten_checkbox_checked() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "Checkbox", "name": "agree", "width": 14, "height": 14,
+                "checked": true, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened checkbox should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    assert!(
+        !pdf_str.contains("/FT /Btn"),
+        "Flattened PDF should not contain button field widgets"
+    );
+}
+
+#[test]
+fn test_flatten_dropdown_with_value() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "Dropdown", "name": "size", "width": 150, "height": 24,
+                "options": ["Small", "Medium", "Large"], "value": "Medium",
+                "read_only": false, "font_size": 12
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened dropdown should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    assert!(
+        !pdf_str.contains("/FT /Ch"),
+        "Flattened PDF should not contain choice field widgets"
+    );
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+}
+
+#[test]
+fn test_flatten_radio_button_group() {
+    let json = r#"{
+        "children": [
+            {
+                "kind": {
+                    "type": "RadioButton", "name": "color", "value": "red",
+                    "width": 14, "height": 14, "checked": true, "read_only": false
+                },
+                "style": {}, "children": []
+            },
+            {
+                "kind": {
+                    "type": "RadioButton", "name": "color", "value": "blue",
+                    "width": 14, "height": 14, "checked": false, "read_only": false
+                },
+                "style": {}, "children": []
+            }
+        ],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened radio buttons should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    // No radio button field type in flattened output
+    assert!(
+        !pdf_str.contains("/FT /Btn"),
+        "Flattened PDF should not contain button field widgets"
+    );
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+}
+
+#[test]
+fn test_flatten_empty_text_field() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField", "name": "empty", "width": 200, "height": 24,
+                "font_size": 12,
+                "multiline": false, "password": false, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened empty field should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    // Should still produce a valid PDF
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+}
+
+#[test]
+fn test_non_flattened_default_has_acroform() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField", "name": "name", "width": 200, "height": 24,
+                "value": "Test", "font_size": 12,
+                "multiline": false, "password": false, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": []
+    }"#;
+    let pdf = forme::render_json(json).expect("Non-flattened form should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/AcroForm"),
+        "Non-flattened PDF should contain /AcroForm"
+    );
+}
+
+#[test]
+fn test_flatten_mixed_content() {
+    let json = r#"{
+        "children": [
+            {
+                "kind": { "type": "Text", "content": "Hello World" },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "TextField", "name": "field1", "width": 200, "height": 24,
+                    "value": "Static Value", "font_size": 12,
+                    "multiline": false, "password": false, "read_only": false
+                },
+                "style": {},
+                "children": []
+            },
+            {
+                "kind": {
+                    "type": "Checkbox", "name": "check1", "width": 14, "height": 14,
+                    "checked": true, "read_only": false
+                },
+                "style": {},
+                "children": []
+            }
+        ],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened mixed content should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    // Regular text should still render, valid PDF
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+    // No interactive field types
+    assert!(
+        !pdf_str.contains("/FT /Tx"),
+        "Flattened PDF should not contain text field widgets"
+    );
+}
+
+#[test]
+fn test_flatten_password_field_renders_dots() {
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField", "name": "pw", "width": 200, "height": 24,
+                "value": "secret", "font_size": 12,
+                "multiline": false, "password": true, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened password field should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    // No AcroForm in flattened output
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    // Password value must not appear as plain text
+    assert!(
+        !pdf_str.contains("secret"),
+        "Flattened password field should not contain plain text value"
+    );
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+}
+
+#[test]
+fn test_flatten_multiline_long_word() {
+    // 50 'A's in a narrow field — should break at character boundary
+    let long_word = "A".repeat(50);
+    let json = format!(
+        r#"{{
+        "children": [{{
+            "kind": {{
+                "type": "TextField", "name": "long", "width": 80, "height": 100,
+                "value": "{}", "font_size": 10,
+                "multiline": true, "password": false, "read_only": false
+            }},
+            "style": {{}},
+            "children": []
+        }}],
+        "metadata": {{}},
+        "defaultPage": {{}},
+        "fonts": [],
+        "flattenForms": true
+    }}"#,
+        long_word
+    );
+    let pdf = forme::render_json(&json).expect("Flattened multiline long word should render");
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+}
+
+#[test]
+fn test_flatten_text_field_non_ascii() {
+    // Euro sign (U+20AC) and en-dash (U+2013) — both in WinAnsi
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField", "name": "price", "width": 200, "height": 24,
+                "value": "\u20AC100 \u2013 price", "font_size": 12,
+                "multiline": false, "password": false, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened non-ASCII text should render");
+    assert!(pdf.starts_with(b"%PDF-1.7"));
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
 }
