@@ -47,10 +47,14 @@ pub mod wasm;
 pub mod wasm_raw;
 
 pub use error::FormeError;
+pub use layout::LayoutInfo;
+pub use model::{ChartDataPoint, ChartSeries, DotPlotGroup};
+pub use model::{ColumnDef, ColumnWidth, FontEntry, TextRun};
+pub use model::{Document, Metadata, Node, NodeKind, PageConfig, PageSize};
+pub use style::Style;
 
 use font::FontContext;
-use layout::{LayoutEngine, LayoutInfo};
-use model::{Document, FontEntry};
+use layout::LayoutEngine;
 use pdf::PdfWriter;
 
 /// Render a document to PDF bytes.

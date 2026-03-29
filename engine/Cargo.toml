@@ -1,8 +1,20 @@
 [package]
-name = "forme"
+name = "forme-pdf"
 version = "0.7.13"
 edition = "2021"
 description = "A page-native PDF rendering engine. Layout INTO pages, not onto an infinite canvas."
+license = "MIT"
+repository = "https://github.com/formepdf/forme"
+homepage = "https://formepdf.com"
+documentation = "https://docs.rs/forme-pdf"
+readme = "README.md"
+keywords = ["pdf", "wasm", "layout", "document", "report"]
+categories = ["rendering", "encoding", "wasm"]
+exclude = [
+    "target/",
+    "tests/references/",
+    "output.pdf",
+]
 
 [dependencies]
 # Compression for PDF content streams
