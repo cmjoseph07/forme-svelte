@@ -6944,3 +6944,154 @@ fn test_pdf_ua_and_pdfa_combined_xmp() {
         "PDF/UA doc should have structure tree"
     );
 }
+
+// ─── Tagged PDF compliance tests ───────────────────────────────────
+
+#[test]
+fn test_tagged_pdf_has_tab_order() {
+    let doc = Document {
+        children: vec![Node::text("Tab order test", Style::default())],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: true,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(
+        text.contains("/Tabs /S"),
+        "Tagged PDF pages must have /Tabs /S for structure-order tab navigation"
+    );
+}
+
+#[test]
+fn test_untagged_pdf_no_tab_order() {
+    let doc = Document {
+        children: vec![Node::text("No tabs", Style::default())],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(
+        !text.contains("/Tabs"),
+        "Non-tagged PDF should not contain /Tabs"
+    );
+}
+
+#[test]
+fn test_tagged_role_map_complete() {
+    let doc = Document {
+        children: vec![Node::text("RoleMap test", Style::default())],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: true,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("/H1 /H1"), "RoleMap must include H1");
+    assert!(text.contains("/L /L"), "RoleMap must include L (list)");
+    assert!(text.contains("/THead /THead"), "RoleMap must include THead");
+    assert!(text.contains("/Link /Link"), "RoleMap must include Link");
+    assert!(
+        text.contains("/BlockQuote /BlockQuote"),
+        "RoleMap must include BlockQuote"
+    );
+}
+
+#[test]
+fn test_tagged_struct_tree_has_lang() {
+    let doc = Document {
+        children: vec![Node::text("Lang test", Style::default())],
+        metadata: Metadata {
+            lang: Some("en-US".to_string()),
+            ..Default::default()
+        },
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: true,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    // /Lang should appear on both Catalog and StructTreeRoot
+    assert!(
+        text.contains("/Type /StructTreeRoot"),
+        "Tagged doc must have StructTreeRoot"
+    );
+    // Count /Lang occurrences — should be at least 2 (Catalog + StructTreeRoot)
+    let lang_count = text.matches("/Lang (en-US)").count();
+    assert!(
+        lang_count >= 2,
+        "Expected /Lang (en-US) on both Catalog and StructTreeRoot, found {} occurrences",
+        lang_count
+    );
+}
+
+#[test]
+fn test_tagged_watermark_not_in_structure_tree() {
+    // Watermarks should be artifact-tagged (not structure-tagged) in tagged PDFs.
+    // When properly artifact-tagged, they don't appear in the structure tree.
+    // The structure tree should only have: Document, Page (Div), and Text (P).
+    let json = r#"{
+        "children": [{
+            "kind": { "type": "Page", "config": { "size": "A4", "margin": { "top": 54, "right": 54, "bottom": 54, "left": 54 }, "wrap": true } },
+            "style": {},
+            "children": [
+                {
+                    "kind": { "type": "Watermark", "text": "DRAFT", "font_size": 60, "angle": -45 },
+                    "style": {},
+                    "children": []
+                },
+                {
+                    "kind": { "type": "Text", "content": "Real content", "runs": [] },
+                    "style": {},
+                    "children": []
+                }
+            ]
+        }],
+        "metadata": {},
+        "tagged": true
+    }"#;
+    let bytes = forme::render_json(json).unwrap();
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+
+    // The structure tree should have /StructTreeRoot
+    assert!(text.contains("/Type /StructTreeRoot"));
+
+    // Count StructElem objects — watermark should NOT generate one.
+    // Expected: Page→Div, Text→P (2 structure elements, not 3).
+    let struct_elem_count = text.matches("/Type /StructElem").count();
+    assert_eq!(
+        struct_elem_count, 2,
+        "Watermark should not be in structure tree (expected 2 StructElems: Div + P, got {})",
+        struct_elem_count
+    );
+}

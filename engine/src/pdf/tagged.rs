@@ -162,6 +162,7 @@ impl TagBuilder {
         &self,
         objects: &mut Vec<super::PdfObject>,
         page_obj_ids: &[usize],
+        lang: Option<&str>,
     ) -> (usize, usize) {
         let num_pages = page_obj_ids.len();
 
@@ -196,11 +197,17 @@ impl TagBuilder {
         {
             let root = &self.elements[0];
             let kids_str = self.format_kids(&root.kids, &elem_obj_ids, page_obj_ids);
+            let lang_str = if let Some(l) = lang {
+                format!(" /Lang ({})", super::PdfWriter::escape_pdf_string(l))
+            } else {
+                String::new()
+            };
             let data = format!(
-                "<< /Type /StructTreeRoot /K [{kids}] /ParentTree {pt} 0 R /RoleMap {rm} 0 R >>",
+                "<< /Type /StructTreeRoot /K [{kids}] /ParentTree {pt} 0 R /RoleMap {rm} 0 R{lang} >>",
                 kids = kids_str,
                 pt = parent_tree_id,
                 rm = role_map_id,
+                lang = lang_str,
             );
             objects[root_obj_id].data = data.into_bytes();
         }
@@ -253,9 +260,21 @@ impl TagBuilder {
         let parent_tree_data = format!("<< /Nums [{}] >>", nums.trim());
         objects[parent_tree_id].data = parent_tree_data.into_bytes();
 
-        // RoleMap: identity mapping for our standard roles
-        let role_map_data = "<< /Document /Document /Div /Div /P /P /Span /Span /Table /Table \
-             /TR /TR /TH /TH /TD /TD /Figure /Figure >>"
+        // RoleMap: identity mapping for all PDF 1.7 standard structure roles.
+        // Comprehensive mapping prevents veraPDF from flagging unmapped roles.
+        let role_map_data = "<< \
+             /Document /Document /Part /Part /Art /Art /Sect /Sect /Div /Div \
+             /BlockQuote /BlockQuote /Caption /Caption /TOC /TOC /TOCI /TOCI \
+             /Index /Index /NonStruct /NonStruct /Private /Private \
+             /P /P /H /H /H1 /H1 /H2 /H2 /H3 /H3 /H4 /H4 /H5 /H5 /H6 /H6 \
+             /Span /Span /Quote /Quote /Note /Note /Reference /Reference \
+             /BibEntry /BibEntry /Code /Code /Link /Link /Annot /Annot \
+             /Ruby /Ruby /RB /RB /RT /RT /RP /RP \
+             /Warichu /Warichu /WT /WT /WP /WP \
+             /L /L /LI /LI /Lbl /Lbl /LBody /LBody \
+             /Table /Table /TR /TR /TH /TH /TD /TD \
+             /THead /THead /TBody /TBody /TFoot /TFoot \
+             /Figure /Figure /Formula /Formula /Form /Form >>"
             .to_string();
         objects[role_map_id].data = role_map_data.into_bytes();
 

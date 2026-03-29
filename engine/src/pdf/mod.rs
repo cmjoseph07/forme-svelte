@@ -331,7 +331,7 @@ impl PdfWriter {
             let page_obj_id = page_obj_ids[page_idx];
             let content_obj_id = per_page_content_obj_ids[page_idx];
             let struct_parents_str = if tagged {
-                format!(" /StructParents {}", page_idx)
+                format!(" /StructParents {} /Tabs /S", page_idx)
             } else {
                 String::new()
             };
@@ -357,7 +357,11 @@ impl PdfWriter {
 
         // Build structure tree for tagged PDF
         let struct_tree_root_id = if let Some(ref tb) = tag_builder {
-            let (root_id, _parent_tree_id) = tb.write_objects(&mut builder.objects, &page_obj_ids);
+            let (root_id, _parent_tree_id) = tb.write_objects(
+                &mut builder.objects,
+                &page_obj_ids,
+                metadata.lang.as_deref(),
+            );
             Some(root_id)
         } else {
             None
@@ -1113,15 +1117,28 @@ impl PdfWriter {
         mut tag_builder: Option<&mut tagged::TagBuilder>,
         flatten_forms: bool,
     ) {
-        // Tagged PDF: emit BDC (begin marked content) for elements with a node_type
+        // Tagged PDF: emit BDC (begin marked content) for elements with a node_type,
+        // or /Artifact BMC for decorative elements (watermarks, untagged drawing).
+        let mut is_artifact = false;
         let tagged_mcid = if let Some(ref mut tb) = tag_builder {
             if let Some(ref nt) = element.node_type {
-                let is_header = element.is_header_row;
-                // For TableCell, inherit is_header_row from its parent row
-                let mcid = tb.begin_element(nt, is_header, element.alt.as_deref(), page_idx);
-                let role = tb.map_role_public(nt, is_header);
-                let _ = writeln!(stream, "/{} <</MCID {}>> BDC", role, mcid);
-                Some(mcid)
+                if nt == "Watermark" {
+                    // Watermarks are decorative — mark as artifact, not structure
+                    let _ = writeln!(stream, "/Artifact BMC");
+                    is_artifact = true;
+                    None
+                } else {
+                    let is_header = element.is_header_row;
+                    let mcid = tb.begin_element(nt, is_header, element.alt.as_deref(), page_idx);
+                    let role = tb.map_role_public(nt, is_header);
+                    let _ = writeln!(stream, "/{} <</MCID {}>> BDC", role, mcid);
+                    Some(mcid)
+                }
+            } else if !matches!(element.draw, DrawCommand::None) {
+                // No node_type but has drawing — wrap as artifact
+                let _ = writeln!(stream, "/Artifact BMC");
+                is_artifact = true;
+                None
             } else {
                 None
             }
@@ -1444,6 +1461,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return; // Don't increment counter again for children
             }
@@ -1462,6 +1481,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return;
             }
@@ -1502,6 +1523,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return;
             }
@@ -1532,6 +1555,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return;
             }
@@ -1563,6 +1588,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return;
             }
@@ -1588,6 +1615,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return;
             }
@@ -1675,6 +1704,8 @@ impl PdfWriter {
                     if let Some(ref mut tb) = tag_builder {
                         tb.end_element();
                     }
+                } else if is_artifact {
+                    let _ = writeln!(stream, "EMC");
                 }
                 return;
             }
@@ -1935,6 +1966,8 @@ impl PdfWriter {
             if let Some(ref mut tb) = tag_builder {
                 tb.end_element();
             }
+        } else if is_artifact {
+            let _ = writeln!(stream, "EMC");
         }
     }
 
