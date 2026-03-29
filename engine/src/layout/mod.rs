@@ -5441,6 +5441,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5497,6 +5498,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5554,6 +5556,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5622,6 +5625,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5769,6 +5773,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5836,6 +5841,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5915,6 +5921,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5972,6 +5979,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6040,6 +6048,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6119,6 +6128,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6197,6 +6207,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6269,6 +6280,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6333,6 +6345,7 @@ mod tests {
             default_style: None,
             embedded_data: None,
             flatten_forms: false,
+            pdf_ua: false,
         };
 
         let pages = engine.layout(&doc, &font_context);

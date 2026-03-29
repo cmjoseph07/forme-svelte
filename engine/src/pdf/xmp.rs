@@ -1,31 +1,68 @@
-//! # XMP Metadata for PDF/A
+//! # XMP Metadata for PDF/A and PDF/UA
 //!
 //! Generates the XMP (Extensible Metadata Platform) XML packet required by
-//! PDF/A. Written as an uncompressed metadata stream referenced from the
-//! Catalog via `/Metadata`.
+//! PDF/A and PDF/UA. Written as an uncompressed metadata stream referenced
+//! from the Catalog via `/Metadata`.
 
 use crate::model::{Metadata, PdfAConformance};
 
-/// Generate XMP metadata XML for a PDF/A document.
-pub fn generate_xmp(metadata: &Metadata, conformance: &PdfAConformance) -> String {
-    let (part, conf) = match conformance {
-        PdfAConformance::A2a => ("2", "A"),
-        PdfAConformance::A2b => ("2", "B"),
-    };
-
+/// Generate XMP metadata XML for PDF/A and/or PDF/UA documents.
+pub fn generate_xmp(
+    metadata: &Metadata,
+    conformance: Option<&PdfAConformance>,
+    pdf_ua: bool,
+) -> String {
     let title = metadata.title.as_deref().unwrap_or("Untitled");
     let creator = metadata.creator.as_deref().unwrap_or("Forme");
+
+    // Build namespace declarations
+    let mut namespaces = vec![
+        r#"xmlns:dc="http://purl.org/dc/elements/1.1/""#.to_string(),
+        r#"xmlns:xmp="http://ns.adobe.com/xap/1.0/""#.to_string(),
+        r#"xmlns:pdf="http://ns.adobe.com/pdf/1.3/""#.to_string(),
+    ];
+    if conformance.is_some() {
+        namespaces.push(r#"xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/""#.to_string());
+    }
+    if pdf_ua {
+        namespaces.push(r#"xmlns:pdfuaid="http://www.aiim.org/pdfua/ns/id/""#.to_string());
+    }
+
+    // Build conformance entries
+    let mut entries = String::new();
+    if let Some(conf) = conformance {
+        let (part, level) = match conf {
+            PdfAConformance::A2a => ("2", "A"),
+            PdfAConformance::A2b => ("2", "B"),
+        };
+        entries.push_str(&format!(
+            "      <pdfaid:part>{}</pdfaid:part>\n      <pdfaid:conformance>{}</pdfaid:conformance>\n",
+            part, level
+        ));
+    }
+    if pdf_ua {
+        entries.push_str("      <pdfuaid:part>1</pdfuaid:part>\n");
+    }
+
+    let ns_str = namespaces
+        .iter()
+        .enumerate()
+        .map(|(i, ns)| {
+            if i == 0 {
+                format!("\n      {}", ns)
+            } else {
+                format!("      {}", ns)
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
 
     // XMP packet — must not be compressed per PDF/A spec
     format!(
         r#"<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
 <x:xmpmeta xmlns:x="adobe:ns:meta/">
   <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
-    <rdf:Description rdf:about=""
-      xmlns:dc="http://purl.org/dc/elements/1.1/"
-      xmlns:xmp="http://ns.adobe.com/xap/1.0/"
-      xmlns:pdfaid="http://www.aiim.org/pdfa/ns/id/"
-      xmlns:pdf="http://ns.adobe.com/pdf/1.3/">
+    <rdf:Description rdf:about=""{ns}>
       <dc:title>
         <rdf:Alt>
           <rdf:li xml:lang="x-default">{title}</rdf:li>
@@ -38,16 +75,14 @@ pub fn generate_xmp(metadata: &Metadata, conformance: &PdfAConformance) -> Strin
       </dc:creator>
       <xmp:CreatorTool>Forme</xmp:CreatorTool>
       <pdf:Producer>Forme 0.6</pdf:Producer>
-      <pdfaid:part>{part}</pdfaid:part>
-      <pdfaid:conformance>{conf}</pdfaid:conformance>
-    </rdf:Description>
+{entries}    </rdf:Description>
   </rdf:RDF>
 </x:xmpmeta>
 <?xpacket end="w"?>"#,
+        ns = ns_str,
         title = xml_escape(title),
         creator = xml_escape(creator),
-        part = part,
-        conf = conf,
+        entries = entries,
     )
 }
 
@@ -70,9 +105,10 @@ mod tests {
             title: Some("Test".to_string()),
             ..Default::default()
         };
-        let xmp = generate_xmp(&metadata, &PdfAConformance::A2a);
+        let xmp = generate_xmp(&metadata, Some(&PdfAConformance::A2a), false);
         assert!(xmp.contains("<pdfaid:part>2</pdfaid:part>"));
         assert!(xmp.contains("<pdfaid:conformance>A</pdfaid:conformance>"));
+        assert!(!xmp.contains("pdfuaid"));
     }
 
     #[test]
@@ -81,8 +117,43 @@ mod tests {
             title: Some("A & B <C>".to_string()),
             ..Default::default()
         };
-        let xmp = generate_xmp(&metadata, &PdfAConformance::A2b);
+        let xmp = generate_xmp(&metadata, Some(&PdfAConformance::A2b), false);
         assert!(xmp.contains("A &amp; B &lt;C&gt;"));
         assert!(xmp.contains("<pdfaid:conformance>B</pdfaid:conformance>"));
+    }
+
+    #[test]
+    fn test_xmp_contains_pdfua_part() {
+        let metadata = Metadata {
+            title: Some("Accessible".to_string()),
+            ..Default::default()
+        };
+        let xmp = generate_xmp(&metadata, None, true);
+        assert!(xmp.contains("<pdfuaid:part>1</pdfuaid:part>"));
+        assert!(xmp.contains("xmlns:pdfuaid"));
+        assert!(!xmp.contains("pdfaid"));
+    }
+
+    #[test]
+    fn test_xmp_both_pdfa_and_pdfua() {
+        let metadata = Metadata {
+            title: Some("Both".to_string()),
+            ..Default::default()
+        };
+        let xmp = generate_xmp(&metadata, Some(&PdfAConformance::A2a), true);
+        assert!(xmp.contains("<pdfaid:part>2</pdfaid:part>"));
+        assert!(xmp.contains("<pdfaid:conformance>A</pdfaid:conformance>"));
+        assert!(xmp.contains("<pdfuaid:part>1</pdfuaid:part>"));
+        assert!(xmp.contains("xmlns:pdfaid"));
+        assert!(xmp.contains("xmlns:pdfuaid"));
+    }
+
+    #[test]
+    fn test_xmp_pdfua_only_no_pdfa_entries() {
+        let metadata = Metadata::default();
+        let xmp = generate_xmp(&metadata, None, true);
+        assert!(xmp.contains("<pdfuaid:part>1</pdfuaid:part>"));
+        assert!(!xmp.contains("<pdfaid:part>"));
+        assert!(!xmp.contains("<pdfaid:conformance>"));
     }
 }

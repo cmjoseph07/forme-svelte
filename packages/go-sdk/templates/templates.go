@@ -870,6 +870,8 @@ type DocumentNode struct {
 	style        *Style
 	fonts        []map[string]any
 	tagged       bool
+	pdfa         string
+	pdfUa        bool
 	flattenForms bool
 }
 
@@ -885,6 +887,8 @@ func (d *DocumentNode) Lang(lang string) *DocumentNode         { d.lang = lang; 
 func (d *DocumentNode) DefaultStyle(s Style) *DocumentNode     { d.style = &s; return d }
 func (d *DocumentNode) Fonts(fonts []map[string]any) *DocumentNode { d.fonts = fonts; return d }
 func (d *DocumentNode) Tagged(tagged bool) *DocumentNode       { d.tagged = tagged; return d }
+func (d *DocumentNode) PdfA(level string) *DocumentNode        { d.pdfa = level; return d }
+func (d *DocumentNode) PdfUA() *DocumentNode                   { d.pdfUa = true; return d }
 func (d *DocumentNode) FlattenForms() *DocumentNode            { d.flattenForms = true; return d }
 
 func (d *DocumentNode) toDict() map[string]any {
@@ -917,6 +921,12 @@ func (d *DocumentNode) toDict() map[string]any {
 	}
 	if d.tagged {
 		doc["tagged"] = true
+	}
+	if d.pdfa != "" {
+		doc["pdfa"] = d.pdfa
+	}
+	if d.pdfUa {
+		doc["pdfUa"] = true
 	}
 
 	return doc

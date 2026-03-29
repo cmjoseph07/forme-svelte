@@ -47,6 +47,10 @@ pub struct Document {
     #[serde(default)]
     pub pdfa: Option<PdfAConformance>,
 
+    /// When true, the PDF claims PDF/UA-1 conformance. Forces `tagged = true`.
+    #[serde(default)]
+    pub pdf_ua: bool,
+
     /// Optional JSON string to embed as an attached file in the PDF.
     /// Enables round-tripping structured data through PDF files.
     #[serde(default, skip_serializing_if = "Option::is_none")]

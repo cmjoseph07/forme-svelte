@@ -1352,6 +1352,8 @@ class Document(_Component):
         style: Optional[Dict[str, Any]] = None,
         fonts: Optional[List[Dict[str, Any]]] = None,
         tagged: bool = False,
+        pdfa: Optional[str] = None,
+        pdf_ua: bool = False,
     ):
         self.children = list(children)
         self.title = title
@@ -1361,6 +1363,8 @@ class Document(_Component):
         self.style = style
         self.fonts = fonts
         self.tagged = tagged
+        self.pdfa = pdfa
+        self.pdf_ua = pdf_ua
 
     def to_dict(self) -> Dict[str, Any]:
         doc: Dict[str, Any] = {
@@ -1387,6 +1391,12 @@ class Document(_Component):
 
         if self.tagged:
             doc["tagged"] = True
+
+        if self.pdfa:
+            doc["pdfa"] = self.pdfa
+
+        if self.pdf_ua:
+            doc["pdfUa"] = True
 
         return doc
 

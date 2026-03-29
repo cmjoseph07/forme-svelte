@@ -238,6 +238,7 @@ fn visual_invoice() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -273,6 +274,7 @@ fn visual_multi_page_text() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -404,6 +406,7 @@ fn visual_table_header_repetition() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -456,6 +459,7 @@ fn visual_flex_layout() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -508,6 +512,7 @@ fn visual_justified_text() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -584,6 +589,7 @@ fn visual_line_breaking_greedy_vs_optimal() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -662,6 +668,7 @@ fn visual_text_alignment() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();
@@ -690,6 +697,7 @@ fn visual_tagged_no_visual_change() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let doc_tagged = Document {
@@ -706,6 +714,7 @@ fn visual_tagged_no_visual_change() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf_untagged = forme::render(&doc_untagged).unwrap();
@@ -855,6 +864,7 @@ fn visual_flattened_forms() {
         default_style: None,
         embedded_data: None,
         flatten_forms: true,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).unwrap();

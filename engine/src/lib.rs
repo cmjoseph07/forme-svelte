@@ -67,13 +67,16 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
     let engine = LayoutEngine::new();
     let pages = engine.layout(document, &font_context);
     let writer = PdfWriter::new();
-    let tagged = document.tagged || matches!(document.pdfa, Some(model::PdfAConformance::A2a));
+    let tagged = document.tagged
+        || document.pdf_ua
+        || matches!(document.pdfa, Some(model::PdfAConformance::A2a));
     writer.write(
         &pages,
         &document.metadata,
         &font_context,
         tagged,
         document.pdfa.as_ref(),
+        document.pdf_ua,
         document.embedded_data.as_deref(),
         document.flatten_forms,
     )
@@ -90,13 +93,16 @@ pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), 
     let pages = engine.layout(document, &font_context);
     let layout_info = LayoutInfo::from_pages(&pages);
     let writer = PdfWriter::new();
-    let tagged = document.tagged || matches!(document.pdfa, Some(model::PdfAConformance::A2a));
+    let tagged = document.tagged
+        || document.pdf_ua
+        || matches!(document.pdfa, Some(model::PdfAConformance::A2a));
     let pdf = writer.write(
         &pages,
         &document.metadata,
         &font_context,
         tagged,
         document.pdfa.as_ref(),
+        document.pdf_ua,
         document.embedded_data.as_deref(),
         document.flatten_forms,
     )?;

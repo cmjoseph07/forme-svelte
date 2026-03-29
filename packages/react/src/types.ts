@@ -179,6 +179,8 @@ export interface DocumentProps {
   tagged?: boolean;
   /** PDF/A conformance level. "2a" requires tagging, "2b" is visual-only compliance. */
   pdfa?: '2a' | '2b';
+  /** When true, the PDF claims PDF/UA-1 conformance. Forces tagging. */
+  pdfUa?: boolean;
   fonts?: FontRegistration[];
   children?: ReactNode;
 }
@@ -560,6 +562,7 @@ export interface FormeDocument {
   fonts?: FormeFont[];
   tagged?: boolean;
   pdfa?: '2a' | '2b';
+  pdfUa?: boolean;
   flattenForms?: boolean;
 }
 

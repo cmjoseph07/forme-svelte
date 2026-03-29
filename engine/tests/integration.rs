@@ -117,6 +117,7 @@ fn default_doc(children: Vec<Node>) -> Document {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     }
 }
 
@@ -538,6 +539,7 @@ fn test_metadata_in_output() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -676,6 +678,7 @@ fn render_with_custom_font(font_data: &[u8], text: &str) -> Vec<u8> {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let engine = LayoutEngine::new();
@@ -688,6 +691,7 @@ fn render_with_custom_font(font_data: &[u8], text: &str) -> Vec<u8> {
             &font_context,
             doc.tagged,
             doc.pdfa.as_ref(),
+            doc.pdf_ua,
             doc.embedded_data.as_deref(),
             doc.flatten_forms,
         )
@@ -826,6 +830,7 @@ fn test_mixed_standard_and_custom_fonts() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let engine = LayoutEngine::new();
@@ -838,6 +843,7 @@ fn test_mixed_standard_and_custom_fonts() {
             &font_context,
             false,
             None,
+            false,
             None,
             false,
         )
@@ -3134,6 +3140,7 @@ fn test_breakable_view_with_background_splits_across_pages() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3211,6 +3218,7 @@ fn test_breakable_view_background_does_not_overlap_footer() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3279,6 +3287,7 @@ fn test_breakable_view_without_visual_stays_unwrapped() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3607,6 +3616,7 @@ fn test_breakable_view_continuation_page_has_top_padding() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pages = layout_doc(&doc);
@@ -3961,6 +3971,7 @@ fn test_document_lang_in_pdf_catalog() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -4199,6 +4210,7 @@ fn test_justified_text_produces_valid_pdf() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).expect("Should render justified text");
@@ -4253,6 +4265,7 @@ fn test_lang_inherits_to_text_nodes() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     // Just verify it renders without error — lang cascading is tested at the unit level
@@ -4322,6 +4335,7 @@ fn test_per_node_lang_override() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).expect("Should render with per-node lang override");
@@ -4346,6 +4360,7 @@ fn test_tagged_pdf_has_struct_tree_root() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4400,6 +4415,7 @@ fn test_tagged_pdf_parent_tree_consistency() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4472,6 +4488,7 @@ fn test_tagged_pdf_nested_text_roles() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4566,6 +4583,7 @@ fn test_tagged_pdf_table_th_td() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4617,6 +4635,7 @@ fn test_tagged_pdf_figure_alt_text() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4883,6 +4902,7 @@ fn test_qrcode_renders_to_pdf() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).expect("QR code should render to PDF");
@@ -4914,6 +4934,7 @@ fn test_qrcode_with_explicit_size() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -4957,6 +4978,7 @@ fn test_qrcode_page_break() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5012,6 +5034,7 @@ fn test_font_fallback_chain_in_document() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).expect("Fallback chain should render");
@@ -5088,6 +5111,7 @@ fn test_text_overflow_ellipsis_single_line() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5459,6 +5483,7 @@ fn test_document_default_style() {
         }),
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
     let pdf = render_to_pdf(&doc);
     let pdf_str = String::from_utf8_lossy(&pdf);
@@ -5487,6 +5512,7 @@ fn test_embedded_data_round_trip() {
         default_style: None,
         embedded_data: Some(data.to_string()),
         flatten_forms: false,
+        pdf_ua: false,
     };
     let pdf = render_to_pdf(&doc);
     assert_valid_pdf(&pdf);
@@ -5572,6 +5598,7 @@ fn test_barcode_renders_to_pdf() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let pdf = forme::render(&doc).expect("Barcode should render to PDF");
@@ -5637,6 +5664,7 @@ fn test_barcode_layout_dimensions() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5687,6 +5715,7 @@ fn auto_margin_horizontal_centers_child() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5741,6 +5770,7 @@ fn auto_margin_left_pushes_right() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -6059,6 +6089,7 @@ fn test_bar_chart_layout_dimensions() {
         default_style: None,
         embedded_data: None,
         flatten_forms: false,
+        pdf_ua: false,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -6785,5 +6816,131 @@ fn test_flatten_text_field_non_ascii() {
     assert!(
         !pdf_str.contains("/AcroForm"),
         "Flattened PDF should not contain /AcroForm"
+    );
+}
+
+// ─── PDF/UA tests ──────────────────────────────────────────────────
+
+#[test]
+fn test_pdf_ua_has_viewer_preferences() {
+    let doc = Document {
+        children: vec![Node::text("Accessible doc", Style::default())],
+        metadata: Metadata {
+            title: Some("UA Test".to_string()),
+            ..Default::default()
+        },
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: true,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(
+        text.contains("/ViewerPreferences"),
+        "PDF/UA should include /ViewerPreferences"
+    );
+    assert!(
+        text.contains("/DisplayDocTitle true"),
+        "PDF/UA should set /DisplayDocTitle true"
+    );
+}
+
+#[test]
+fn test_pdf_ua_has_xmp_pdfuaid() {
+    let doc = Document {
+        children: vec![Node::text("Accessible doc", Style::default())],
+        metadata: Metadata {
+            title: Some("UA Test".to_string()),
+            ..Default::default()
+        },
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: true,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(
+        text.contains("pdfuaid:part"),
+        "PDF/UA should include pdfuaid:part in XMP metadata"
+    );
+}
+
+#[test]
+fn test_pdf_ua_forces_tagging() {
+    let doc = Document {
+        children: vec![Node::text("Tagged by UA", Style::default())],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: true,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(
+        text.contains("/StructTreeRoot"),
+        "PDF/UA should force tagging even when tagged=false"
+    );
+    assert!(
+        text.contains("/Marked true"),
+        "PDF/UA should have /Marked true in /MarkInfo"
+    );
+}
+
+#[test]
+fn test_pdf_ua_and_pdfa_combined_xmp() {
+    // PDF/A requires embedded fonts, so we can't easily test the full render
+    // pipeline with both flags. The combined XMP metadata (both pdfaid + pdfuaid)
+    // is verified in xmp.rs unit tests (test_xmp_both_pdfa_and_pdfua).
+    // Here we verify PDF/UA works correctly on its own with all expected features.
+    let doc = Document {
+        children: vec![Node::text("Accessible", Style::default())],
+        metadata: Metadata {
+            title: Some("UA Only".to_string()),
+            ..Default::default()
+        },
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: true,
+    };
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let text = String::from_utf8_lossy(&bytes);
+    // PDF/UA generates XMP with pdfuaid namespace
+    assert!(
+        text.contains("pdfuaid"),
+        "PDF/UA doc should have pdfuaid in XMP"
+    );
+    // PDF/UA has ViewerPreferences
+    assert!(
+        text.contains("/ViewerPreferences"),
+        "PDF/UA doc should have /ViewerPreferences"
+    );
+    // PDF/UA forces tagging
+    assert!(
+        text.contains("/StructTreeRoot"),
+        "PDF/UA doc should have structure tree"
     );
 }

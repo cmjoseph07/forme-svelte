@@ -140,6 +140,7 @@ impl PdfWriter {
         font_context: &FontContext,
         tagged: bool,
         pdfa: Option<&PdfAConformance>,
+        pdf_ua: bool,
         embedded_data: Option<&str>,
         flatten_forms: bool,
     ) -> Result<Vec<u8>, FormeError> {
@@ -362,9 +363,9 @@ impl PdfWriter {
             None
         };
 
-        // PDF/A: write XMP metadata stream and ICC output intent
-        let xmp_metadata_id = if let Some(conf) = pdfa {
-            let xmp_xml = xmp::generate_xmp(metadata, conf);
+        // PDF/A and/or PDF/UA: write XMP metadata stream and ICC output intent
+        let xmp_metadata_id = if pdfa.is_some() || pdf_ua {
+            let xmp_xml = xmp::generate_xmp(metadata, pdfa, pdf_ua);
             let xmp_bytes = xmp_xml.as_bytes();
             let xmp_obj_id = builder.objects.len();
             // XMP metadata stream must NOT be compressed (PDF/A requirement)
@@ -1017,6 +1018,9 @@ impl PdfWriter {
         }
         if let Some(names_id) = embedded_names_id {
             write!(catalog, " /Names << /EmbeddedFiles {} 0 R >>", names_id).unwrap();
+        }
+        if pdf_ua {
+            catalog.push_str(" /ViewerPreferences << /DisplayDocTitle true >>");
         }
         catalog.push_str(" >>");
         builder.objects[1].data = catalog.into_bytes();
@@ -3350,7 +3354,16 @@ mod tests {
         }];
         let metadata = Metadata::default();
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None, false)
+            .write(
+                &pages,
+                &metadata,
+                &font_context,
+                false,
+                None,
+                false,
+                None,
+                false,
+            )
             .unwrap();
 
         assert!(bytes.starts_with(b"%PDF-1.7"));
@@ -3380,7 +3393,16 @@ mod tests {
             lang: None,
         };
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None, false)
+            .write(
+                &pages,
+                &metadata,
+                &font_context,
+                false,
+                None,
+                false,
+                None,
+                false,
+            )
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
 
@@ -3493,7 +3515,16 @@ mod tests {
 
         let metadata = Metadata::default();
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None, false)
+            .write(
+                &pages,
+                &metadata,
+                &font_context,
+                false,
+                None,
+                false,
+                None,
+                false,
+            )
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
 
@@ -3650,7 +3681,16 @@ mod tests {
 
         let metadata = Metadata::default();
         let bytes = writer
-            .write(&pages, &metadata, &font_context, false, None, None, false)
+            .write(
+                &pages,
+                &metadata,
+                &font_context,
+                false,
+                None,
+                false,
+                None,
+                false,
+            )
             .unwrap();
         let text = String::from_utf8_lossy(&bytes);
 
