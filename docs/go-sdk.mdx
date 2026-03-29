@@ -1,0 +1,157 @@
+---
+title: Go SDK
+sidebarTitle: Go
+description: Generate PDFs from Go with the hosted API or local WASM rendering. Zero-dependency API client, plus a component DSL for building documents in Go code.
+---
+
+## Installation
+
+```bash
+# API client only (zero dependencies)
+go get github.com/formepdf/forme-go
+
+# Local rendering with component DSL (adds wazero)
+go get github.com/formepdf/forme-go/templates
+```
+
+## Hosted API
+
+The API client uses only the Go standard library. Create templates in the [dashboard](https://app.formepdf.com), then render them with data:
+
+```go
+package main
+
+import (
+    "os"
+    forme "github.com/formepdf/forme-go"
+)
+
+func main() {
+    client := forme.New(os.Getenv("FORME_API_KEY"))
+
+    pdf, err := client.Render("invoice", map[string]any{
+        "customer": "Acme Corp",
+        "items":    []map[string]any{
+            {"name": "Widget", "qty": 5, "price": 49},
+        },
+        "total": 245,
+    })
+    if err != nil {
+        panic(err)
+    }
+
+    os.WriteFile("invoice.pdf", pdf, 0644)
+}
+```
+
+### Client options
+
+```go
+client := forme.New(apiKey,
+    forme.WithBaseURL("https://custom-api.example.com"),
+    forme.WithHTTPClient(&http.Client{Timeout: 30 * time.Second}),
+)
+```
+
+### Methods
+
+| Method | Description | Returns |
+|--------|-------------|---------|
+| `Render(slug, data)` | Synchronous render | `([]byte, error)` |
+| `RenderWithOptions(slug, data, opts)` | Render with options | `([]byte, error)` |
+| `RenderS3(slug, data, s3Opts)` | Render and upload to S3 | `(*S3Result, error)` |
+| `RenderAsync(slug, data, asyncOpts)` | Start async render job | `(*AsyncResult, error)` |
+| `GetJob(jobID)` | Poll async job status | `(*JobResult, error)` |
+| `Merge(pdfs)` | Merge multiple PDFs | `([]byte, error)` |
+| `Extract(pdfBytes)` | Extract embedded data | `(map[string]any, error)` |
+
+### Error handling
+
+```go
+pdf, err := client.Render("invoice", data)
+if err != nil {
+    var fErr *forme.FormeError
+    if errors.As(err, &fErr) {
+        fmt.Printf("API error %d: %s\n", fErr.Status, fErr.Message)
+    }
+}
+```
+
+---
+
+## Native templates
+
+Build documents in Go code using a component DSL that mirrors the JSX API. Renders locally via the WASM engine — no network calls.
+
+```go
+package main
+
+import (
+    "os"
+    t "github.com/formepdf/forme-go/templates"
+)
+
+func main() {
+    doc := t.Document(
+        t.Page(
+            t.View(
+                t.Text("Invoice #001", t.Style{FontSize: 24, FontWeight: "bold"}),
+                t.Text("Acme Corp", t.Style{FontSize: 14, Color: "#666"}),
+            ).Style(t.Style{FlexDirection: "column", Gap: 8}),
+
+            t.Table(
+                t.Row(t.Cell(t.Text("Item")), t.Cell(t.Text("Price"))).Header(true),
+                t.Row(t.Cell(t.Text("Widget")), t.Cell(t.Text("$50.00"))),
+                t.Row(t.Cell(t.Text("Gadget")), t.Cell(t.Text("$100.00"))),
+            ).Columns([]t.Column{{Width: "1fr"}, {Width: 100.0}}),
+        ),
+    ).Title("Invoice #001")
+
+    pdf, err := doc.Render()
+    if err != nil {
+        panic(err)
+    }
+    os.WriteFile("invoice.pdf", pdf, 0644)
+}
+```
+
+### Components
+
+| Constructor | Description | Chainable methods |
+|-------------|-------------|-------------------|
+| `Document(children...)` | Root container | `.Title()`, `.Author()`, `.Subject()`, `.Lang()`, `.DefaultStyle()`, `.Fonts()`, `.Tagged()` |
+| `Page(children...)` | Page container | `.Size()`, `.Margin()` |
+| `View(children...)` | Flex/grid container | `.Style()`, `.Wrap()`, `.Bookmark()`, `.Href()` |
+| `Text(content, style?)` | Text element | `.Style()`, `.Href()`, `.Children()` |
+| `Image(src)` | Image element | `.Width()`, `.Height()`, `.Style()`, `.Href()`, `.Alt()` |
+| `Table(children...)` | Table with auto-repeating headers | `.Columns()`, `.Style()` |
+| `Row(children...)` | Table row | `.Header()`, `.Style()` |
+| `Cell(children...)` | Table cell | `.ColSpan()`, `.RowSpan()`, `.Style()` |
+| `QRCode(data)` | Vector QR code | `.Size()`, `.Color()`, `.Style()` |
+| `Barcode(data)` | 1D barcode | `.Format()`, `.Width()`, `.Height()`, `.Color()`, `.Style()` |
+| `BarChart(data)` | Bar chart | `.Width()`, `.Height()`, `.Color()`, `.Title()`, `.Style()` |
+| `LineChart(series, labels)` | Line chart | `.Width()`, `.Height()`, `.ShowPoints()`, `.Title()`, `.Style()` |
+| `PieChart(data)` | Pie/donut chart | `.Width()`, `.Height()`, `.Donut()`, `.Title()`, `.Style()` |
+| `PageBreak()` | Force page break | -- |
+| `Watermark(text)` | Rotated watermark | `.FontSize()`, `.Color()`, `.Angle()`, `.Style()` |
+
+### Building the WASM binary
+
+Local rendering requires the Forme WASM binary:
+
+```bash
+cd packages/go-sdk/templates
+bash build_wasm.sh
+go test -tags forme_wasm ./...
+```
+
+---
+
+## Hosted vs native
+
+| | Hosted API | Native templates |
+|---|---|---|
+| **Dependencies** | Zero (stdlib only) | wazero (~10MB WASM) |
+| **Templates** | Pre-uploaded via dashboard | Built in Go code |
+| **Network** | Requires API call | Fully offline |
+| **Use case** | Dynamic data + stored templates | Full control, CI/CD, testing |

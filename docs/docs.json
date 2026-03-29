@@ -31,6 +31,10 @@
         "pages": ["components", "styles", "tailwind", "fonts", "page-breaks", "charts", "templates", "embedded-data", "api-reference"]
       },
       {
+        "group": "SDKs",
+        "pages": ["go-sdk", "rust-sdk"]
+      },
+      {
         "group": "Migration",
         "pages": ["migrating-from-react-pdf", "replacing-puppeteer"]
       }

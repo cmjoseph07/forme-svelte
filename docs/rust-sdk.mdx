@@ -1,0 +1,146 @@
+---
+title: Rust Crate
+sidebarTitle: Rust
+description: Use the Forme layout engine and PDF writer directly from Rust. The same engine that powers the WASM builds, hosted API, and VS Code extension.
+---
+
+## Installation
+
+```bash
+cargo add forme-pdf
+```
+
+The crate is published as `forme-pdf` on [crates.io](https://crates.io/crates/forme-pdf). The library name is `forme`:
+
+```rust
+use forme::{render_json, Document, Style, FormeError};
+```
+
+## Quick start
+
+```rust
+use forme::{render_json, FormeError};
+
+fn main() -> Result<(), FormeError> {
+    let json = r#"{
+        "pages": [{ "size": "A4" }],
+        "children": [{
+            "kind": "text",
+            "content": "Hello from Forme!",
+            "style": { "fontSize": 24, "margin": { "top": 72, "left": 72 } }
+        }]
+    }"#;
+
+    let pdf_bytes = render_json(json)?;
+    std::fs::write("hello.pdf", pdf_bytes).unwrap();
+    Ok(())
+}
+```
+
+## API
+
+| Function | Description |
+|----------|-------------|
+| `render(&Document)` | Render a `Document` struct to PDF bytes |
+| `render_json(&str)` | Parse JSON and render to PDF |
+| `render_with_layout(&Document)` | Render and return layout metadata |
+| `render_json_with_layout(&str)` | Parse JSON, render, and return layout metadata |
+| `render_template(&str, &str)` | Evaluate a template with data, then render |
+| `render_template_with_layout(&str, &str)` | Evaluate a template with data, render, and return layout metadata |
+
+All functions return `Result<Vec<u8>, FormeError>` (or `Result<(Vec<u8>, LayoutInfo), FormeError>` for the `_with_layout` variants).
+
+## Working with the Document struct
+
+For full control, build a `Document` directly instead of using JSON:
+
+```rust
+use forme::{Document, Node, NodeKind, PageConfig, PageSize, Style, Metadata, render};
+
+let document = Document {
+    children: vec![Node {
+        kind: NodeKind::Text {
+            content: "Hello from Forme!".to_string(),
+        },
+        style: Some(Style {
+            font_size: Some(24.0),
+            ..Default::default()
+        }),
+        children: vec![],
+        ..Default::default()
+    }],
+    pages: vec![PageConfig {
+        size: Some(PageSize::A4),
+        ..Default::default()
+    }],
+    metadata: Metadata::default(),
+    ..Default::default()
+};
+
+let pdf_bytes = render(&document)?;
+```
+
+## Templates
+
+Render dynamic documents by combining a template (with `$ref`, `$each`, `$if` expressions) and a data object:
+
+```rust
+use forme::render_template;
+
+let template = r#"{
+    "pages": [{ "size": "A4" }],
+    "children": [{
+        "kind": "text",
+        "content": { "$ref": "greeting" },
+        "style": { "fontSize": 24 }
+    }]
+}"#;
+
+let data = r#"{ "greeting": "Hello, world!" }"#;
+
+let pdf_bytes = render_template(template, data)?;
+```
+
+See the [templates guide](/templates) for the full expression language.
+
+## Layout metadata
+
+The `_with_layout` variants return a `LayoutInfo` struct describing the position and dimensions of every element on every page. Useful for overlays, click-to-inspect, and testing:
+
+```rust
+use forme::render_json_with_layout;
+
+let (pdf_bytes, layout) = render_json_with_layout(json)?;
+println!("Pages: {}", layout.pages.len());
+for page in &layout.pages {
+    for element in &page.elements {
+        println!("  {} at ({}, {})", element.id, element.x, element.y);
+    }
+}
+```
+
+## Features
+
+The engine supports:
+
+- **Flexbox layout** — row, column, wrap, grow/shrink, all alignment modes
+- **CSS Grid** — track sizing, auto/explicit placement, `repeat()` syntax
+- **Text** — OpenType shaping, Knuth-Plass line breaking, hyphenation (35+ languages), BiDi, per-character font fallback
+- **Tables** — automatic header repetition on page breaks
+- **Images** — JPEG, PNG, WebP
+- **SVG** — inline rendering (rect, circle, line, path, arc)
+- **Charts** — BarChart, LineChart, PieChart, AreaChart, DotPlot
+- **QR codes & barcodes** — Code128, Code39, EAN13, EAN8, Codabar
+- **Tagged PDF / PDF/A-2a** — accessibility and archival compliance
+- **Embedded data** — attach JSON inside the PDF for round-tripping
+
+## WASM
+
+The crate compiles to WebAssembly. Enable the `wasm` feature for `wasm-bindgen` support:
+
+```toml
+[dependencies]
+forme-pdf = { version = "0.7", features = ["wasm"] }
+```
+
+This is how `@formepdf/core` works under the hood — the same engine, compiled to WASM and called from JavaScript.
