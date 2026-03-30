@@ -75,7 +75,18 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
     let mut font_context = FontContext::new();
     register_document_fonts(&mut font_context, &document.fonts);
     let engine = LayoutEngine::new();
-    let pages = engine.layout(document, &font_context);
+    let mut pages = engine.layout(document, &font_context);
+
+    // Re-layout if sentinel digit count was wrong (up to 3 total passes)
+    for _ in 0..2 {
+        let needed = digits_for_count(pages.len());
+        if needed == font_context.sentinel_digit_count() {
+            break;
+        }
+        font_context.set_sentinel_digit_count(needed);
+        pages = engine.layout(document, &font_context);
+    }
+
     let writer = PdfWriter::new();
     let tagged = document.tagged
         || document.pdf_ua
@@ -108,7 +119,18 @@ pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), 
     let mut font_context = FontContext::new();
     register_document_fonts(&mut font_context, &document.fonts);
     let engine = LayoutEngine::new();
-    let pages = engine.layout(document, &font_context);
+    let mut pages = engine.layout(document, &font_context);
+
+    // Re-layout if sentinel digit count was wrong (up to 3 total passes)
+    for _ in 0..2 {
+        let needed = digits_for_count(pages.len());
+        if needed == font_context.sentinel_digit_count() {
+            break;
+        }
+        font_context.set_sentinel_digit_count(needed);
+        pages = engine.layout(document, &font_context);
+    }
+
     let layout_info = LayoutInfo::from_pages(&pages);
     let writer = PdfWriter::new();
     let tagged = document.tagged
@@ -130,6 +152,19 @@ pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), 
         pdf
     };
     Ok((pdf, layout_info))
+}
+
+/// Return the number of digits needed to display `n` as a decimal string.
+fn digits_for_count(n: usize) -> u32 {
+    if n < 10 {
+        1
+    } else if n < 100 {
+        2
+    } else if n < 1000 {
+        3
+    } else {
+        4
+    }
 }
 
 /// Register custom fonts from the document's `fonts` array.
@@ -189,4 +224,21 @@ pub fn render_template_with_layout(
     let resolved = template::evaluate_template(&template, &data)?;
     let document: Document = serde_json::from_value(resolved)?;
     render_with_layout(&document)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_digits_for_count() {
+        assert_eq!(digits_for_count(0), 1);
+        assert_eq!(digits_for_count(1), 1);
+        assert_eq!(digits_for_count(9), 1);
+        assert_eq!(digits_for_count(10), 2);
+        assert_eq!(digits_for_count(99), 2);
+        assert_eq!(digits_for_count(100), 3);
+        assert_eq!(digits_for_count(999), 3);
+        assert_eq!(digits_for_count(1000), 4);
+    }
 }

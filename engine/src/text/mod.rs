@@ -49,7 +49,8 @@ pub struct RunBrokenLine {
 }
 
 /// Override widths for page placeholder sentinel characters.
-/// Sentinels are single chars that must measure as the width of "00".
+/// Delegates to `FontContext::char_width` which returns the correct
+/// width based on the current `sentinel_digit_count`.
 #[allow(clippy::too_many_arguments)]
 fn fix_sentinel_widths(
     chars: &[char],
@@ -63,8 +64,7 @@ fn fix_sentinel_widths(
 ) {
     for (i, &ch) in chars.iter().enumerate() {
         if ch == PAGE_NUMBER_SENTINEL || ch == TOTAL_PAGES_SENTINEL {
-            widths[i] = font_context.char_width('0', font_family, font_weight, italic, font_size)
-                * 2.0
+            widths[i] = font_context.char_width(ch, font_family, font_weight, italic, font_size)
                 + letter_spacing;
         }
     }
@@ -707,13 +707,12 @@ impl TextLayout {
                         let ch = chars[j].ch;
                         if ch == PAGE_NUMBER_SENTINEL || ch == TOTAL_PAGES_SENTINEL {
                             widths[j] = font_context.char_width(
-                                '0',
+                                ch,
                                 &chars[j].font_family,
                                 chars[j].font_weight,
                                 italic,
                                 chars[j].font_size,
-                            ) * 2.0
-                                + chars[j].letter_spacing;
+                            ) + chars[j].letter_spacing;
                         }
                     }
                     i = run_end;

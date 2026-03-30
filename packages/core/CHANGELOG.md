@@ -3,7 +3,7 @@
 ## [0.8.1] - 2026-03-30
 
 ### Fixed
-- Engine fixes: Latin Extended character widths, page number placeholder measurement
+- Engine fixes: Latin Extended character widths, page number placeholder measurement, two-pass digit-accurate rendering
 
 ## [0.8.0] - 2026-03-29
 

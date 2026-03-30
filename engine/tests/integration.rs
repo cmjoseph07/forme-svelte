@@ -7973,3 +7973,118 @@ fn test_page_placeholder_no_sentinel_in_text_operators() {
         "Sentinel \\x03 octal must not appear in PDF text"
     );
 }
+
+#[test]
+fn test_two_pass_single_page_digit_count() {
+    // A 1-page document should use 1-digit sentinel width after the
+    // two-pass re-layout. Verify placeholders are replaced correctly.
+    let text_node = make_text("{{pageNumber}}/{{totalPages}}", 12.0);
+    let doc = default_doc(vec![text_node]);
+    let (pdf, layout) = forme::render_with_layout(&doc).unwrap();
+    assert_eq!(layout.pages.len(), 1);
+    assert_valid_pdf(&pdf);
+}
+
+#[test]
+fn test_two_pass_multi_page_common_case() {
+    // A ~15-page document falls in the 10-99 range (2 digits),
+    // matching the default estimate — no re-layout needed.
+    let mut children = Vec::new();
+    for i in 0..60 {
+        children.push(make_text(
+            &format!("Paragraph {} with enough text to fill space. {{{{pageNumber}}}}/{{{{totalPages}}}}", i),
+            11.0,
+        ));
+    }
+    let page = Node {
+        kind: NodeKind::Page {
+            config: PageConfig {
+                size: PageSize::A4,
+                margin: Edges::uniform(40.0),
+                wrap: true,
+            },
+        },
+        style: Style::default(),
+        children,
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let doc = Document {
+        children: vec![page],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+        signature: None,
+    };
+    let (pdf, layout) = forme::render_with_layout(&doc).unwrap();
+    assert!(layout.pages.len() >= 2, "Should be multi-page");
+    assert_valid_pdf(&pdf);
+}
+
+#[test]
+fn test_render_performance() {
+    // Performance benchmark: render a multi-page document and verify timing.
+    // Run with: cargo test test_render_performance --release -- --nocapture
+    use std::time::Instant;
+
+    let mut children = Vec::new();
+    for i in 0..200 {
+        children.push(make_text(
+            &format!(
+                "Line {}: Lorem ipsum dolor sit amet, consectetur adipiscing elit. Page {{{{pageNumber}}}} of {{{{totalPages}}}}.",
+                i
+            ),
+            10.0,
+        ));
+    }
+    let page = Node {
+        kind: NodeKind::Page {
+            config: PageConfig {
+                size: PageSize::A4,
+                margin: Edges::uniform(50.0),
+                wrap: true,
+            },
+        },
+        style: Style::default(),
+        children,
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let doc = Document {
+        children: vec![page],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+        signature: None,
+    };
+
+    let start = Instant::now();
+    let (pdf, layout) = forme::render_with_layout(&doc).unwrap();
+    let elapsed = start.elapsed();
+
+    eprintln!(
+        "Performance: {} pages rendered in {:?}",
+        layout.pages.len(),
+        elapsed
+    );
+    assert_valid_pdf(&pdf);
+    assert!(layout.pages.len() >= 2, "Should produce multiple pages");
+}

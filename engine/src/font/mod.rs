@@ -377,6 +377,10 @@ impl FontRegistry {
 /// Provides text measurement with real glyph metrics.
 pub struct FontContext {
     registry: FontRegistry,
+    /// Number of digits to use when measuring page number sentinel width.
+    /// Default 2 ("00"). Updated by the two-pass render loop after the
+    /// first layout reveals the actual page count.
+    sentinel_digit_count: u32,
 }
 
 impl Default for FontContext {
@@ -389,7 +393,18 @@ impl FontContext {
     pub fn new() -> Self {
         Self {
             registry: FontRegistry::new(),
+            sentinel_digit_count: 2,
         }
+    }
+
+    /// Get the current sentinel digit count.
+    pub fn sentinel_digit_count(&self) -> u32 {
+        self.sentinel_digit_count
+    }
+
+    /// Set the number of digits used to measure page number sentinel width.
+    pub fn set_sentinel_digit_count(&mut self, count: u32) {
+        self.sentinel_digit_count = count;
     }
 
     /// Get the advance width of a single character in points.
@@ -404,9 +419,11 @@ impl FontContext {
         italic: bool,
         font_size: f64,
     ) -> f64 {
-        // Page placeholder sentinels: measure as the width of "00"
+        // Page placeholder sentinels: measure as the width of N zeros
+        // where N = sentinel_digit_count (set by the two-pass render loop)
         if ch == crate::layout::PAGE_NUMBER_SENTINEL || ch == crate::layout::TOTAL_PAGES_SENTINEL {
-            return self.char_width('0', family, weight, italic, font_size) * 2.0;
+            return self.char_width('0', family, weight, italic, font_size)
+                * self.sentinel_digit_count as f64;
         }
 
         // Fast path: single font family — try primary font first,
