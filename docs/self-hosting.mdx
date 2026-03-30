@@ -1,0 +1,353 @@
+---
+title: Self-Hosting
+sidebarTitle: Self-Hosting
+description: Run the Forme render engine as a self-hosted Docker container. Same API, no external dependencies, no database, no Chromium.
+---
+
+A single Docker container that exposes the Forme render engine as an HTTP API. Same endpoints as the [hosted API](/api-reference), runs anywhere Docker runs. No Chromium, no LibreOffice, no database, no native dependencies.
+
+```bash
+docker run --rm -p 3000:3000 formepdf/forme:latest
+```
+
+PDF API on port 3000. That's the whole install.
+
+---
+
+## Quick Start
+
+### Docker run
+
+```bash
+docker run --rm -p 3000:3000 formepdf/forme:latest
+```
+
+### Docker Compose
+
+```yaml docker-compose.yml
+version: "3.8"
+
+services:
+  forme:
+    image: formepdf/forme:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - FORME_API_KEY=your-secret-key     # optional
+      - FORME_TEMPLATES_DIR=/templates    # optional
+    volumes:
+      - ./templates:/templates:ro
+    restart: unless-stopped
+```
+
+```bash
+docker compose up
+```
+
+### Health check
+
+```bash
+curl http://localhost:3000/health
+# {"status":"ok","version":"0.8.1"}
+```
+
+---
+
+## API Endpoints
+
+The self-hosted API matches the hosted API, so switching between them is a base URL change — not a code change. All existing SDKs work against self-hosted without modification.
+
+| Endpoint | Description |
+|----------|-------------|
+| `POST /v1/render` | Inline render — compiled template JSON + data in request body |
+| `POST /v1/render/:slug` | Template render — loads pre-compiled JSON from mounted volume |
+| `POST /v1/sign` | Sign an existing PDF with an X.509 certificate |
+| `GET /health` | Health check |
+
+### Inline render
+
+Pass the compiled template JSON and data directly in the request body. No template storage needed. Fully stateless.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST http://localhost:3000/v1/render \
+  -H "Content-Type: application/json" \
+  -d '{
+    "template": { ... },
+    "data": { "customer": "Acme", "amount": 1500 }
+  }' \
+  --output invoice.pdf
+```
+
+```javascript Node.js
+const res = await fetch("http://localhost:3000/v1/render", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    template: compiledTemplateJson,
+    data: { customer: "Acme", amount: 1500 },
+  }),
+});
+
+const pdf = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync("invoice.pdf", pdf);
+```
+
+```python Python
+import requests
+
+res = requests.post(
+    "http://localhost:3000/v1/render",
+    json={
+        "template": compiled_template_json,
+        "data": {"customer": "Acme", "amount": 1500},
+    },
+)
+
+with open("invoice.pdf", "wb") as f:
+    f.write(res.content)
+```
+
+</CodeGroup>
+
+The `template` field is the compiled document JSON tree — the output of `forme build --template` or `serialize()` in `@formepdf/react`. The `data` field is optional; when present, Forme evaluates template expressions (`$ref`, `$each`, `$if`) against it before rendering.
+
+### Template render
+
+Mount a directory of pre-compiled JSON templates and reference them by slug (filename without `.json`).
+
+```
+./templates/
+  invoice.json
+  contract.json
+  report.json
+```
+
+<CodeGroup>
+
+```bash curl
+curl -X POST http://localhost:3000/v1/render/invoice \
+  -H "Content-Type: application/json" \
+  -d '{ "data": { "customer": "Acme", "amount": 1500 } }' \
+  --output invoice.pdf
+```
+
+```javascript Node.js
+const res = await fetch("http://localhost:3000/v1/render/invoice", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    data: { customer: "Acme", amount: 1500 },
+  }),
+});
+```
+
+```python Python
+res = requests.post(
+    "http://localhost:3000/v1/render/invoice",
+    json={"data": {"customer": "Acme", "amount": 1500}},
+)
+```
+
+</CodeGroup>
+
+Templates are loaded from disk on each request — no restart needed when templates change.
+
+### Sign
+
+```bash
+curl -X POST http://localhost:3000/v1/sign \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdf": "<base64-encoded PDF>",
+    "certificatePem": "-----BEGIN CERTIFICATE-----\n...",
+    "privateKeyPem": "-----BEGIN PRIVATE KEY-----\n...",
+    "reason": "Approved"
+  }' \
+  --output signed.pdf
+```
+
+---
+
+## Compiling Templates
+
+The self-hosted container is a pure Rust binary with no Node.js runtime. This means `.tsx` templates must be compiled to JSON before mounting — the same way you'd compile TypeScript before deploying to production.
+
+```bash
+# Compile a single template
+npx forme build --template invoice.tsx
+
+# Output: invoice.json (compiled document tree)
+```
+
+In your CI pipeline, add the build step alongside your existing TypeScript compilation:
+
+```bash
+# Install dependencies
+npm install @formepdf/react @formepdf/cli
+
+# Compile all templates
+for f in templates/*.tsx; do
+  npx forme build --template "$f"
+done
+
+# Deploy the .json files to your container volume
+```
+
+The hosted API handles this compilation step for you — that's one of the conveniences of the paid tiers.
+
+---
+
+## Authentication
+
+Optional. If `FORME_API_KEY` is not set, the API is open — suitable for local development or internal network use behind a firewall.
+
+If set, all `/v1/*` endpoints require:
+
+```
+Authorization: Bearer your-secret-key
+```
+
+The `/health` endpoint is always public.
+
+```bash
+# Start with auth enabled
+docker run --rm -p 3000:3000 -e FORME_API_KEY=my-secret formepdf/forme:latest
+
+# Requests require the key
+curl -X POST http://localhost:3000/v1/render/invoice \
+  -H "Authorization: Bearer my-secret" \
+  -H "Content-Type: application/json" \
+  -d '{ "data": { "customer": "Acme" } }' \
+  --output invoice.pdf
+```
+
+---
+
+## Configuration
+
+All configuration is via environment variables. No config files.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HTTP_PORT` | `3000` | Port the server listens on |
+| `FORME_API_KEY` | *(none)* | If set, enables Bearer token auth on all `/v1/*` endpoints |
+| `FORME_TEMPLATES_DIR` | *(none)* | Path to directory of pre-compiled `.json` templates |
+
+---
+
+## SDK Configuration
+
+All Forme SDKs support a custom base URL. Point them at your self-hosted instance:
+
+<CodeGroup>
+
+```javascript Node.js
+import { FormeClient } from "@formepdf/sdk";
+const client = new FormeClient({
+  baseUrl: "http://localhost:3000",
+  apiKey: "your-key",
+});
+```
+
+```python Python
+import formepdf
+client = formepdf.Client(base_url="http://localhost:3000", api_key="your-key")
+```
+
+```go Go
+import forme "github.com/formepdf/forme-go"
+client := forme.New("your-key", forme.WithBaseURL("http://localhost:3000"))
+```
+
+</CodeGroup>
+
+---
+
+## Deployment Examples
+
+### Kubernetes
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: forme
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: forme
+  template:
+    metadata:
+      labels:
+        app: forme
+    spec:
+      containers:
+        - name: forme
+          image: formepdf/forme:latest
+          ports:
+            - containerPort: 3000
+          env:
+            - name: FORME_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: forme-secrets
+                  key: api-key
+```
+
+Stateless — scales horizontally with no coordination needed.
+
+### With templates in Kubernetes
+
+Mount templates from a ConfigMap or persistent volume:
+
+```yaml
+volumes:
+  - name: templates
+    configMap:
+      name: forme-templates
+containers:
+  - name: forme
+    volumeMounts:
+      - name: templates
+        mountPath: /templates
+    env:
+      - name: FORME_TEMPLATES_DIR
+        value: /templates
+```
+
+---
+
+## What Self-Hosted Does Not Include
+
+These features are available on the [hosted API](https://api.formepdf.com) only:
+
+- **Template compilation** — upload `.tsx` files directly, Forme compiles them server-side
+- **Dashboard** — template editor, usage graphs, logs, billing
+- **AI template generation** — Claude-powered template creation
+- **Team management** — org-level API keys, seat management
+- **Usage analytics** — per-render logging and analytics
+- **Async rendering** — job queuing, webhooks, S3 upload
+- **Priority support** — SLA-backed response times
+
+Self-hosters who need these features can upgrade to the hosted service at any time — it's a base URL change.
+
+---
+
+## Comparison
+
+| | Gotenberg | Forme Self-Hosted |
+|--|-----------|-------------------|
+| Dependencies | Chromium + LibreOffice | None |
+| Image size | ~1GB | ~50MB |
+| Cold start | 2-5s | <100ms |
+| Input | HTML, Markdown, Office docs | JSX templates (compiled to JSON) |
+| Page breaks | Chromium-dependent | Engine-native |
+| AcroForms | No | Yes |
+| Digital signatures | No | Yes |
+| PDF/UA | No | Yes |
+| PDF/A | No | Yes |
+
+Gotenberg converts existing documents (HTML, Word, etc.). Forme generates from code templates. Different tools for different jobs.

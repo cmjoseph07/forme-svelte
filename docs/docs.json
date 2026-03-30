@@ -28,7 +28,7 @@
       },
       {
         "group": "Reference",
-        "pages": ["components", "styles", "tailwind", "fonts", "page-breaks", "charts", "templates", "embedded-data", "api-reference"]
+        "pages": ["components", "styles", "tailwind", "fonts", "page-breaks", "charts", "templates", "embedded-data", "api-reference", "self-hosting"]
       },
       {
         "group": "Enterprise",

@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  forme:
+    image: formepdf/forme:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - FORME_API_KEY=your-secret-key     # optional — remove to disable auth
+      - FORME_TEMPLATES_DIR=/templates    # optional — enables POST /v1/render/:slug
+    volumes:
+      - ./templates:/templates:ro         # mount pre-compiled JSON templates
+    restart: unless-stopped
