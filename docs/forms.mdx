@@ -1,0 +1,316 @@
+---
+title: Fillable Forms
+sidebarTitle: Forms
+description: Create interactive fillable PDF forms with AcroForm components -- text fields, checkboxes, dropdowns, and radio buttons.
+---
+
+Forme supports native AcroForm components for creating interactive fillable PDF forms. Form fields work in every major PDF viewer without JavaScript or external form handling. Users fill in fields directly in their PDF viewer, and you can flatten forms at render time to lock in values as static content.
+
+```tsx
+import {
+  Document, Page, View, Text,
+  TextField, Checkbox, Dropdown, RadioButton,
+} from '@formepdf/react';
+```
+
+---
+
+## TextField
+
+A single-line or multiline text input field.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | (required) | Unique field name. Used as the PDF field identifier. |
+| `value` | `string` | `""` | Pre-filled text value. |
+| `placeholder` | `string` | - | Placeholder text shown when the field is empty. |
+| `width` | `number` | (required) | Field width in points. |
+| `height` | `number` | `24` | Field height in points. |
+| `multiline` | `boolean` | `false` | Allow multiple lines of text. |
+| `password` | `boolean` | `false` | Mask input with dots. |
+| `readOnly` | `boolean` | `false` | Prevent editing. Useful for pre-filled fields that should not be changed. |
+| `maxLength` | `number` | - | Maximum number of characters allowed. |
+| `fontSize` | `number` | `12` | Font size in points. |
+| `style` | `Style` | - | Additional style properties (margin, padding, etc.). |
+
+### Example
+
+```tsx
+<View style={{ gap: 12 }}>
+  <Text style={{ fontSize: 10, fontWeight: 700 }}>Full Name</Text>
+  <TextField name="fullName" value="Jane Smith" width={300} height={24} fontSize={10} />
+
+  <Text style={{ fontSize: 10, fontWeight: 700 }}>Notes</Text>
+  <TextField name="notes" multiline width={300} height={80} fontSize={10} />
+</View>
+```
+
+---
+
+## Checkbox
+
+A checkbox with checked or unchecked state.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | (required) | Unique field name. |
+| `checked` | `boolean` | `false` | Whether the checkbox is checked by default. |
+| `width` | `number` | `14` | Display width in points. |
+| `height` | `number` | `14` | Display height in points. |
+| `readOnly` | `boolean` | `false` | Prevent editing. |
+| `style` | `Style` | - | Additional style properties (margin, etc.). |
+
+### Example
+
+```tsx
+<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+  <Checkbox name="agreeToTerms" />
+  <Text style={{ fontSize: 10 }}>I agree to the terms and conditions</Text>
+</View>
+```
+
+---
+
+## Dropdown
+
+A select dropdown with predefined options.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | (required) | Unique field name. |
+| `options` | `string[]` | (required) | List of selectable options. |
+| `value` | `string` | - | Pre-selected option. Must match one of the `options` values. |
+| `width` | `number` | (required) | Field width in points. |
+| `height` | `number` | `24` | Field height in points. |
+| `readOnly` | `boolean` | `false` | Prevent editing. |
+| `fontSize` | `number` | `12` | Font size in points. |
+| `style` | `Style` | - | Additional style properties (margin, etc.). |
+
+### Example
+
+```tsx
+<View style={{ gap: 4 }}>
+  <Text style={{ fontSize: 10, fontWeight: 700 }}>Country</Text>
+  <Dropdown
+    name="country"
+    options={['United States', 'Canada', 'United Kingdom', 'Germany', 'France']}
+    value="United States"
+    width={200}
+    height={24}
+    fontSize={10}
+  />
+</View>
+```
+
+---
+
+## RadioButton
+
+A radio button. Group multiple radio buttons by giving them the same `name`. Only one in the group can be selected at a time.
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `name` | `string` | (required) | Group name. All radio buttons with the same name form a mutually exclusive group. |
+| `value` | `string` | (required) | The value this radio button represents within the group. |
+| `checked` | `boolean` | `false` | Whether this radio button is selected by default. Only one per group should be `true`. |
+| `width` | `number` | `14` | Display width in points. |
+| `height` | `number` | `14` | Display height in points. |
+| `readOnly` | `boolean` | `false` | Prevent editing. |
+| `style` | `Style` | - | Additional style properties (margin, etc.). |
+
+### Example
+
+```tsx
+<View style={{ gap: 8 }}>
+  <Text style={{ fontSize: 10, fontWeight: 700 }}>Payment Method</Text>
+
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <RadioButton name="paymentMethod" value="creditCard" checked width={14} height={14} />
+    <Text style={{ fontSize: 10 }}>Credit Card</Text>
+  </View>
+
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <RadioButton name="paymentMethod" value="bankTransfer" width={14} height={14} />
+    <Text style={{ fontSize: 10 }}>Bank Transfer</Text>
+  </View>
+
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+    <RadioButton name="paymentMethod" value="check" width={14} height={14} />
+    <Text style={{ fontSize: 10 }}>Check</Text>
+  </View>
+</View>
+```
+
+All three radio buttons share `name="paymentMethod"`, so selecting one deselects the others.
+
+---
+
+## Full Example: Contact Form
+
+```tsx
+import {
+  Document, Page, View, Text,
+  TextField, Checkbox, Dropdown, RadioButton,
+} from '@formepdf/react';
+
+const ContactForm = () => (
+  <Document title="Contact Form">
+    <Page size="Letter" margin={54}>
+      <Text style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>Contact Form</Text>
+
+      <View style={{ gap: 12 }}>
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Name</Text>
+          <TextField name="name" placeholder="Your full name" width={300} fontSize={10} />
+        </View>
+
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Email</Text>
+          <TextField name="email" placeholder="you@example.com" width={300} fontSize={10} />
+        </View>
+
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Department</Text>
+          <Dropdown
+            name="department"
+            options={['Sales', 'Support', 'Engineering', 'Other']}
+            width={200}
+            fontSize={10}
+          />
+        </View>
+
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Priority</Text>
+          <View style={{ flexDirection: 'row', gap: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <RadioButton name="priority" value="low" />
+              <Text style={{ fontSize: 10 }}>Low</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <RadioButton name="priority" value="medium" checked />
+              <Text style={{ fontSize: 10 }}>Medium</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <RadioButton name="priority" value="high" />
+              <Text style={{ fontSize: 10 }}>High</Text>
+            </View>
+          </View>
+        </View>
+
+        <View>
+          <Text style={{ fontSize: 10, fontWeight: 700, marginBottom: 4 }}>Message</Text>
+          <TextField name="message" multiline width={400} height={100} fontSize={10} />
+        </View>
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <Checkbox name="subscribe" checked />
+          <Text style={{ fontSize: 10 }}>Subscribe to updates</Text>
+        </View>
+      </View>
+    </Page>
+  </Document>
+);
+```
+
+---
+
+## Form Flattening
+
+Flattening converts interactive form fields into static PDF content. The visual appearance is preserved, but users can no longer edit the fields. This is useful when you pre-fill a form with data and want to send a finalized, non-editable PDF.
+
+### At render time
+
+Pass `flattenForms: true` to the render options:
+
+<CodeGroup>
+
+```tsx TypeScript
+import { renderDocument } from '@formepdf/core';
+
+const pdfBytes = await renderDocument(
+  <Document>
+    <Page size="Letter" margin={54}>
+      <TextField name="clientName" value="Jane Smith" readOnly width={200} height={24} fontSize={10} />
+    </Page>
+  </Document>,
+  { flattenForms: true }
+);
+```
+
+```python Python
+import formepdf
+
+pdf_bytes = formepdf.render({
+    "children": [{
+        "kind": { "type": "Page" },
+        "children": [{
+            "kind": {
+                "type": "TextField",
+                "name": "clientName",
+                "value": "Jane Smith",
+                "width": 200,
+                "height": 24,
+                "read_only": True,
+                "font_size": 10,
+                "multiline": False,
+                "password": False
+            }
+        }]
+    }]
+}, flatten_forms=True)
+```
+
+```go Go
+// Pass flattenForms=true as a query parameter
+// GET /v1/render/my-template?flattenForms=true
+```
+
+</CodeGroup>
+
+### Via the hosted API
+
+Pass `flattenForms=true` as a query parameter on any render endpoint:
+
+```bash
+curl https://api.formepdf.com/v1/render/intake-form?flattenForms=true \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{"clientName": "Jane Smith", "date": "2026-03-15"}'
+```
+
+See the [Hosted API reference](/api-reference#flatten-forms) for details.
+
+### Edge cases
+
+- Flattening a form that has no fields produces an unchanged PDF.
+- Fields with no value flatten to empty space (the field widget is removed).
+- Read-only fields and editable fields are both flattened. The `readOnly` prop has no effect on the flattened output.
+
+---
+
+## Known Limitations
+
+- **Helvetica only for form field text.** PDF form fields use the built-in Helvetica font regardless of the document's font settings. This means form field text is limited to Latin characters. Document text outside of form fields uses your custom fonts as expected.
+- **Field name collisions.** If two fields share the same `name` (and are not radio buttons in the same group), they will be linked -- editing one updates the other. Use unique names for independent fields.
+- **macOS Preview quirks.** macOS Preview renders basic text fields and checkboxes correctly, but dropdowns and radio buttons may not behave as expected. Use Chrome's built-in PDF viewer or Adobe Acrobat for full form interactivity.
+
+---
+
+## Viewer Compatibility
+
+| Feature | Chrome | Acrobat | macOS Preview | iOS | Android |
+|---------|--------|---------|---------------|-----|---------|
+| Text fields | Yes | Yes | Yes | Varies | Varies |
+| Checkboxes | Yes | Yes | Yes | Varies | Varies |
+| Dropdowns | Yes | Yes | Limited | Varies | Varies |
+| Radio buttons | Yes | Yes | Limited | Varies | Varies |
+
+<Tip>For the most reliable cross-platform experience, recommend Chrome or Adobe Acrobat to your users. If you need guaranteed rendering on all viewers, flatten the form before sending.</Tip>

@@ -1,0 +1,101 @@
+---
+title: Archival (PDF/A)
+sidebarTitle: Archival
+description: Generate PDF/A-compliant documents for long-term preservation, legal archival, and regulatory compliance.
+---
+
+PDF/A is an ISO standard (ISO 19005) for long-term document preservation. It ensures that a PDF is self-contained: all fonts are embedded, colors are device-independent, and no external dependencies exist. PDF/A is required in legal filings, government records, regulatory submissions, medical records, and any context where documents must remain readable decades from now.
+
+---
+
+## Enabling PDF/A
+
+Add the `pdfa` prop to your Document component with the desired conformance level:
+
+```tsx
+<Document pdfa="2b" title="Contract Agreement" author="Legal Dept">
+  <Page size="A4" margin={54}>
+    <Text style={{ fontSize: 24, fontWeight: 700 }}>Service Agreement</Text>
+    <Text style={{ fontSize: 10, lineHeight: 1.6 }}>
+      This document is PDF/A-2b compliant for long-term archival.
+    </Text>
+  </Page>
+</Document>
+```
+
+---
+
+## Supported Levels
+
+Forme supports two PDF/A conformance levels:
+
+| Level | Standard | Description |
+|-------|----------|-------------|
+| `"2b"` | PDF/A-2b | Visual preservation. Guarantees the document looks the same when opened years later. The most common level for general archival. |
+| `"2a"` | PDF/A-2a | Visual preservation + full tagged structure. Requires the same structure tree as PDF/UA (reading order, role map, alt text). Use when both archival and accessibility are required. |
+
+```tsx
+{/* Most common -- visual preservation */}
+<Document pdfa="2b">...</Document>
+
+{/* Tagged structure required (forces tagging, same as pdfUa) */}
+<Document pdfa="2a">...</Document>
+```
+
+<Tip>If you are unsure which level to use, start with `"2b"`. It covers the majority of archival requirements and has the broadest acceptance.</Tip>
+
+### Roadmap: PDF/A-3b
+
+PDF/A-3b extends PDF/A-2b with support for embedded file attachments (XML data, source spreadsheets, machine-readable invoices). This is on the roadmap but not yet supported. When available, it will use `pdfa="3b"`.
+
+---
+
+## What Forme Handles
+
+When `pdfa` is set, Forme automatically ensures the output conforms to the standard:
+
+- **Font embedding** -- All fonts (including subsets) are fully embedded in the PDF. No external font references.
+- **sRGB output intent** -- An sRGB ICC color profile is embedded as the document's output intent, ensuring colors render consistently across devices.
+- **XMP metadata** -- Document title, author, and conformance level are written as XMP metadata packets (required by PDF/A).
+- **Document ID** -- A unique `/ID` array is written in the PDF trailer (required by PDF/A).
+- **No encryption** -- PDF/A prohibits encryption. If you need to restrict access, use application-level controls instead of PDF encryption.
+- **No JavaScript** -- PDF/A prohibits embedded JavaScript. Forme does not embed JavaScript in any case, so this is always satisfied.
+
+---
+
+## Combining with PDF/UA
+
+For documents that need both archival compliance and accessibility (common in government and healthcare), combine both props:
+
+```tsx
+<Document pdfUa pdfa="2b" title="Accessible Archival Report" lang="en">
+  <Page size="A4" margin={54}>
+    <Text style={{ fontSize: 20, fontWeight: 700 }}>Annual Compliance Report</Text>
+    <Image src="./chart.png" width={400} alt="Compliance metrics for fiscal year 2025" />
+  </Page>
+</Document>
+```
+
+This produces a PDF that satisfies both PDF/UA-1 and PDF/A-2b. See the [Accessibility guide](/accessibility) for PDF/UA details.
+
+Using `pdfa="2a"` also works here. PDF/A-2a requires the same tagged structure that PDF/UA demands, so the two standards align naturally.
+
+---
+
+## Known Limitations
+
+- **No encryption.** PDF/A explicitly prohibits document encryption. Attempting to combine encryption with PDF/A will produce a non-conformant file.
+
+---
+
+## Level Comparison
+
+| Capability | PDF/A-2b | PDF/A-2a |
+|-----------|----------|----------|
+| Visual preservation | Yes | Yes |
+| Font embedding | Yes | Yes |
+| sRGB output intent | Yes | Yes |
+| XMP metadata | Yes | Yes |
+| Tagged structure tree | No | Yes (required) |
+| Form fields (AcroForm) | Yes | No |
+| Combined with PDF/UA | Yes | Yes |

@@ -1,0 +1,136 @@
+---
+title: Accessibility (PDF/UA)
+sidebarTitle: Accessibility
+description: Generate screen-reader-compatible PDFs with PDF/UA-1 compliance for government, healthcare, and legal requirements.
+---
+
+PDF/UA (Universal Accessibility) is an ISO standard (ISO 14289-1) for accessible PDF documents. It ensures that PDFs work correctly with screen readers and assistive technologies. PDF/UA compliance is required or recommended in many contexts: government documents (Section 508, EN 301 549), healthcare forms, legal filings, and any organization targeting WCAG 2.x conformance.
+
+---
+
+## Enabling PDF/UA
+
+Add `pdfUa` to your Document component. The `title` prop is required for PDF/UA compliance (it becomes the XMP dc:title metadata):
+
+```tsx
+<Document pdfUa title="Quarterly Report" author="Acme Corp" lang="en">
+  <Page size="A4" margin={54}>
+    <Text style={{ fontSize: 24, fontWeight: 700 }}>Quarterly Report</Text>
+    <Text style={{ fontSize: 10, lineHeight: 1.6 }}>
+      This document is PDF/UA-1 compliant and works with screen readers.
+    </Text>
+  </Page>
+</Document>
+```
+
+That single prop enables the full PDF/UA-1 structure in the output file.
+
+---
+
+## What Forme Handles Automatically
+
+When `pdfUa` is enabled, Forme generates the required accessibility structures without additional configuration:
+
+- **Structure tree** -- Every element (Text, View, Image, Table, Row, Cell) is tagged with the correct PDF structure role (P, Div, Figure, Table, TR, TD, TH, etc.)
+- **Marked content** -- All content streams use marked content operators (BMC/EMC) linking each painted region to its structure element.
+- **XMP metadata** -- The `title` and `author` props on Document are written as XMP metadata with `pdfuaid:part=1`, which is required by PDF/UA.
+- **MarkInfo dictionary** -- `/Marked true` is set in the document catalog.
+- **ViewerPreferences** -- `/DisplayDocTitle true` so PDF viewers show the document title instead of the filename.
+- **Language tag** -- The document language defaults to English. Override it with the `lang` prop: `<Document pdfUa lang="de">`.
+- **Tab order** -- Each page sets `/Tabs /S` so interactive elements follow the document's logical reading order.
+- **Artifact tagging** -- Headers and footers inside `<Fixed>` elements are automatically marked as artifacts so screen readers skip them.
+
+---
+
+## Alt Text on Images
+
+Every image in an accessible PDF must have alternative text. Pass the `alt` prop on `Image` and `Svg` components:
+
+```tsx
+<Image src="./chart.png" width={400} alt="Revenue chart showing 23% growth in Q4" />
+
+<Svg
+  width={100} height={100} viewBox="0 0 100 100"
+  content='<circle cx="50" cy="50" r="40" fill="#3b82f6" />'
+  alt="Blue circle indicator"
+/>
+```
+
+<Note>If `pdfUa` is enabled and an image has no `alt` prop, Forme will still produce a valid PDF, but the image will be marked as a decorative artifact. Screen readers will skip it. Always provide `alt` text for meaningful images.</Note>
+
+---
+
+## Reading Order
+
+Screen readers read the PDF's structure tree in the order elements appear in your JSX. If your visual layout uses `position: 'absolute'` or complex flex ordering, verify that the JSX order matches the intended reading sequence.
+
+---
+
+## Validating with veraPDF
+
+For formal compliance verification, use [veraPDF](https://verapdf.org/) -- the industry-standard open-source PDF/UA validator. It checks structure tree completeness, role mappings, alt text, and metadata.
+
+```bash
+verapdf --flavour ua1 report.pdf
+```
+
+---
+
+## Example: Accessible Report
+
+```tsx
+<Document pdfUa title="Q4 2025 Report" author="Acme Corp" lang="en">
+  <Page size="A4" margin={54}>
+    <Fixed position="header">
+      <Text style={{ fontSize: 8, color: '#94a3b8' }}>Acme Corp -- Confidential</Text>
+    </Fixed>
+
+    <Text bookmark="Executive Summary" style={{ fontSize: 20, fontWeight: 700 }}>
+      Executive Summary
+    </Text>
+    <Text style={{ fontSize: 10, lineHeight: 1.6, marginTop: 8 }}>
+      Revenue grew 23% year-over-year, driven by expansion in the enterprise segment.
+    </Text>
+
+    <Text bookmark="Key Metrics" style={{ fontSize: 16, fontWeight: 700, marginTop: 24 }}>
+      Key Metrics
+    </Text>
+
+    <Image
+      src="./revenue-chart.png"
+      width={400}
+      alt="Bar chart showing quarterly revenue: Q1 $2.1M, Q2 $2.4M, Q3 $2.8M, Q4 $3.2M"
+      style={{ marginTop: 12 }}
+    />
+
+    <Text bookmark="Outlook" style={{ fontSize: 16, fontWeight: 700, marginTop: 24 }}>
+      Outlook
+    </Text>
+    <Text style={{ fontSize: 10, lineHeight: 1.6, marginTop: 8 }}>
+      We expect continued growth in Q1 2026 based on the current pipeline.
+    </Text>
+
+    <Fixed position="footer">
+      <Text style={{ fontSize: 8, textAlign: 'center', color: '#94a3b8' }}>
+        Page {'{{pageNumber}}'} of {'{{totalPages}}'}
+      </Text>
+    </Fixed>
+  </Page>
+</Document>
+```
+
+The `bookmark` props create a navigable outline, headers/footers are auto-tagged as artifacts, and the image has descriptive alt text.
+
+---
+
+## Combining with PDF/A
+
+For documents that need both accessibility and long-term archival compliance, combine both props:
+
+```tsx
+<Document pdfUa pdfa="2b" title="Accessible Archival Report" lang="en">
+  {/* ... */}
+</Document>
+```
+
+This produces a PDF that satisfies both PDF/UA-1 and PDF/A-2b. See the [Archival guide](/archival) for PDF/A details.
