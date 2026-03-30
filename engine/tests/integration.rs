@@ -7821,3 +7821,58 @@ fn test_checkbox_renders_checkmark() {
         "Must not draw X (diagonal stroke lines) for checkbox"
     );
 }
+
+#[test]
+fn test_latin_extended_character_widths() {
+    // Verify Latin Extended characters (Å, Ä, Ö, etc.) have correct advance widths
+    // and don't render stacked on top of each other.
+    use forme::font::StandardFont;
+
+    let m = StandardFont::Helvetica.metrics();
+    let test_str = "ÅÄÖÉÈÊÑÜÚÙû";
+    let font_size = 24.0;
+
+    // Verify each character has a reasonable width (not near-zero)
+    let mut total_width = 0.0;
+    let mut prev_x = 0.0;
+    for ch in test_str.chars() {
+        let w = m.char_width(ch, font_size);
+        assert!(
+            w > 3.0,
+            "Character '{}' (U+{:04X}) has suspiciously small width: {} at {}pt",
+            ch,
+            ch as u32,
+            w,
+            font_size
+        );
+        // Each character's x position should be greater than the previous
+        if total_width > 0.0 {
+            assert!(
+                total_width > prev_x,
+                "Character '{}' x position ({}) not advancing from previous ({})",
+                ch,
+                total_width,
+                prev_x
+            );
+        }
+        prev_x = total_width;
+        total_width += w;
+    }
+
+    // Total width should be reasonable (each char ~16pt at 24pt font size)
+    assert!(
+        total_width > 100.0,
+        "Total width of '{}' at {}pt should be >100pt, got {}",
+        test_str,
+        font_size,
+        total_width
+    );
+
+    // Also render a full document and verify PDF is valid
+    let text_node = make_text(test_str, font_size);
+    let doc = default_doc(vec![text_node]);
+    let (pdf, layout) = forme::render_with_layout(&doc).unwrap();
+
+    assert!(pdf.starts_with(b"%PDF"), "Output should be a valid PDF");
+    assert_eq!(layout.pages.len(), 1);
+}
