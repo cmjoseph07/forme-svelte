@@ -1290,10 +1290,10 @@ impl PdfWriter {
                         tm_x = x_cursor;
                         tm_y = pdf_y;
 
-                        // Check for page number placeholders
+                        // Check for page number sentinel characters
                         let raw_text: String = group.iter().map(|g| g.char_value).collect();
-                        let has_placeholder = raw_text.contains("{{pageNumber}}")
-                            || raw_text.contains("{{totalPages}}");
+                        let has_placeholder = raw_text.contains(PAGE_NUMBER_SENTINEL)
+                            || raw_text.contains(TOTAL_PAGES_SENTINEL);
 
                         let is_custom = builder.custom_font_data.contains_key(&font_key);
 
@@ -1301,10 +1301,12 @@ impl PdfWriter {
                             if let Some(embed_data) = builder.custom_font_data.get(&font_key) {
                                 let mut hex = String::new();
                                 if has_placeholder {
-                                    // Placeholder text: replace and use char→gid fallback
+                                    // Sentinel text: replace with actual values and use char→gid fallback
+                                    let pn = PAGE_NUMBER_SENTINEL.to_string();
+                                    let tp = TOTAL_PAGES_SENTINEL.to_string();
                                     let text_after = raw_text
-                                        .replace("{{pageNumber}}", &page_number.to_string())
-                                        .replace("{{totalPages}}", &total_pages.to_string());
+                                        .replace(&pn, &page_number.to_string())
+                                        .replace(&tp, &total_pages.to_string());
                                     for ch in text_after.chars() {
                                         let gid =
                                             embed_data.char_to_gid.get(&ch).copied().unwrap_or(0);
@@ -1333,9 +1335,11 @@ impl PdfWriter {
                                 let _ = writeln!(stream, "<> Tj");
                             }
                         } else {
+                            let pn = PAGE_NUMBER_SENTINEL.to_string();
+                            let tp = TOTAL_PAGES_SENTINEL.to_string();
                             let text_after = raw_text
-                                .replace("{{pageNumber}}", &page_number.to_string())
-                                .replace("{{totalPages}}", &total_pages.to_string());
+                                .replace(&pn, &page_number.to_string())
+                                .replace(&tp, &total_pages.to_string());
                             let mut text_str = String::new();
                             for ch in text_after.chars() {
                                 let b = Self::unicode_to_winansi(ch).unwrap_or(b'?');

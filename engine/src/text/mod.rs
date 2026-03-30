@@ -9,6 +9,7 @@ pub mod knuth_plass;
 pub mod shaping;
 
 use crate::font::FontContext;
+use crate::layout::{PAGE_NUMBER_SENTINEL, TOTAL_PAGES_SENTINEL};
 use crate::style::{Color, FontStyle, Hyphens, TextDecoration};
 use unicode_linebreak::{linebreaks, BreakOpportunity};
 
@@ -47,6 +48,28 @@ pub struct RunBrokenLine {
     pub width: f64,
 }
 
+/// Override widths for page placeholder sentinel characters.
+/// Sentinels are single chars that must measure as the width of "00".
+#[allow(clippy::too_many_arguments)]
+fn fix_sentinel_widths(
+    chars: &[char],
+    widths: &mut [f64],
+    font_context: &FontContext,
+    font_family: &str,
+    font_weight: u32,
+    italic: bool,
+    font_size: f64,
+    letter_spacing: f64,
+) {
+    for (i, &ch) in chars.iter().enumerate() {
+        if ch == PAGE_NUMBER_SENTINEL || ch == TOTAL_PAGES_SENTINEL {
+            widths[i] = font_context.char_width('0', font_family, font_weight, italic, font_size)
+                * 2.0
+                + letter_spacing;
+        }
+    }
+}
+
 /// Compute UAX#14 break opportunities indexed by char position.
 ///
 /// Returns a vec of length `text.chars().count()`. Each entry is the break
@@ -76,6 +99,20 @@ fn compute_break_opportunities(text: &str) -> Vec<Option<BreakOpportunity>> {
             result[char_idx] = Some(opp);
         }
         // byte_offset == text.len() means "break at end" — we ignore that
+    }
+
+    // Suppress breaks before and after sentinel characters so they stay
+    // glued to surrounding text (e.g. "Page \x02" won't break between them).
+    let chars: Vec<char> = text.chars().collect();
+    for (i, &ch) in chars.iter().enumerate() {
+        if ch == PAGE_NUMBER_SENTINEL || ch == TOTAL_PAGES_SENTINEL {
+            // No break before the sentinel
+            result[i] = None;
+            // No break after the sentinel
+            if i + 1 < char_count {
+                result[i + 1] = None;
+            }
+        }
     }
 
     result
@@ -537,18 +574,39 @@ impl TextLayout {
                             }
                         }
                     }
+                    fix_sentinel_widths(
+                        &chars,
+                        &mut widths,
+                        font_context,
+                        font_family,
+                        font_weight,
+                        italic,
+                        font_size,
+                        letter_spacing,
+                    );
                     return widths;
                 }
 
                 if let Some(shaped) = shaping::shape_text(text, font_data) {
                     let num_chars = chars.len();
-                    return shaping::cluster_widths(
+                    let mut widths = shaping::cluster_widths(
                         &shaped,
                         num_chars,
                         units_per_em,
                         font_size,
                         letter_spacing,
                     );
+                    fix_sentinel_widths(
+                        &chars,
+                        &mut widths,
+                        font_context,
+                        font_family,
+                        font_weight,
+                        italic,
+                        font_size,
+                        letter_spacing,
+                    );
+                    return widths;
                 }
             }
 
@@ -643,6 +701,20 @@ impl TextLayout {
                     );
                     for (j, w) in cluster_w.into_iter().enumerate() {
                         widths[run_start + j] = w;
+                    }
+                    // Fix sentinel widths that shaping may have given wrong values
+                    for j in run_start..run_end {
+                        let ch = chars[j].ch;
+                        if ch == PAGE_NUMBER_SENTINEL || ch == TOTAL_PAGES_SENTINEL {
+                            widths[j] = font_context.char_width(
+                                '0',
+                                &chars[j].font_family,
+                                chars[j].font_weight,
+                                italic,
+                                chars[j].font_size,
+                            ) * 2.0
+                                + chars[j].letter_spacing;
+                        }
                     }
                     i = run_end;
                     continue;

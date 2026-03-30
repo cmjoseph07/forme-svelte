@@ -731,14 +731,22 @@ fn apply_text_transform(text: &str, transform: TextTransform) -> String {
     }
 }
 
-/// Replace page number placeholders with "00" for layout measurement.
-/// The actual values are substituted later during PDF generation (pdf/mod.rs).
-/// "00" approximates typical 1-2 digit page numbers; documents over 99 pages
-/// will have slightly wider actual values than estimated.
+/// Sentinel character for `{{pageNumber}}` placeholder.
+/// A single char that is atomic (can't be split by line breaking), measured
+/// as the width of "00", and recognized by the PDF serializer for replacement.
+pub const PAGE_NUMBER_SENTINEL: char = '\x02';
+
+/// Sentinel character for `{{totalPages}}` placeholder.
+pub const TOTAL_PAGES_SENTINEL: char = '\x03';
+
+/// Replace page number placeholders with single sentinel characters.
+/// The sentinels are measured as the width of "00" by the font system,
+/// are atomic (single char, so line breaking can't split them), and are
+/// replaced with actual values by the PDF serializer.
 fn substitute_page_placeholders(text: &str) -> String {
     if text.contains("{{pageNumber}}") || text.contains("{{totalPages}}") {
-        text.replace("{{pageNumber}}", "00")
-            .replace("{{totalPages}}", "00")
+        text.replace("{{pageNumber}}", &PAGE_NUMBER_SENTINEL.to_string())
+            .replace("{{totalPages}}", &TOTAL_PAGES_SENTINEL.to_string())
     } else {
         text.to_string()
     }

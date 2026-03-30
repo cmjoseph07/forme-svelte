@@ -404,6 +404,11 @@ impl FontContext {
         italic: bool,
         font_size: f64,
     ) -> f64 {
+        // Page placeholder sentinels: measure as the width of "00"
+        if ch == crate::layout::PAGE_NUMBER_SENTINEL || ch == crate::layout::TOTAL_PAGES_SENTINEL {
+            return self.char_width('0', family, weight, italic, font_size) * 2.0;
+        }
+
         // Fast path: single font family — try primary font first,
         // fall back to per-char resolution only when the char isn't covered
         let font_data = if !family.contains(',') {
@@ -439,26 +444,11 @@ impl FontContext {
         font_size: f64,
         letter_spacing: f64,
     ) -> f64 {
-        let font_data = self.registry.resolve(family, weight, italic);
-        match font_data {
-            FontData::Standard(std_font) => {
-                std_font
-                    .metrics()
-                    .measure_string(text, font_size, letter_spacing)
-            }
-            FontData::Custom {
-                metrics: Some(m), ..
-            } => {
-                let mut width = 0.0;
-                for ch in text.chars() {
-                    width += m.char_width(ch, font_size) + letter_spacing;
-                }
-                width
-            }
-            FontData::Custom { metrics: None, .. } => StandardFont::Helvetica
-                .metrics()
-                .measure_string(text, font_size, letter_spacing),
+        let mut width = 0.0;
+        for ch in text.chars() {
+            width += self.char_width(ch, family, weight, italic, font_size) + letter_spacing;
         }
+        width
     }
 
     /// Resolve a font key to its font data.
