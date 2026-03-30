@@ -5,6 +5,14 @@ pub fn render_pdf(json: &str) -> Result<Vec<u8>, JsValue> {
     crate::render_json(json).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Sign PDF bytes with an X.509 certificate (PKCS#7 detached signature).
+#[wasm_bindgen]
+pub fn sign_pdf(pdf_bytes: &[u8], config_json: &str) -> Result<Vec<u8>, JsValue> {
+    let config: crate::model::SignatureConfig =
+        serde_json::from_str(config_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    crate::sign_pdf(pdf_bytes, &config).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 #[wasm_bindgen]
 pub fn render_pdf_with_layout(json: &str) -> Result<JsValue, JsValue> {
     let (pdf_bytes, layout_info) =

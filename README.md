@@ -87,6 +87,10 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Embedded data**: Attach structured JSON to any PDF. Recipients can extract the original data programmatically — invoices carry their line items, reports carry their datasets.
 - **Browser rendering**: Import `@formepdf/core/browser` to generate PDFs entirely client-side. Same engine, same templates — no server required.
 - **Tailwind CSS**: `tw("p-4 text-lg font-bold bg-blue-500")` converts Tailwind classes to Forme style objects. Full color palette, grid, arbitrary values, negative values, fractions.
+- **Fillable forms**: AcroForm components — `<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>`. Fill and flatten for non-editable delivery.
+- **PDF/UA accessibility**: `<Document pdfUa>` generates PDF/UA-1 compliant documents with structure tree, tab order, role map, and artifact tagging.
+- **PDF/A archival**: `<Document pdfa="a-2b">` for long-term preservation. Supports PDF/A-2b, PDF/A-2u, and PDF/A-3b.
+- **Digital signatures**: PKCS#7 signatures with X.509 certificates via the `signature` prop or `/v1/sign` API endpoint.
 
 ## Browser Usage
 
@@ -177,6 +181,10 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | `<AreaChart>` | Multi-series area chart. `series`, `labels`, `showGrid`, `title`. |
 | `<DotPlot>` | Scatter plot. `groups`, `xLabel`, `yLabel`, `showLegend`, `dotSize`. |
 | `<Watermark>` | Rotated text behind page content. `text`, `fontSize`, `color`, `angle`. |
+| `<TextField>` | Form text input. `name`, `defaultValue`, `multiline`, `password`, `readOnly`. |
+| `<Checkbox>` | Form checkbox. `name`, `checked`. |
+| `<Dropdown>` | Form select dropdown. `name`, `options`, `defaultValue`. |
+| `<RadioButton>` | Form radio button. `name`, `group`, `checked`. |
 | `<Fixed>` | Repeating header or footer. |
 | `<PageBreak>` | Force a page break. |
 
@@ -210,6 +218,10 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Custom fonts | TTF with OpenType shaping | Yes | Yes |
 | Browser rendering | Yes (`@formepdf/core/browser`) | Yes (client-side) | No (server only) |
 | Tailwind CSS | `tw("p-4 text-lg font-bold")` utility | No | No |
+| Fillable forms | AcroForm (TextField, Checkbox, Dropdown, Radio) | No | HTML `<form>` (not PDF forms) |
+| PDF/UA accessibility | `<Document pdfUa>` | No | No |
+| PDF/A archival | `<Document pdfa="a-2b">` | No | No |
+| Digital signatures | PKCS#7 via `signature` prop or API | No | No |
 | Dependencies | None (WASM) | yoga-layout | Chrome/Chromium |
 | Runs in-process | Yes | Yes | No (subprocess) |
 
@@ -247,7 +259,11 @@ Supports spacing, typography, colors (full Tailwind palette), flexbox, grid, bor
 
 ## Documentation
 
-Full docs at [docs.formepdf.com](https://docs.formepdf.com)
+Full docs at [docs.formepdf.com](https://docs.formepdf.com):
+- [Forms](https://docs.formepdf.com/forms) — fillable AcroForm components
+- [Accessibility](https://docs.formepdf.com/accessibility) — PDF/UA-1 compliance
+- [Archival](https://docs.formepdf.com/archival) — PDF/A compliance
+- [Digital Signatures](https://docs.formepdf.com/digital-signatures) — PKCS#7 signing
 
 ## Contributing
 

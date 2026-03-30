@@ -334,6 +334,27 @@ Key files: `packages/core/src/index.ts` (RenderDocumentOptions.embedData), `pack
 ### Browser Entry Point (`@formepdf/core/browser`)
 `packages/core/src/browser.ts` provides the same API as the Node entry point but with zero Node dependencies. WASM loading uses wasm-pack's `fetch()`-based loader (auto-resolves via `import.meta.url` with bundlers). `init(module?)` allows pre-loading or passing a custom WASM URL/bytes. Font resolution uses `fetch()` for URL-based fonts instead of `node:fs`. Base64 encoding uses `btoa()` instead of `Buffer.from()`. `extractData()` uses the browser-native `DecompressionStream` API instead of `node:zlib`. The WASM module itself is pure compute with no Node APIs — the browser entry is just a Node-free JS wrapper around the same `pkg/forme.js` glue code.
 
+### AcroForms (Fillable PDF Forms)
+`<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>` — AcroForm components for creating interactive fillable PDFs. Form fields render as native PDF AcroForm widgets. `flattenForms` render option converts filled fields to static content. Known limitation: form field text uses Helvetica only (Latin characters). Key files: `packages/react/src/components.tsx` (form components), `packages/react/src/serialize.ts` (form serialization), `engine/src/model/mod.rs` (NodeKind variants), `engine/src/layout/mod.rs` (form layout), `engine/src/pdf/mod.rs` (AcroForm widget rendering).
+
+### PDF/UA Accessibility
+`<Document pdfUa>` enables PDF/UA-1 compliance. Forme automatically generates: structure tree (StructTreeRoot), tab order (/S on each page), role map, artifact tagging for headers/footers, and XMP metadata with `pdfuaid:part=1`. `alt` prop on `<Image>` and `<Svg>` flows to `/Alt` entries in structure elements. Reading order follows layout order. Key files: `engine/src/pdf/tagged.rs` (structure tree generation), `engine/src/pdf/xmp.rs` (XMP metadata), `engine/src/pdf/mod.rs` (tagged PDF emission).
+
+### PDF/A Archival Compliance
+`<Document pdfa="a-2b">` enables PDF/A compliance. Supported levels: `a-2b` (visual match), `a-2u` (Unicode text extraction), `a-3b` (file attachments). Forme handles: full font embedding (no subsetting for PDF/A), sRGB output intent, XMP metadata with `pdfaid:part/conformance`, encryption prohibition. Forms + PDF/A-2a is not supported; PDF/A-2b works fine with forms. Key files: `engine/src/pdf/xmp.rs` (PDF/A XMP metadata), `engine/src/pdf/mod.rs` (output intent, font embedding mode).
+
+### Digital Signatures
+`<Document signature={{ cert, key, reason?, location?, contactInfo? }}>` applies a PKCS#7 detached digital signature at render time. Also available via `POST /v1/sign` API endpoint for signing existing PDFs. Certificates must be X.509 PEM format. Supports visible and invisible signature appearances. Key files: `engine/src/pdf/mod.rs` (signature dictionary, ByteRange placeholder, PKCS#7 embedding).
+
+### `__formeType` Marker
+The `Document` component sets `__formeType: 'Document'` on the returned element for version-independent identity checking. This allows `serialize()` to detect a Forme document element without relying on React component reference equality (which breaks across package versions or duplicate installs).
+
+### Go SDK
+`github.com/formepdf/forme-go` — Go SDK for the Forme hosted API. Wraps render, async render, job polling, S3 upload, and data extraction endpoints.
+
+### Rust Crate
+`forme-pdf` on crates.io — the Rust engine as a standalone crate. `cargo add forme-pdf`. Exports `render()`, `render_json()`, `render_with_layout()`, `render_template()`.
+
 ## Known Issues & Limitations (Current State)
 
 1. No variable font axis support.

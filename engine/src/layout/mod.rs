@@ -5442,6 +5442,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5499,6 +5500,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5557,6 +5559,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5626,6 +5629,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5774,6 +5778,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5842,6 +5847,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5922,6 +5928,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -5980,6 +5987,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6049,6 +6057,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6129,6 +6138,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6208,6 +6218,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6281,6 +6292,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);
@@ -6346,6 +6358,7 @@ mod tests {
             embedded_data: None,
             flatten_forms: false,
             pdf_ua: false,
+            signature: None,
         };
 
         let pages = engine.layout(&doc, &font_context);

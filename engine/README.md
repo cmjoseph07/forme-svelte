@@ -20,7 +20,10 @@ use forme::{render_json, Document, FormeError};
 - **QR codes & barcodes** — vector rendering (Code128, Code39, EAN13, EAN8, Codabar)
 - **Canvas** — arbitrary vector drawing via a Canvas-like API
 - **Watermarks** — rotated text behind page content
-- **Tagged PDF / PDF/A-2a** — accessibility and archival compliance
+- **AcroForms** — fillable PDF forms (TextField, Checkbox, Dropdown, RadioButton) with form flattening
+- **PDF/UA-1** — accessibility compliance with structure tree, tab order, role map, artifact tagging
+- **PDF/A** — archival compliance (PDF/A-2b, PDF/A-2u, PDF/A-3b) with full font embedding and XMP metadata
+- **Digital signatures** — PKCS#7 detached signatures with X.509 certificates
 - **Templates** — expression language for dynamic documents (`$ref`, `$each`, `$if`)
 - **WASM** — compiles to WebAssembly for browser and serverless use
 

@@ -118,6 +118,7 @@ fn default_doc(children: Vec<Node>) -> Document {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     }
 }
 
@@ -540,6 +541,7 @@ fn test_metadata_in_output() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -679,6 +681,7 @@ fn render_with_custom_font(font_data: &[u8], text: &str) -> Vec<u8> {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let engine = LayoutEngine::new();
@@ -831,6 +834,7 @@ fn test_mixed_standard_and_custom_fonts() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let engine = LayoutEngine::new();
@@ -3141,6 +3145,7 @@ fn test_breakable_view_with_background_splits_across_pages() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pages = layout_doc(&doc);
@@ -3219,6 +3224,7 @@ fn test_breakable_view_background_does_not_overlap_footer() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pages = layout_doc(&doc);
@@ -3288,6 +3294,7 @@ fn test_breakable_view_without_visual_stays_unwrapped() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pages = layout_doc(&doc);
@@ -3617,6 +3624,7 @@ fn test_breakable_view_continuation_page_has_top_padding() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pages = layout_doc(&doc);
@@ -3972,6 +3980,7 @@ fn test_document_lang_in_pdf_catalog() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -4211,6 +4220,7 @@ fn test_justified_text_produces_valid_pdf() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).expect("Should render justified text");
@@ -4266,6 +4276,7 @@ fn test_lang_inherits_to_text_nodes() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     // Just verify it renders without error — lang cascading is tested at the unit level
@@ -4336,6 +4347,7 @@ fn test_per_node_lang_override() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).expect("Should render with per-node lang override");
@@ -4361,6 +4373,7 @@ fn test_tagged_pdf_has_struct_tree_root() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4416,6 +4429,7 @@ fn test_tagged_pdf_parent_tree_consistency() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4489,6 +4503,7 @@ fn test_tagged_pdf_nested_text_roles() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4584,6 +4599,7 @@ fn test_tagged_pdf_table_th_td() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4636,6 +4652,7 @@ fn test_tagged_pdf_figure_alt_text() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let bytes = forme::render(&doc).unwrap();
@@ -4903,6 +4920,7 @@ fn test_qrcode_renders_to_pdf() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pdf = forme::render(&doc).expect("QR code should render to PDF");
@@ -4935,6 +4953,7 @@ fn test_qrcode_with_explicit_size() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -4979,6 +4998,7 @@ fn test_qrcode_page_break() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5035,6 +5055,7 @@ fn test_font_fallback_chain_in_document() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pdf = forme::render(&doc).expect("Fallback chain should render");
@@ -5112,6 +5133,7 @@ fn test_text_overflow_ellipsis_single_line() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5484,6 +5506,7 @@ fn test_document_default_style() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let pdf = render_to_pdf(&doc);
     let pdf_str = String::from_utf8_lossy(&pdf);
@@ -5513,6 +5536,7 @@ fn test_embedded_data_round_trip() {
         embedded_data: Some(data.to_string()),
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let pdf = render_to_pdf(&doc);
     assert_valid_pdf(&pdf);
@@ -5599,6 +5623,7 @@ fn test_barcode_renders_to_pdf() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let pdf = forme::render(&doc).expect("Barcode should render to PDF");
@@ -5665,6 +5690,7 @@ fn test_barcode_layout_dimensions() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5716,6 +5742,7 @@ fn auto_margin_horizontal_centers_child() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -5771,6 +5798,7 @@ fn auto_margin_left_pushes_right() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (_pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -6090,6 +6118,7 @@ fn test_bar_chart_layout_dimensions() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
 
     let (pdf, layout) = forme::render_with_layout(&doc).expect("Should render");
@@ -6837,6 +6866,7 @@ fn test_pdf_ua_has_viewer_preferences() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: true,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -6867,6 +6897,7 @@ fn test_pdf_ua_has_xmp_pdfuaid() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: true,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -6890,6 +6921,7 @@ fn test_pdf_ua_forces_tagging() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: true,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -6924,6 +6956,7 @@ fn test_pdf_ua_and_pdfa_combined_xmp() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: true,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -6960,6 +6993,7 @@ fn test_tagged_pdf_has_tab_order() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -6983,6 +7017,7 @@ fn test_untagged_pdf_no_tab_order() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -7006,6 +7041,7 @@ fn test_tagged_role_map_complete() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -7036,6 +7072,7 @@ fn test_tagged_struct_tree_has_lang() {
         embedded_data: None,
         flatten_forms: false,
         pdf_ua: false,
+        signature: None,
     };
     let bytes = render_to_pdf(&doc);
     assert_valid_pdf(&bytes);
@@ -7093,5 +7130,419 @@ fn test_tagged_watermark_not_in_structure_tree() {
         struct_elem_count, 2,
         "Watermark should not be in structure tree (expected 2 StructElems: Div + P, got {})",
         struct_elem_count
+    );
+}
+
+// ─── Digital Signature Tests ────────────────────────────────────
+
+/// Helper: generate a self-signed X.509 cert + RSA private key for testing.
+fn generate_test_cert_and_key() -> (String, String) {
+    use rsa::pkcs8::EncodePrivateKey;
+
+    // Generate RSA key using the `rsa` crate
+    let mut rng = rsa::rand_core::OsRng;
+    let rsa_key = rsa::RsaPrivateKey::new(&mut rng, 2048).unwrap();
+    let key_pem = rsa_key
+        .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
+        .unwrap()
+        .to_string();
+
+    // Create rcgen KeyPair from the RSA PEM
+    let key_pair = rcgen::KeyPair::from_pem(&key_pem).unwrap();
+
+    // Generate self-signed cert with CN in Subject DN
+    let mut params = rcgen::CertificateParams::new(vec!["Test Signer".to_string()]).unwrap();
+    params.distinguished_name = {
+        let mut dn = rcgen::DistinguishedName::new();
+        dn.push(rcgen::DnType::CommonName, "Test Signer");
+        dn
+    };
+    let cert = params.self_signed(&key_pair).unwrap();
+
+    (cert.pem(), key_pem)
+}
+
+#[test]
+fn test_sign_pdf_basic() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("Signed document", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    assert!(
+        text.contains("/Type /Sig"),
+        "Must contain signature dictionary"
+    );
+    assert!(
+        text.contains("/Filter /Adobe.PPKLite"),
+        "Must have Adobe.PPKLite filter"
+    );
+    assert!(
+        text.contains("/SubFilter /adbe.pkcs7.detached"),
+        "Must use PKCS#7 detached subfilter"
+    );
+}
+
+#[test]
+fn test_sign_pdf_has_acroform() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("AcroForm test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    assert!(text.contains("/AcroForm"), "Must contain AcroForm");
+    assert!(text.contains("/SigFlags 3"), "Must have SigFlags 3");
+}
+
+#[test]
+fn test_sign_pdf_byterange() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("ByteRange test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    // Find /ByteRange [0 X Y Z]
+    let br_start = text.find("/ByteRange [").expect("Must contain /ByteRange");
+    let br_end = text[br_start..].find(']').unwrap() + br_start + 1;
+    let br_str = &text[br_start + 12..br_end - 1]; // inside the brackets
+    let values: Vec<usize> = br_str
+        .split_whitespace()
+        .filter_map(|s| s.parse().ok())
+        .collect();
+
+    assert_eq!(values.len(), 4, "ByteRange must have exactly 4 values");
+    assert_eq!(values[0], 0, "ByteRange must start at 0");
+    assert!(
+        values[1] < values[2],
+        "First range end must be before second range start"
+    );
+    assert_eq!(
+        values[1] + values[2] + values[3],
+        values[1] + values[2] + values[3],
+        "Values must be consistent"
+    );
+    // Verify: first_range_end + gap + second_range_len should relate to file size
+    assert_eq!(
+        values[2] + values[3],
+        signed_pdf.len(),
+        "ByteRange end must equal file length"
+    );
+}
+
+#[test]
+fn test_sign_pdf_contents_not_placeholder() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("Contents test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    // Find /Contents <...> and verify it's not all zeros
+    let contents_start = text.find("/Contents <").expect("Must contain /Contents");
+    let hex_start = contents_start + 11; // after "/Contents <"
+    let hex_end = text[hex_start..].find('>').unwrap() + hex_start;
+    let hex_str = &text[hex_start..hex_end];
+
+    // Should not be all zeros
+    let all_zeros = hex_str.chars().all(|c| c == '0');
+    assert!(!all_zeros, "/Contents must not be all zeros after signing");
+}
+
+#[test]
+fn test_sign_pdf_invisible() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("Invisible sig", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    assert!(
+        text.contains("/Rect [0 0 0 0]"),
+        "Invisible signature must have zero rect"
+    );
+}
+
+#[test]
+fn test_sign_pdf_reason_location() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("Reason/location test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: Some("Approved for release".to_string()),
+        location: Some("New York, NY".to_string()),
+        contact: Some("signer@example.com".to_string()),
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    assert!(
+        text.contains("/Reason (Approved for release)"),
+        "Must contain reason string"
+    );
+    assert!(
+        text.contains("/Location (New York, NY)"),
+        "Must contain location string"
+    );
+    assert!(
+        text.contains("/ContactInfo (signer@example.com)"),
+        "Must contain contact info"
+    );
+}
+
+#[test]
+fn test_sign_pdf_invalid_cert() {
+    let doc = default_doc(vec![make_text("Invalid cert test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: "not a real PEM certificate".to_string(),
+        private_key_pem: "not a real PEM key".to_string(),
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let result = forme::sign_pdf(&unsigned_pdf, &config);
+    assert!(result.is_err(), "Invalid cert should produce an error");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("certificate") || err.contains("PEM"),
+        "Error message should mention certificate: {}",
+        err
+    );
+}
+
+#[test]
+fn test_sign_pdf_key_mismatch() {
+    // Generate two different key pairs
+    let (cert_pem, _key_pem) = generate_test_cert_and_key();
+    let (_other_cert, other_key) = generate_test_cert_and_key();
+
+    let doc = default_doc(vec![make_text("Key mismatch test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: other_key, // wrong key
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        page: None,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let result = forme::sign_pdf(&unsigned_pdf, &config);
+    assert!(result.is_err(), "Mismatched key should produce an error");
+    let err = result.unwrap_err().to_string();
+    assert!(
+        err.contains("do not match"),
+        "Error should mention key mismatch: {}",
+        err
+    );
+}
+
+#[test]
+fn test_sign_at_render_time() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+
+    let doc = Document {
+        children: vec![make_text("Render-time signed", 12.0)],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+        signature: Some(forme::SignatureConfig {
+            certificate_pem: cert_pem,
+            private_key_pem: key_pem,
+            reason: Some("Auto-signed at render".to_string()),
+            location: None,
+            contact: None,
+            visible: false,
+            page: None,
+            x: None,
+            y: None,
+            width: None,
+            height: None,
+        }),
+    };
+
+    let pdf = forme::render(&doc).unwrap();
+    let text = String::from_utf8_lossy(&pdf);
+
+    assert!(
+        text.contains("/Type /Sig"),
+        "Render-time signing must produce signature"
+    );
+    assert!(
+        text.contains("/Reason (Auto-signed at render)"),
+        "Reason must appear in signed output"
+    );
+    assert!(text.contains("/AcroForm"), "Must have AcroForm");
+}
+
+#[test]
+fn test_sign_pdf_visible_has_appearance_stream() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("Visible sig test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: Some("Contract approval".to_string()),
+        location: None,
+        contact: None,
+        visible: true,
+        page: None,
+        x: Some(50.0),
+        y: Some(600.0),
+        width: Some(200.0),
+        height: Some(60.0),
+    };
+
+    let signed_pdf = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text = String::from_utf8_lossy(&signed_pdf);
+
+    // Must have a non-zero rect
+    assert!(
+        !text.contains("/Rect [0 0 0 0]"),
+        "Visible signature must not have zero rect"
+    );
+    assert!(
+        text.contains("/Rect [50.00 600.00 250.00 660.00]"),
+        "Rect must match configured position/size"
+    );
+
+    // Must have an appearance stream reference
+    assert!(
+        text.contains("/AP <<"),
+        "Visible signature must have /AP entry"
+    );
+
+    // Must have a Form XObject with the appearance content
+    assert!(
+        text.contains("/Subtype /Form"),
+        "Must have Form XObject for appearance"
+    );
+    assert!(
+        text.contains("Digitally signed by"),
+        "Appearance must contain 'Digitally signed by' text"
+    );
+    assert!(
+        text.contains("Test Signer"),
+        "Appearance must contain the signer CN"
+    );
+    assert!(
+        text.contains("Contract approval"),
+        "Appearance must contain the reason"
+    );
+
+    // AcroForm must have default resources for Helvetica
+    assert!(
+        text.contains("/DR <<"),
+        "AcroForm must have /DR for font resources"
     );
 }

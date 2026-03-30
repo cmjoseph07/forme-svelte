@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.0] - 2026-03-29
+
+### Added
+- WASM rebuilt with AcroForm, PDF/UA, PDF/A, and digital signature support
+- `flattenForms` option in `renderDocument()` and `renderDocumentWithLayout()`
+
 ## [0.7.13] - 2026-03-28
 
 ### Added

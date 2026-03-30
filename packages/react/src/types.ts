@@ -166,6 +166,31 @@ export interface Style {
 
 // ─── Component prop types ────────────────────────────────────────────
 
+export interface SignatureConfig {
+  /** PEM-encoded X.509 certificate. */
+  certificatePem: string;
+  /** PEM-encoded RSA private key (PKCS#8). */
+  privateKeyPem: string;
+  /** Reason for signing (e.g. "Approved"). */
+  reason?: string;
+  /** Location of signing (e.g. "New York, NY"). */
+  location?: string;
+  /** Contact info for the signer. */
+  contact?: string;
+  /** Whether to show a visible signature annotation on the page. */
+  visible?: boolean;
+  /** Page index (0-based) for visible signature placement. */
+  page?: number;
+  /** X coordinate in points for visible signature. */
+  x?: number;
+  /** Y coordinate in points for visible signature. */
+  y?: number;
+  /** Width in points for visible signature. */
+  width?: number;
+  /** Height in points for visible signature. */
+  height?: number;
+}
+
 export interface DocumentProps {
   title?: string;
   author?: string;
@@ -181,6 +206,8 @@ export interface DocumentProps {
   pdfa?: '2a' | '2b';
   /** When true, the PDF claims PDF/UA-1 conformance. Forces tagging. */
   pdfUa?: boolean;
+  /** Digital signature configuration. Signs the PDF with an X.509 certificate. */
+  signature?: SignatureConfig;
   fonts?: FontRegistration[];
   children?: ReactNode;
 }
@@ -564,6 +591,7 @@ export interface FormeDocument {
   pdfa?: '2a' | '2b';
   pdfUa?: boolean;
   flattenForms?: boolean;
+  signature?: SignatureConfig;
 }
 
 export interface FormeMetadata {

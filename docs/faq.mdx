@@ -75,3 +75,23 @@ Each API key is limited to 100 requests per minute. Monthly render limits depend
 ## Is Forme free?
 
 Yes. The core library is open source under the MIT license. You can use it in personal and commercial projects without restrictions. The [hosted service](https://app.formepdf.com) has a free tier with 500 renders/month and 3 templates, with paid plans for higher limits.
+
+## Does Forme support fillable PDF forms?
+
+Yes. Forme includes AcroForm components — `<TextField>`, `<Checkbox>`, `<Dropdown>`, and `<RadioButton>` — for creating interactive fillable PDFs. You can also flatten forms at render time to convert filled fields to static content. See the [Forms guide](/forms) for details.
+
+## Is Forme accessible / screen reader compatible?
+
+Yes. Enable PDF/UA-1 compliance with `<Document pdfUa>`. Forme automatically generates the structure tree, tab order, role map, and artifact tagging required for screen readers. Add `alt` text to images for full accessibility. See the [Accessibility guide](/accessibility).
+
+## Can I generate archival PDFs?
+
+Yes. Forme supports PDF/A-2b, PDF/A-2u, and PDF/A-3b for long-term document preservation. Enable it with `<Document pdfa="a-2b">`. Forme handles font embedding, sRGB output intent, and XMP metadata automatically. See the [Archival guide](/archival).
+
+## Does Forme support digital signatures?
+
+Yes. Forme can apply PKCS#7 detached digital signatures using X.509 certificates. Sign at render time via the `signature` prop on `<Document>`, or sign an existing PDF via the `/v1/sign` API endpoint. See the [Digital Signatures guide](/digital-signatures).
+
+## Does Forme work with macOS Preview?
+
+Basic form fields render in macOS Preview, but interactive features like dropdowns and radio buttons work best in Chrome's PDF viewer or Adobe Acrobat. For the most reliable experience across all Forme features, use Chrome or Acrobat.

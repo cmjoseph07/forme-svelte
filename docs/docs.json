@@ -31,6 +31,10 @@
         "pages": ["components", "styles", "tailwind", "fonts", "page-breaks", "charts", "templates", "embedded-data", "api-reference"]
       },
       {
+        "group": "Enterprise",
+        "pages": ["forms", "accessibility", "archival", "digital-signatures"]
+      },
+      {
         "group": "SDKs",
         "pages": ["go-sdk", "rust-sdk"]
       },

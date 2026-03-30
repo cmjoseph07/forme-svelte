@@ -49,7 +49,7 @@ pub mod wasm_raw;
 pub use error::FormeError;
 pub use layout::LayoutInfo;
 pub use model::{ChartDataPoint, ChartSeries, DotPlotGroup};
-pub use model::{ColumnDef, ColumnWidth, FontEntry, TextRun};
+pub use model::{ColumnDef, ColumnWidth, FontEntry, SignatureConfig, TextRun};
 pub use model::{Document, Metadata, Node, NodeKind, PageConfig, PageSize};
 pub use style::Style;
 
@@ -57,10 +57,20 @@ use font::FontContext;
 use layout::LayoutEngine;
 use pdf::PdfWriter;
 
+/// Sign PDF bytes with an X.509 certificate.
+///
+/// Takes arbitrary PDF bytes and a signature configuration, and returns
+/// new PDF bytes with a valid digital signature. Uses incremental update
+/// to preserve the original PDF content.
+pub fn sign_pdf(pdf_bytes: &[u8], config: &model::SignatureConfig) -> Result<Vec<u8>, FormeError> {
+    pdf::signing::sign_pdf(pdf_bytes, config)
+}
+
 /// Render a document to PDF bytes.
 ///
 /// This is the primary entry point. Takes a document tree and returns
-/// the raw bytes of a valid PDF file.
+/// the raw bytes of a valid PDF file. If the document has a `signature`
+/// configuration, the output PDF is digitally signed.
 pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
     let mut font_context = FontContext::new();
     register_document_fonts(&mut font_context, &document.fonts);
@@ -70,7 +80,7 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
     let tagged = document.tagged
         || document.pdf_ua
         || matches!(document.pdfa, Some(model::PdfAConformance::A2a));
-    writer.write(
+    let pdf = writer.write(
         &pages,
         &document.metadata,
         &font_context,
@@ -79,13 +89,21 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
         document.pdf_ua,
         document.embedded_data.as_deref(),
         document.flatten_forms,
-    )
+    )?;
+    let pdf = if let Some(ref sig_config) = document.signature {
+        pdf::signing::sign_pdf(&pdf, sig_config)?
+    } else {
+        pdf
+    };
+    Ok(pdf)
 }
 
 /// Render a document to PDF bytes along with layout metadata.
 ///
 /// Same as `render()` but also returns `LayoutInfo` describing the
 /// position and dimensions of every element on every page.
+/// If the document has a `signature` configuration, the output PDF
+/// is digitally signed.
 pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), FormeError> {
     let mut font_context = FontContext::new();
     register_document_fonts(&mut font_context, &document.fonts);
@@ -106,6 +124,11 @@ pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), 
         document.embedded_data.as_deref(),
         document.flatten_forms,
     )?;
+    let pdf = if let Some(ref sig_config) = document.signature {
+        pdf::signing::sign_pdf(&pdf, sig_config)?
+    } else {
+        pdf
+    };
     Ok((pdf, layout_info))
 }
 

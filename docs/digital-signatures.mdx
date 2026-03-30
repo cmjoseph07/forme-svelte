@@ -1,0 +1,231 @@
+---
+title: Digital Signatures
+sidebarTitle: Signatures
+description: Apply PKCS#7 digital signatures to PDFs for contracts, compliance, and legal documents.
+---
+
+Digital signatures cryptographically prove that a PDF has not been tampered with since signing and identify the signer. They are required or expected for contracts, regulatory filings, legal documents, and compliance workflows. Forme supports PKCS#7 detached signatures using X.509 certificates.
+
+---
+
+## Signing at Render Time
+
+Pass the `signature` prop on the Document component to sign the PDF during rendering. You need an X.509 certificate and its corresponding private key in PEM format.
+
+```tsx
+import { readFileSync } from 'fs';
+import { Document, Page, Text } from '@formepdf/react';
+import { renderDocument } from '@formepdf/core';
+
+const cert = readFileSync('./cert.pem', 'utf-8');
+const key = readFileSync('./key.pem', 'utf-8');
+
+const pdfBytes = await renderDocument(
+  <Document
+    title="Service Agreement"
+    signature={{
+      cert,
+      key,
+      reason: 'Approved',
+      location: 'San Francisco, CA',
+      contactInfo: 'legal@acme.com',
+    }}
+  >
+    <Page size="Letter" margin={54}>
+      <Text style={{ fontSize: 24, fontWeight: 700 }}>Service Agreement</Text>
+      <Text style={{ fontSize: 10, lineHeight: 1.6, marginTop: 12 }}>
+        This agreement is entered into as of March 29, 2026...
+      </Text>
+    </Page>
+  </Document>
+);
+```
+
+### Signature Props
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `cert` | `string` | Yes | X.509 certificate in PEM format. |
+| `key` | `string` | Yes | Private key in PEM format. |
+| `reason` | `string` | No | Reason for signing (e.g., "Approved", "Reviewed"). Shown in signature details. |
+| `location` | `string` | No | Signing location (e.g., "San Francisco, CA"). |
+| `contactInfo` | `string` | No | Signer contact information (e.g., email address). |
+
+---
+
+## Signing an Existing PDF via API
+
+Use the `/v1/sign` endpoint to apply a digital signature to a PDF you have already rendered or received from another source.
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/sign \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/pdf" \
+  --data-binary @contract.pdf \
+  -G \
+  --data-urlencode "cert=$(base64 -w0 cert.pem)" \
+  --data-urlencode "key=$(base64 -w0 key.pem)" \
+  --data-urlencode "reason=Approved" \
+  --data-urlencode "location=San Francisco, CA" \
+  --output signed-contract.pdf
+```
+
+```javascript Node.js
+import fs from 'fs';
+
+const pdf = fs.readFileSync('contract.pdf');
+const cert = Buffer.from(fs.readFileSync('cert.pem')).toString('base64');
+const key = Buffer.from(fs.readFileSync('key.pem')).toString('base64');
+
+const params = new URLSearchParams({
+  cert,
+  key,
+  reason: 'Approved',
+  location: 'San Francisco, CA',
+});
+
+const res = await fetch(`https://api.formepdf.com/v1/sign?${params}`, {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer forme_sk_abc123...',
+    'Content-Type': 'application/pdf',
+  },
+  body: pdf,
+});
+
+const signedPdf = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync('signed-contract.pdf', signedPdf);
+```
+
+```python Python
+import requests
+import base64
+
+with open("contract.pdf", "rb") as f:
+    pdf_bytes = f.read()
+
+cert = base64.b64encode(open("cert.pem", "rb").read()).decode()
+key = base64.b64encode(open("key.pem", "rb").read()).decode()
+
+res = requests.post(
+    "https://api.formepdf.com/v1/sign",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/pdf",
+    },
+    params={
+        "cert": cert,
+        "key": key,
+        "reason": "Approved",
+        "location": "San Francisco, CA",
+    },
+    data=pdf_bytes,
+)
+
+with open("signed-contract.pdf", "wb") as f:
+    f.write(res.content)
+```
+
+```go Go
+package main
+
+import (
+	"bytes"
+	"encoding/base64"
+	"io"
+	"net/http"
+	"net/url"
+	"os"
+)
+
+func main() {
+	pdf, _ := os.ReadFile("contract.pdf")
+	certPem, _ := os.ReadFile("cert.pem")
+	keyPem, _ := os.ReadFile("key.pem")
+
+	params := url.Values{}
+	params.Set("cert", base64.StdEncoding.EncodeToString(certPem))
+	params.Set("key", base64.StdEncoding.EncodeToString(keyPem))
+	params.Set("reason", "Approved")
+	params.Set("location", "San Francisco, CA")
+
+	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/sign?"+params.Encode(), bytes.NewReader(pdf))
+	req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+	req.Header.Set("Content-Type", "application/pdf")
+
+	res, _ := http.DefaultClient.Do(req)
+	defer res.Body.Close()
+
+	out, _ := os.Create("signed-contract.pdf")
+	io.Copy(out, res.Body)
+}
+```
+
+</CodeGroup>
+
+The endpoint returns `200 OK` with the signed PDF as the response body (`Content-Type: application/pdf`).
+
+---
+
+## Visible vs Invisible Signatures
+
+By default, Forme applies an invisible signature. The signature is embedded in the PDF's metadata and can be verified in the signature panel of any PDF viewer, but nothing appears on the page itself.
+
+To add a visible signature annotation, pass `appearance` options:
+
+```tsx
+<Document
+  signature={{
+    cert,
+    key,
+    reason: 'Approved',
+    appearance: {
+      page: 0,
+      x: 350,
+      y: 700,
+      width: 200,
+      height: 50,
+      label: 'Digitally signed by Jane Smith',
+    },
+  }}
+>
+  {/* ... */}
+</Document>
+```
+
+The visible annotation displays the `label` text at the specified position. Coordinates are in points from the bottom-left corner of the page.
+
+<Note>Visible signature appearance text uses the built-in Helvetica font, limited to Latin characters. This is a PDF specification constraint on form field appearances.</Note>
+
+---
+
+## Generating a Test Certificate
+
+For development and testing, generate a self-signed X.509 certificate with OpenSSL:
+
+```bash
+# Generate a private key
+openssl genrsa -out key.pem 2048
+
+# Generate a self-signed certificate (valid for 365 days)
+openssl req -new -x509 -key key.pem -out cert.pem -days 365 \
+  -subj "/CN=Test Signer/O=Acme Corp/C=US"
+```
+
+This creates `key.pem` (private key) and `cert.pem` (certificate) in the current directory.
+
+<Tip>Self-signed certificates work for testing and internal use. For production documents that need third-party trust verification, use a certificate from a trusted Certificate Authority (CA) or your organization's PKI.</Tip>
+
+---
+
+## Known Limitations
+
+- **RSA keys only.** Only RSA private keys are supported. ECDSA, Ed25519, and other key types are not supported. If you pass a non-RSA key, you'll get a clear error message.
+- **Leaf certificate only.** Only the signing certificate is embedded in the signature. Intermediate CA certificates are not included. PDF viewers may show "unknown signer" if they can't build the full chain to a trusted root.
+- **No timestamp authority (TSA).** Signatures do not include a trusted timestamp from a TSA server. The signing date is set from the server clock but is not cryptographically verified by a third party.
+- **No Long-Term Validation (LTV).** CRL and OCSP responses are not embedded. Signature validity cannot be verified after the signing certificate expires.
+- **Helvetica only in signature appearance text.** Visible signature annotations use the PDF built-in Helvetica font. Custom fonts are not supported in signature form field appearances.
+- **One signature per render.** Each render operation applies a single signature. To apply multiple signatures (e.g., co-signers), sign sequentially using the `/v1/sign` endpoint.
+- **Self-signed certificates show "unknown signer" in Acrobat.** This is expected — Acrobat only trusts certificates from its trusted root store. Self-signed certs are fine for testing and internal workflows.

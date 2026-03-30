@@ -51,6 +51,7 @@ class _FormeEngine:
         self._alloc = self._instance.exports(self._store)["forme_alloc"]
         self._dealloc = self._instance.exports(self._store)["forme_dealloc"]
         self._render = self._instance.exports(self._store)["forme_render_pdf"]
+        self._sign = self._instance.exports(self._store)["forme_sign_pdf"]
         self._result_ptr = self._instance.exports(self._store)["forme_get_result_ptr"]
         self._result_len = self._instance.exports(self._store)["forme_get_result_len"]
         self._error_ptr = self._instance.exports(self._store)["forme_get_error_ptr"]
@@ -114,6 +115,46 @@ class _FormeEngine:
             self._dealloc(self._store, input_ptr, length, 1)
 
 
+    def sign_pdf(self, pdf_bytes: bytes, config_json: str) -> bytes:
+        """Sign PDF bytes with an X.509 certificate."""
+        config_bytes = config_json.encode("utf-8")
+
+        # Allocate input buffers in WASM memory
+        pdf_ptr = self._alloc(self._store, len(pdf_bytes), 1)
+        config_ptr = self._alloc(self._store, len(config_bytes), 1)
+        if not pdf_ptr or not config_ptr:
+            raise FormeRenderError("Failed to allocate WASM memory for sign input")
+
+        try:
+            self._write_memory(pdf_ptr, pdf_bytes)
+            self._write_memory(config_ptr, config_bytes)
+
+            status = self._sign(
+                self._store, pdf_ptr, len(pdf_bytes), config_ptr, len(config_bytes)
+            )
+
+            if status != 0:
+                err_ptr = self._error_ptr(self._store)
+                err_len = self._error_len(self._store)
+                if err_ptr and err_len > 0:
+                    error_msg = self._read_memory(err_ptr, err_len).decode("utf-8")
+                else:
+                    error_msg = "Unknown sign error"
+                raise FormeRenderError(error_msg)
+
+            res_ptr = self._result_ptr(self._store)
+            res_len = self._result_len(self._store)
+            if not res_ptr or res_len == 0:
+                raise FormeRenderError("Sign returned empty result")
+
+            signed_bytes = self._read_memory(res_ptr, res_len)
+            self._free_result(self._store)
+            return signed_bytes
+        finally:
+            self._dealloc(self._store, pdf_ptr, len(pdf_bytes), 1)
+            self._dealloc(self._store, config_ptr, len(config_bytes), 1)
+
+
 def _get_engine() -> _FormeEngine:
     """Get or create the singleton engine instance."""
     global _engine
@@ -145,3 +186,16 @@ def render_pdf(json_str: str) -> bytes:
         FileNotFoundError: If the WASM binary is not found.
     """
     return _get_engine().render_pdf(json_str)
+
+
+def sign_pdf(pdf_bytes: bytes, config_json: str) -> bytes:
+    """Sign PDF bytes with an X.509 certificate.
+
+    Args:
+        pdf_bytes: Raw PDF file bytes.
+        config_json: JSON string with signature configuration.
+
+    Returns:
+        Signed PDF file bytes.
+    """
+    return _get_engine().sign_pdf(pdf_bytes, config_json)

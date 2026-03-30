@@ -160,6 +160,20 @@ export async function renderPdfWithLayout(json: string): Promise<RenderWithLayou
   return result;
 }
 
+export interface SignatureConfig {
+  certificatePem: string;
+  privateKeyPem: string;
+  reason?: string;
+  location?: string;
+  contact?: string;
+  visible?: boolean;
+  page?: number;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+}
+
 export interface RenderDocumentOptions {
   /** Data to embed as a hidden JSON attachment in the PDF. */
   embedData?: unknown;
@@ -206,6 +220,14 @@ export async function renderTemplateWithLayout(templateJson: string, dataJson: s
   const { render_template_pdf_with_layout } = await import('../pkg/forme.js');
   const result = render_template_pdf_with_layout(templateJson, dataJson) as { pdf: Uint8Array; layout: LayoutInfo };
   return result;
+}
+
+// ── PDF signing ──────────────────────────────────────────────────────
+
+export async function signPdf(pdfBytes: Uint8Array, config: SignatureConfig): Promise<Uint8Array> {
+  await ensureInit();
+  const { sign_pdf } = await import('../pkg/forme.js');
+  return sign_pdf(pdfBytes, JSON.stringify(config));
 }
 
 // ── Data extraction ──────────────────────────────────────────────────

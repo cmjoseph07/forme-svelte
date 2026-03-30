@@ -81,6 +81,59 @@ pub unsafe extern "C" fn forme_render_pdf(ptr: *const u8, len: usize) -> i32 {
     }
 }
 
+/// Sign PDF bytes with an X.509 certificate.
+///
+/// Returns 0 on success (result available via `forme_get_result_ptr`/`forme_get_result_len`).
+/// Returns 1 on error (error message via `forme_get_error_ptr`/`forme_get_error_len`).
+///
+/// # Safety
+/// `pdf_ptr` must point to `pdf_len` valid bytes.
+/// `config_ptr` must point to `config_len` valid UTF-8 bytes (JSON).
+#[no_mangle]
+pub unsafe extern "C" fn forme_sign_pdf(
+    pdf_ptr: *const u8,
+    pdf_len: usize,
+    config_ptr: *const u8,
+    config_len: usize,
+) -> i32 {
+    free_result_buf();
+    free_error_buf();
+
+    let pdf_bytes = std::slice::from_raw_parts(pdf_ptr, pdf_len);
+    let config_bytes = std::slice::from_raw_parts(config_ptr, config_len);
+    let config_str = match std::str::from_utf8(config_bytes) {
+        Ok(s) => s,
+        Err(e) => {
+            set_error(&format!("Invalid UTF-8 in config: {e}"));
+            return 1;
+        }
+    };
+
+    let config: crate::model::SignatureConfig = match serde_json::from_str(config_str) {
+        Ok(c) => c,
+        Err(e) => {
+            set_error(&format!("Invalid signature config JSON: {e}"));
+            return 1;
+        }
+    };
+
+    match crate::sign_pdf(pdf_bytes, &config) {
+        Ok(signed_bytes) => {
+            let len = signed_bytes.len();
+            let layout = Layout::from_size_align(len, 1).unwrap();
+            let buf = alloc(layout);
+            std::ptr::copy_nonoverlapping(signed_bytes.as_ptr(), buf, len);
+            RESULT_BUF = buf;
+            RESULT_LEN = len;
+            0
+        }
+        Err(e) => {
+            set_error(&e.to_string());
+            1
+        }
+    }
+}
+
 /// Get pointer to the result PDF bytes (after successful `forme_render_pdf`).
 #[no_mangle]
 pub extern "C" fn forme_get_result_ptr() -> *const u8 {

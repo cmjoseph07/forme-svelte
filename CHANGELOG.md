@@ -2,6 +2,18 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.8.0] - 2026-03-29
+
+### Added
+- **AcroForm components**: `<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>` for creating fillable PDF forms
+- **Form flattening**: `flattenForms` render option converts interactive fields to static content
+- **PDF/UA-1 accessibility**: `<Document pdfUa>` generates tagged PDFs with structure tree, tab order, role map, and artifact tagging
+- **PDF/A archival**: `<Document pdfa="a-2b">` for long-term document preservation (supports `a-2b`, `a-2u`, `a-3b`)
+- **Digital signatures**: `<Document signature={{ cert, key }}>` applies PKCS#7 detached signatures with X.509 certificates
+- **`/v1/sign` API endpoint**: Sign existing PDFs via the hosted API
+- **`/v1/render/:slug?flattenForms=true`**: Flatten form fields via query parameter on render endpoints
+- New docs pages: Forms, Accessibility, Archival, Digital Signatures
+
 ## [0.7.13] - 2026-03-28
 
 ### Added

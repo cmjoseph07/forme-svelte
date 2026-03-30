@@ -36,12 +36,25 @@ barcoders = { version = "2", default-features = false }  # 1D barcode generation
 quick-xml = "0.37"
 image = { version = "0.24", default-features = false, features = ["jpeg", "png", "webp"] }
 base64 = "0.22"
+
+# Digital signature support
+sha2 = { version = "0.10", features = ["oid"] }
+rsa = "0.9"
+x509-cert = { version = "0.2", features = ["pem"] }
+cms = "0.2"
+const-oid = "0.9"
+der = { version = "0.7", features = ["alloc", "pem"] }
+pem-rfc7468 = "0.7"
+pkcs8 = { version = "0.10", features = ["pem"] }
+signature = "2"
+
+getrandom = { version = "0.2", features = ["js"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 
 [features]
-wasm = ["wasm-bindgen", "js-sys", "serde-wasm-bindgen"]
+wasm = ["wasm-bindgen", "js-sys", "serde-wasm-bindgen", "getrandom"]
 wasm-raw = []  # C-ABI exports for non-JS WASM hosts (Python wasmtime, Go wazero)
 visual-tests = []
 
@@ -53,6 +66,9 @@ crate-type = ["cdylib", "rlib"]
 [[bin]]
 name = "forme"
 path = "src/main.rs"
+
+[dev-dependencies]
+rcgen = "0.13"
 
 [profile.release]
 opt-level = 3

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.8.0] - 2026-03-29
+
+### Added
+- AcroForm support: `NodeKind::TextField`, `NodeKind::Checkbox`, `NodeKind::Dropdown`, `NodeKind::RadioButton`
+- Form field layout functions and PDF AcroForm widget rendering
+- `flattenForms` option in render pipeline to convert form fields to static content
+- PDF/UA-1 compliance: structure tree (`StructTreeRoot`), tab order, role map, artifact tagging for headers/footers
+- `pdf/tagged.rs`: structure tree generation for tagged PDF
+- PDF/A compliance: sRGB output intent, XMP metadata with `pdfaid:part/conformance`, full font embedding mode
+- `pdf/signing.rs`: PKCS#7 detached digital signatures with ByteRange placeholder
+- `Document.pdf_ua`, `Document.pdfa`, `Document.signature` fields
+- `Image.alt` and `Svg.alt` emit `/Alt` entries in structure elements for PDF/UA
+
 ## [0.7.13] - 2026-03-28
 
 ### Added

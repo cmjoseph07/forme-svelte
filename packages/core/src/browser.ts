@@ -233,6 +233,17 @@ export async function renderTemplateWithLayout(
   return result;
 }
 
+// ── PDF signing ──────────────────────────────────────────────────────
+
+export async function signPdf(
+  pdfBytes: Uint8Array,
+  config: { certificatePem: string; privateKeyPem: string; reason?: string; location?: string; contact?: string; visible?: boolean; page?: number; x?: number; y?: number; width?: number; height?: number },
+): Promise<Uint8Array> {
+  await ensureInit();
+  const { sign_pdf } = await import('../pkg/forme.js');
+  return sign_pdf(pdfBytes, JSON.stringify(config));
+}
+
 // ── Data extraction (browser-native decompression) ──────────────────
 
 /**

@@ -199,6 +199,7 @@ export function serialize(element: ReactElement): FormeDocument {
   if (props.tagged !== undefined) result.tagged = props.tagged;
   if (props.pdfa !== undefined) result.pdfa = props.pdfa;
   if (props.pdfUa) result.pdfUa = true;
+  if (props.signature) result.signature = props.signature;
 
   if (mergedFonts.length > 0) {
     result.fonts = mergedFonts;
@@ -1527,6 +1528,7 @@ export function serializeTemplate(element: ReactElement): Record<string, unknown
   if (props.tagged !== undefined) result.tagged = props.tagged;
   if (props.pdfa !== undefined) result.pdfa = props.pdfa;
   if (props.pdfUa) result.pdfUa = true;
+  if (props.signature) result.signature = props.signature;
 
   if (mergedFonts.length > 0) {
     result.fonts = mergedFonts;

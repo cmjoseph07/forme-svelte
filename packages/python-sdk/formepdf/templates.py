@@ -1354,6 +1354,7 @@ class Document(_Component):
         tagged: bool = False,
         pdfa: Optional[str] = None,
         pdf_ua: bool = False,
+        signature: Optional[Dict[str, Any]] = None,
     ):
         self.children = list(children)
         self.title = title
@@ -1365,6 +1366,7 @@ class Document(_Component):
         self.tagged = tagged
         self.pdfa = pdfa
         self.pdf_ua = pdf_ua
+        self.signature = signature
 
     def to_dict(self) -> Dict[str, Any]:
         doc: Dict[str, Any] = {
@@ -1398,6 +1400,9 @@ class Document(_Component):
         if self.pdf_ua:
             doc["pdfUa"] = True
 
+        if self.signature:
+            doc["signature"] = self.signature
+
         return doc
 
     def to_json(self, **kwargs: Any) -> str:
@@ -1426,3 +1431,39 @@ class Document(_Component):
         if flatten_forms:
             doc["flattenForms"] = True
         return render_pdf(json.dumps(doc))
+
+
+def sign(
+    pdf: bytes,
+    certificate: str,
+    private_key: str,
+    reason: Optional[str] = None,
+    location: Optional[str] = None,
+    contact: Optional[str] = None,
+) -> bytes:
+    """Sign PDF bytes with an X.509 certificate.
+
+    Args:
+        pdf: Raw PDF file bytes.
+        certificate: PEM-encoded X.509 certificate.
+        private_key: PEM-encoded RSA private key (PKCS#8).
+        reason: Optional reason for signing.
+        location: Optional location of signing.
+        contact: Optional contact info for the signer.
+
+    Returns:
+        Signed PDF file bytes.
+    """
+    from .wasm import sign_pdf
+
+    config = {
+        "certificatePem": certificate,
+        "privateKeyPem": private_key,
+    }
+    if reason is not None:
+        config["reason"] = reason
+    if location is not None:
+        config["location"] = location
+    if contact is not None:
+        config["contact"] = contact
+    return sign_pdf(pdf, json.dumps(config))

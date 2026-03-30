@@ -873,6 +873,7 @@ type DocumentNode struct {
 	pdfa         string
 	pdfUa        bool
 	flattenForms bool
+	signature    map[string]any
 }
 
 // Document creates a new document node.
@@ -890,6 +891,10 @@ func (d *DocumentNode) Tagged(tagged bool) *DocumentNode       { d.tagged = tagg
 func (d *DocumentNode) PdfA(level string) *DocumentNode        { d.pdfa = level; return d }
 func (d *DocumentNode) PdfUA() *DocumentNode                   { d.pdfUa = true; return d }
 func (d *DocumentNode) FlattenForms() *DocumentNode            { d.flattenForms = true; return d }
+func (d *DocumentNode) SetSignature(config map[string]any) *DocumentNode {
+	d.signature = config
+	return d
+}
 
 func (d *DocumentNode) toDict() map[string]any {
 	doc := map[string]any{
@@ -927,6 +932,9 @@ func (d *DocumentNode) toDict() map[string]any {
 	}
 	if d.pdfUa {
 		doc["pdfUa"] = true
+	}
+	if d.signature != nil {
+		doc["signature"] = d.signature
 	}
 
 	return doc

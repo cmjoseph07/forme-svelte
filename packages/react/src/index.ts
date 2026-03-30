@@ -59,6 +59,7 @@ export type {
   DropdownProps,
   RadioButtonProps,
   TextRun,
+  SignatureConfig,
   // Forme JSON output
   FormeDocument,
   FormeFont,

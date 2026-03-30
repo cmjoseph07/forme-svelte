@@ -61,6 +61,11 @@ pub struct Document {
     /// fillable fields.
     #[serde(default)]
     pub flatten_forms: bool,
+
+    /// Digital signature configuration. When set, the rendered PDF is signed
+    /// with the specified X.509 certificate and RSA private key.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub signature: Option<SignatureConfig>,
 }
 
 /// PDF/A conformance level.
@@ -72,6 +77,43 @@ pub enum PdfAConformance {
     /// PDF/A-2b: basic compliance (visual appearance only).
     #[serde(rename = "2b")]
     A2b,
+}
+
+/// Configuration for digitally signing a PDF with an X.509 certificate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SignatureConfig {
+    /// PEM-encoded X.509 certificate.
+    pub certificate_pem: String,
+    /// PEM-encoded RSA private key (PKCS#8).
+    pub private_key_pem: String,
+    /// Reason for signing (e.g. "Approved").
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Location of signing (e.g. "New York, NY").
+    #[serde(default)]
+    pub location: Option<String>,
+    /// Contact info for the signer.
+    #[serde(default)]
+    pub contact: Option<String>,
+    /// Whether to show a visible signature annotation on the page.
+    #[serde(default)]
+    pub visible: bool,
+    /// Page index (0-based) for visible signature placement.
+    #[serde(default)]
+    pub page: Option<usize>,
+    /// X coordinate in points for visible signature.
+    #[serde(default)]
+    pub x: Option<f64>,
+    /// Y coordinate in points for visible signature.
+    #[serde(default)]
+    pub y: Option<f64>,
+    /// Width in points for visible signature.
+    #[serde(default)]
+    pub width: Option<f64>,
+    /// Height in points for visible signature.
+    #[serde(default)]
+    pub height: Option<f64>,
 }
 
 /// A custom font to register with the engine.
