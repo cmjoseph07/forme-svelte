@@ -731,6 +731,19 @@ fn apply_text_transform(text: &str, transform: TextTransform) -> String {
     }
 }
 
+/// Replace page number placeholders with "00" for layout measurement.
+/// The actual values are substituted later during PDF generation (pdf/mod.rs).
+/// "00" approximates typical 1-2 digit page numbers; documents over 99 pages
+/// will have slightly wider actual values than estimated.
+fn substitute_page_placeholders(text: &str) -> String {
+    if text.contains("{{pageNumber}}") || text.contains("{{totalPages}}") {
+        text.replace("{{pageNumber}}", "00")
+            .replace("{{totalPages}}", "00")
+    } else {
+        text.to_string()
+    }
+}
+
 /// Apply a text transform to a single character, given whether it's the first
 /// letter of a word (for Capitalize).
 fn apply_char_transform(ch: char, transform: TextTransform, is_word_start: bool) -> char {
@@ -2584,7 +2597,8 @@ impl LayoutEngine {
             return;
         }
 
-        let transformed = apply_text_transform(content, style.text_transform);
+        let content = substitute_page_placeholders(content);
+        let transformed = apply_text_transform(&content, style.text_transform);
         let justify = matches!(style.text_align, TextAlign::Justify);
         let lines = match style.line_breaking {
             LineBreaking::Optimal => self.text_layout.break_into_lines_optimal(
@@ -2854,8 +2868,9 @@ impl LayoutEngine {
             let run_style = run.style.resolve(Some(style), text_width);
             let run_href = run.href.as_deref().or(parent_href);
             let transform = run_style.text_transform;
+            let run_content = substitute_page_placeholders(&run.content);
             let mut prev_is_whitespace = true;
-            for ch in run.content.chars() {
+            for ch in run_content.chars() {
                 let transformed_ch = apply_char_transform(ch, transform, prev_is_whitespace);
                 prev_is_whitespace = ch.is_whitespace();
                 styled_chars.push(StyledChar {
@@ -4262,7 +4277,8 @@ impl LayoutEngine {
                     let mut styled_chars: Vec<StyledChar> = Vec::new();
                     for run in runs {
                         let run_style = run.style.resolve(Some(style), measure_width);
-                        for ch in run.content.chars() {
+                        let run_content = substitute_page_placeholders(&run.content);
+                        for ch in run_content.chars() {
                             styled_chars.push(StyledChar {
                                 ch,
                                 font_family: run_style.font_family.clone(),
@@ -4286,9 +4302,10 @@ impl LayoutEngine {
                     let line_height = style.font_size * style.line_height;
                     (broken_lines.len() as f64) * line_height + style.padding.vertical()
                 } else {
+                    let content = substitute_page_placeholders(content);
                     let lines = self.text_layout.break_into_lines(
                         font_context,
-                        content,
+                        &content,
                         measure_width,
                         style.font_size,
                         &style.font_family,
@@ -4566,7 +4583,8 @@ impl LayoutEngine {
                 *width + style.padding.horizontal() + style.margin.horizontal()
             }
             NodeKind::Text { content, .. } => {
-                let transformed = apply_text_transform(content, style.text_transform);
+                let content = substitute_page_placeholders(content);
+                let transformed = apply_text_transform(&content, style.text_transform);
                 let italic = matches!(style.font_style, FontStyle::Italic | FontStyle::Oblique);
                 let text_width = font_context.measure_string(
                     &transformed,
@@ -4684,8 +4702,9 @@ impl LayoutEngine {
                     runs.iter()
                         .map(|run| {
                             let run_style = run.style.resolve(Some(style), 0.0);
+                            let run_content = substitute_page_placeholders(&run.content);
                             let transformed =
-                                apply_text_transform(&run.content, run_style.text_transform);
+                                apply_text_transform(&run_content, run_style.text_transform);
                             self.text_layout.measure_widest_word(
                                 font_context,
                                 &transformed,
@@ -4700,7 +4719,8 @@ impl LayoutEngine {
                         })
                         .fold(0.0f64, f64::max)
                 } else {
-                    let transformed = apply_text_transform(content, style.text_transform);
+                    let content = substitute_page_placeholders(content);
+                    let transformed = apply_text_transform(&content, style.text_transform);
                     self.text_layout.measure_widest_word(
                         font_context,
                         &transformed,

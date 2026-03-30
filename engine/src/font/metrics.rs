@@ -163,6 +163,20 @@ impl StandardFont {
             },
         }
     }
+
+    #[test]
+    fn test_page_placeholder_width_difference() {
+        let m = StandardFont::Helvetica.metrics();
+        let literal = m.measure_string("{{pageNumber}}", 12.0, 0.0);
+        let substituted = m.measure_string("00", 12.0, 0.0);
+        // "{{pageNumber}}" is 16 chars, "00" is 2 chars — massive difference
+        assert!(
+            literal > substituted * 3.0,
+            "Literal placeholder ({}) is much wider than substituted ({})",
+            literal,
+            substituted
+        );
+    }
 }
 
 // ─── Helvetica ───────────────────────────────────────────────────

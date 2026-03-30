@@ -7876,3 +7876,30 @@ fn test_latin_extended_character_widths() {
     assert!(pdf.starts_with(b"%PDF"), "Output should be a valid PDF");
     assert_eq!(layout.pages.len(), 1);
 }
+
+#[test]
+fn test_page_placeholder_measurement_width() {
+    use forme::font::StandardFont;
+    let m = StandardFont::Helvetica.metrics();
+    let font_size = 12.0;
+
+    // Measure the substituted version
+    let expected_text = "Page 00 of 00";
+    let expected_width = m.measure_string(expected_text, font_size, 0.0);
+
+    // The literal placeholder string is much wider
+    let placeholder_text = "Page {{pageNumber}} of {{totalPages}}";
+    let literal_width = m.measure_string(placeholder_text, font_size, 0.0);
+    assert!(
+        expected_width < literal_width,
+        "Substituted width ({}) should be less than literal placeholder width ({})",
+        expected_width,
+        literal_width
+    );
+
+    // Layout a document with placeholders and verify it renders
+    let text_node = make_text(placeholder_text, font_size);
+    let doc = default_doc(vec![text_node]);
+    let (_pdf, layout) = forme::render_with_layout(&doc).unwrap();
+    assert_eq!(layout.pages.len(), 1);
+}
