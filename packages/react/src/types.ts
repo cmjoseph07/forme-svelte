@@ -179,8 +179,6 @@ export interface SignatureConfig {
   contact?: string;
   /** Whether to show a visible signature annotation on the page. */
   visible?: boolean;
-  /** Page index (0-based) for visible signature placement. */
-  page?: number;
   /** X coordinate in points for visible signature. */
   x?: number;
   /** Y coordinate in points for visible signature. */

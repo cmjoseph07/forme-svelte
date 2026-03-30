@@ -152,6 +152,7 @@ impl TagBuilder {
                     "TD"
                 }
             }
+            "TextField" | "Checkbox" | "Dropdown" | "RadioButton" => "Form",
             _ => "Div",
         }
     }

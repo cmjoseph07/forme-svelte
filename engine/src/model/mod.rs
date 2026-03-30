@@ -99,9 +99,6 @@ pub struct SignatureConfig {
     /// Whether to show a visible signature annotation on the page.
     #[serde(default)]
     pub visible: bool,
-    /// Page index (0-based) for visible signature placement.
-    #[serde(default)]
-    pub page: Option<usize>,
     /// X coordinate in points for visible signature.
     #[serde(default)]
     pub x: Option<f64>,

@@ -143,6 +143,44 @@ fn assert_valid_pdf(bytes: &[u8]) {
     assert!(bytes.windows(7).any(|w| w == b"trailer"), "Missing trailer");
 }
 
+/// Decompress all FlateDecode streams in a PDF and concatenate the results.
+/// Used for testing content that's inside compressed content streams.
+fn decompress_pdf_streams(pdf: &[u8]) -> String {
+    use miniz_oxide::inflate::decompress_to_vec_zlib;
+    let mut result = String::new();
+    let needle_start = b"stream\n";
+    let needle_end = b"\nendstream";
+    let mut pos = 0;
+    while pos + needle_start.len() < pdf.len() {
+        // Find "stream\n" in raw bytes
+        let found = pdf[pos..]
+            .windows(needle_start.len())
+            .position(|w| w == needle_start);
+        let idx = match found {
+            Some(i) => i,
+            None => break,
+        };
+        let abs = pos + idx + needle_start.len();
+        // Find "\nendstream" in raw bytes
+        let end_found = pdf[abs..]
+            .windows(needle_end.len())
+            .position(|w| w == needle_end);
+        let end_idx = match end_found {
+            Some(i) => i,
+            None => break,
+        };
+        let stream_bytes = &pdf[abs..abs + end_idx];
+        if let Ok(decompressed) = decompress_to_vec_zlib(stream_bytes) {
+            if let Ok(s) = std::str::from_utf8(&decompressed) {
+                result.push_str(s);
+                result.push('\n');
+            }
+        }
+        pos = abs + end_idx;
+    }
+    result
+}
+
 // ─── Basic Pipeline Tests ───────────────────────────────────────
 
 #[test]
@@ -7175,7 +7213,7 @@ fn test_sign_pdf_basic() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7212,7 +7250,7 @@ fn test_sign_pdf_has_acroform() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7239,7 +7277,7 @@ fn test_sign_pdf_byterange() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7290,7 +7328,7 @@ fn test_sign_pdf_contents_not_placeholder() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7324,7 +7362,7 @@ fn test_sign_pdf_invisible() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7353,7 +7391,7 @@ fn test_sign_pdf_reason_location() {
         location: Some("New York, NY".to_string()),
         contact: Some("signer@example.com".to_string()),
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7389,7 +7427,7 @@ fn test_sign_pdf_invalid_cert() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7422,7 +7460,7 @@ fn test_sign_pdf_key_mismatch() {
         location: None,
         contact: None,
         visible: false,
-        page: None,
+
         x: None,
         y: None,
         width: None,
@@ -7461,7 +7499,7 @@ fn test_sign_at_render_time() {
             location: None,
             contact: None,
             visible: false,
-            page: None,
+
             x: None,
             y: None,
             width: None,
@@ -7496,7 +7534,7 @@ fn test_sign_pdf_visible_has_appearance_stream() {
         location: None,
         contact: None,
         visible: true,
-        page: None,
+
         x: Some(50.0),
         y: Some(600.0),
         width: Some(200.0),
@@ -7544,5 +7582,242 @@ fn test_sign_pdf_visible_has_appearance_stream() {
     assert!(
         text.contains("/DR <<"),
         "AcroForm must have /DR for font resources"
+    );
+}
+
+#[test]
+fn test_double_signing_unique_names() {
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let doc = default_doc(vec![make_text("Double sign test", 12.0)]);
+    let unsigned_pdf = render_to_pdf(&doc);
+
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem.clone(),
+        private_key_pem: key_pem.clone(),
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    // Sign once → Signature1
+    let signed_once = forme::sign_pdf(&unsigned_pdf, &config).unwrap();
+    let text1 = String::from_utf8_lossy(&signed_once);
+    assert!(
+        text1.contains("/T (Signature1)"),
+        "First signature must be named Signature1"
+    );
+
+    // Sign again → Signature2
+    let signed_twice = forme::sign_pdf(&signed_once, &config).unwrap();
+    let text2 = String::from_utf8_lossy(&signed_twice);
+    assert!(
+        text2.contains("/T (Signature2)"),
+        "Second signature must be named Signature2"
+    );
+    assert!(
+        text2.contains("/T (Signature1)"),
+        "First signature must still be present"
+    );
+}
+
+#[test]
+fn test_sign_preserves_acroform_metadata() {
+    // Create a PDF with a text field (which produces /NeedAppearances true, /DA)
+    let text_field = Node {
+        kind: NodeKind::TextField {
+            name: "field1".to_string(),
+            value: Some("Hello".to_string()),
+            placeholder: None,
+            multiline: false,
+            password: false,
+            read_only: false,
+            max_length: None,
+            font_size: 12.0,
+            width: 200.0,
+            height: 24.0,
+        },
+        style: Default::default(),
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let doc = default_doc(vec![text_field]);
+
+    let pdf = forme::render(&doc).unwrap();
+    let text_before = String::from_utf8_lossy(&pdf);
+    assert!(
+        text_before.contains("/NeedAppearances true"),
+        "Original PDF must have /NeedAppearances"
+    );
+    assert!(text_before.contains("/DA"), "Original PDF must have /DA");
+
+    // Sign it
+    let (cert_pem, key_pem) = generate_test_cert_and_key();
+    let config = forme::SignatureConfig {
+        certificate_pem: cert_pem,
+        private_key_pem: key_pem,
+        reason: None,
+        location: None,
+        contact: None,
+        visible: false,
+        x: None,
+        y: None,
+        width: None,
+        height: None,
+    };
+
+    let signed_pdf = forme::sign_pdf(&pdf, &config).unwrap();
+    let text_after = String::from_utf8_lossy(&signed_pdf);
+
+    // Signed PDF must preserve AcroForm metadata
+    assert!(
+        text_after.contains("/NeedAppearances true"),
+        "Signed PDF must preserve /NeedAppearances"
+    );
+    assert!(text_after.contains("/DA"), "Signed PDF must preserve /DA");
+
+    // Must also have the original form field
+    assert!(
+        text_after.contains("/FT /Tx"),
+        "Signed PDF must still contain the text field"
+    );
+}
+
+#[test]
+fn test_tagged_pdf_form_fields_have_form_role() {
+    let text_field = Node {
+        kind: NodeKind::TextField {
+            name: "name".to_string(),
+            value: Some("Test".to_string()),
+            placeholder: None,
+            multiline: false,
+            password: false,
+            read_only: false,
+            max_length: None,
+            font_size: 12.0,
+            width: 200.0,
+            height: 24.0,
+        },
+        style: Default::default(),
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let checkbox = Node {
+        kind: NodeKind::Checkbox {
+            name: "agree".to_string(),
+            checked: true,
+            read_only: false,
+            width: 14.0,
+            height: 14.0,
+        },
+        style: Default::default(),
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let mut doc = default_doc(vec![text_field, checkbox]);
+    doc.tagged = true;
+
+    let pdf = forme::render(&doc).unwrap();
+    let text = String::from_utf8_lossy(&pdf);
+
+    // Structure elements must use /Form role for form fields
+    assert!(
+        text.contains("/S /Form"),
+        "Form fields must be tagged with /S /Form in structure tree"
+    );
+}
+
+#[test]
+fn test_flatten_forms_renders_placeholder() {
+    // Test via JSON so we can verify flattened rendering
+    let json = r#"{
+        "children": [{
+            "kind": {
+                "type": "TextField", "name": "name", "width": 200, "height": 24,
+                "placeholder": "Enter your name", "font_size": 12,
+                "multiline": false, "password": false, "read_only": false
+            },
+            "style": {},
+            "children": []
+        }],
+        "metadata": {},
+        "defaultPage": {},
+        "fonts": [],
+        "flattenForms": true
+    }"#;
+    let pdf = forme::render_json(json).expect("Flattened form with placeholder should render");
+    let pdf_str = String::from_utf8_lossy(&pdf);
+
+    // Flattened — no interactive widgets
+    assert!(
+        !pdf_str.contains("/AcroForm"),
+        "Flattened PDF should not contain /AcroForm"
+    );
+    assert!(
+        !pdf_str.contains("/FT /Tx"),
+        "Flattened PDF should not contain text field widgets"
+    );
+
+    // Decompress all FlateDecode streams to verify placeholder text in content
+    let decompressed = decompress_pdf_streams(&pdf);
+    assert!(
+        decompressed.contains("Enter your name"),
+        "Flattened form must render placeholder text in content stream when value is empty"
+    );
+    assert!(
+        decompressed.contains("0.6 g"),
+        "Placeholder text must be rendered in grey (0.6 g)"
+    );
+}
+
+#[test]
+fn test_checkbox_renders_checkmark() {
+    let checkbox = Node {
+        kind: NodeKind::Checkbox {
+            name: "agree".to_string(),
+            checked: true,
+            read_only: false,
+            width: 14.0,
+            height: 14.0,
+        },
+        style: Default::default(),
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let doc = default_doc(vec![checkbox]);
+
+    let pdf = forme::render(&doc).unwrap();
+    let text = String::from_utf8_lossy(&pdf);
+
+    // Appearance stream must use fill (checkmark path), not stroke lines (X)
+    // The checkmark is a filled path with 'f' operator, not 'S' (stroke)
+    assert!(
+        text.contains("0.2 0.2 0.2 rg"),
+        "Checkmark must use fill color (rg), not stroke color (RG)"
+    );
+    // Must NOT contain the old X pattern (two diagonal stroke lines)
+    assert!(
+        !text.contains("0 0 m 14 14 l S"),
+        "Must not draw X (diagonal stroke lines) for checkbox"
     );
 }

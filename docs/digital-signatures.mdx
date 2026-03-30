@@ -17,18 +17,18 @@ import { readFileSync } from 'fs';
 import { Document, Page, Text } from '@formepdf/react';
 import { renderDocument } from '@formepdf/core';
 
-const cert = readFileSync('./cert.pem', 'utf-8');
-const key = readFileSync('./key.pem', 'utf-8');
+const certificatePem = readFileSync('./cert.pem', 'utf-8');
+const privateKeyPem = readFileSync('./key.pem', 'utf-8');
 
 const pdfBytes = await renderDocument(
   <Document
     title="Service Agreement"
     signature={{
-      cert,
-      key,
+      certificatePem,
+      privateKeyPem,
       reason: 'Approved',
       location: 'San Francisco, CA',
-      contactInfo: 'legal@acme.com',
+      contact: 'legal@acme.com',
     }}
   >
     <Page size="Letter" margin={54}>
@@ -45,11 +45,11 @@ const pdfBytes = await renderDocument(
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
-| `cert` | `string` | Yes | X.509 certificate in PEM format. |
-| `key` | `string` | Yes | Private key in PEM format. |
+| `certificatePem` | `string` | Yes | X.509 certificate in PEM format. |
+| `privateKeyPem` | `string` | Yes | Private key in PEM format. |
 | `reason` | `string` | No | Reason for signing (e.g., "Approved", "Reviewed"). Shown in signature details. |
 | `location` | `string` | No | Signing location (e.g., "San Francisco, CA"). |
-| `contactInfo` | `string` | No | Signer contact information (e.g., email address). |
+| `contact` | `string` | No | Signer contact information (e.g., email address). |
 
 ---
 
@@ -62,37 +62,39 @@ Use the `/v1/sign` endpoint to apply a digital signature to a PDF you have alrea
 ```bash curl
 curl -X POST https://api.formepdf.com/v1/sign \
   -H "Authorization: Bearer forme_sk_abc123..." \
-  -H "Content-Type: application/pdf" \
-  --data-binary @contract.pdf \
-  -G \
-  --data-urlencode "cert=$(base64 -w0 cert.pem)" \
-  --data-urlencode "key=$(base64 -w0 key.pem)" \
-  --data-urlencode "reason=Approved" \
-  --data-urlencode "location=San Francisco, CA" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdf\": \"$(base64 -w0 contract.pdf)\",
+    \"certificatePem\": \"$(cat cert.pem)\",
+    \"privateKeyPem\": \"$(cat key.pem)\",
+    \"reason\": \"Approved\",
+    \"location\": \"San Francisco, CA\",
+    \"contact\": \"legal@acme.com\"
+  }" \
   --output signed-contract.pdf
 ```
 
 ```javascript Node.js
 import fs from 'fs';
 
-const pdf = fs.readFileSync('contract.pdf');
-const cert = Buffer.from(fs.readFileSync('cert.pem')).toString('base64');
-const key = Buffer.from(fs.readFileSync('key.pem')).toString('base64');
+const pdf = fs.readFileSync('contract.pdf').toString('base64');
+const certificatePem = fs.readFileSync('cert.pem', 'utf-8');
+const privateKeyPem = fs.readFileSync('key.pem', 'utf-8');
 
-const params = new URLSearchParams({
-  cert,
-  key,
-  reason: 'Approved',
-  location: 'San Francisco, CA',
-});
-
-const res = await fetch(`https://api.formepdf.com/v1/sign?${params}`, {
+const res = await fetch('https://api.formepdf.com/v1/sign', {
   method: 'POST',
   headers: {
     Authorization: 'Bearer forme_sk_abc123...',
-    'Content-Type': 'application/pdf',
+    'Content-Type': 'application/json',
   },
-  body: pdf,
+  body: JSON.stringify({
+    pdf,
+    certificatePem,
+    privateKeyPem,
+    reason: 'Approved',
+    location: 'San Francisco, CA',
+    contact: 'legal@acme.com',
+  }),
 });
 
 const signedPdf = Buffer.from(await res.arrayBuffer());
@@ -104,24 +106,25 @@ import requests
 import base64
 
 with open("contract.pdf", "rb") as f:
-    pdf_bytes = f.read()
+    pdf_b64 = base64.b64encode(f.read()).decode()
 
-cert = base64.b64encode(open("cert.pem", "rb").read()).decode()
-key = base64.b64encode(open("key.pem", "rb").read()).decode()
+cert_pem = open("cert.pem").read()
+key_pem = open("key.pem").read()
 
 res = requests.post(
     "https://api.formepdf.com/v1/sign",
     headers={
         "Authorization": "Bearer forme_sk_abc123...",
-        "Content-Type": "application/pdf",
+        "Content-Type": "application/json",
     },
-    params={
-        "cert": cert,
-        "key": key,
+    json={
+        "pdf": pdf_b64,
+        "certificatePem": cert_pem,
+        "privateKeyPem": key_pem,
         "reason": "Approved",
         "location": "San Francisco, CA",
+        "contact": "legal@acme.com",
     },
-    data=pdf_bytes,
 )
 
 with open("signed-contract.pdf", "wb") as f:
@@ -134,9 +137,9 @@ package main
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 )
 
@@ -145,15 +148,18 @@ func main() {
 	certPem, _ := os.ReadFile("cert.pem")
 	keyPem, _ := os.ReadFile("key.pem")
 
-	params := url.Values{}
-	params.Set("cert", base64.StdEncoding.EncodeToString(certPem))
-	params.Set("key", base64.StdEncoding.EncodeToString(keyPem))
-	params.Set("reason", "Approved")
-	params.Set("location", "San Francisco, CA")
+	body, _ := json.Marshal(map[string]string{
+		"pdf":            base64.StdEncoding.EncodeToString(pdf),
+		"certificatePem": string(certPem),
+		"privateKeyPem":  string(keyPem),
+		"reason":         "Approved",
+		"location":       "San Francisco, CA",
+		"contact":        "legal@acme.com",
+	})
 
-	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/sign?"+params.Encode(), bytes.NewReader(pdf))
+	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/sign", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
-	req.Header.Set("Content-Type", "application/pdf")
+	req.Header.Set("Content-Type", "application/json")
 
 	res, _ := http.DefaultClient.Do(req)
 	defer res.Body.Close()
@@ -173,29 +179,34 @@ The endpoint returns `200 OK` with the signed PDF as the response body (`Content
 
 By default, Forme applies an invisible signature. The signature is embedded in the PDF's metadata and can be verified in the signature panel of any PDF viewer, but nothing appears on the page itself.
 
-To add a visible signature annotation, pass `appearance` options:
+To add a visible signature annotation, set `visible: true` and specify the position and size:
 
 ```tsx
 <Document
   signature={{
-    cert,
-    key,
+    certificatePem,
+    privateKeyPem,
     reason: 'Approved',
-    appearance: {
-      page: 0,
-      x: 350,
-      y: 700,
-      width: 200,
-      height: 50,
-      label: 'Digitally signed by Jane Smith',
-    },
+    visible: true,
+    x: 350,
+    y: 700,
+    width: 200,
+    height: 50,
   }}
 >
   {/* ... */}
 </Document>
 ```
 
-The visible annotation displays the `label` text at the specified position. Coordinates are in points from the bottom-left corner of the page.
+The visible annotation displays the signer's common name (from the certificate) at the specified position. Coordinates are in points from the bottom-left corner of the page.
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| `visible` | `boolean` | `false` | Whether to show a visible signature annotation. |
+| `x` | `number` | `0` | X coordinate in points from the left edge. |
+| `y` | `number` | `0` | Y coordinate in points from the bottom edge. |
+| `width` | `number` | `200` | Width of the visible signature in points. |
+| `height` | `number` | `50` | Height of the visible signature in points. |
 
 <Note>Visible signature appearance text uses the built-in Helvetica font, limited to Latin characters. This is a PDF specification constraint on form field appearances.</Note>
 

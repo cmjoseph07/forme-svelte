@@ -501,11 +501,11 @@ impl PdfWriter {
             }
 
             // Create appearance streams for checkboxes and radio buttons
-            // Checkbox checked: X mark
+            // Checkbox checked: checkmark
             let checkbox_yes_stream_id = builder.objects.len();
             {
                 let stream_content =
-                    b"1 0 0 1 0 0 cm\n0.2 0.2 0.2 RG\n1 w\n0 0 m 14 14 l S\n14 0 m 0 14 l S\n";
+                    b"0.2 0.2 0.2 rg\n2 6 m 5.5 2 l 12 11 l 11 12 l 5.5 4.5 l 3 7 l 2 6 l f\n";
                 let mut data: Vec<u8> = Vec::new();
                 let _ = write!(
                     data,
@@ -1721,38 +1721,57 @@ impl PdfWriter {
                 let h = element.height;
                 let _ = writeln!(stream, "q");
                 match field_type {
-                    FormFieldType::Checkbox { checked, .. }
-                    | FormFieldType::RadioButton { checked, .. } => {
-                        // Draw a border square/circle
+                    FormFieldType::Checkbox { checked, .. } => {
+                        // Draw a border square
                         let _ = writeln!(stream, "0.6 0.6 0.6 RG"); // grey stroke
                         let _ = writeln!(stream, "0.5 w");
                         let _ =
                             writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re S", pdf_x, pdf_y, w, h);
                         if *checked {
-                            // Draw an X for checked state
-                            let _ = writeln!(stream, "0.2 0.2 0.2 RG");
-                            let _ = writeln!(stream, "1 w");
-                            let inset = w * 0.2;
+                            // Draw a checkmark scaled to field dimensions
+                            let _ = writeln!(stream, "0.2 0.2 0.2 rg");
+                            let sx = w / 14.0;
+                            let sy = h / 14.0;
                             let _ = writeln!(
                                 stream,
-                                "{:.2} {:.2} m {:.2} {:.2} l S",
-                                pdf_x + inset,
-                                pdf_y + inset,
-                                pdf_x + w - inset,
-                                pdf_y + h - inset
+                                "{:.2} {:.2} m {:.2} {:.2} l {:.2} {:.2} l {:.2} {:.2} l {:.2} {:.2} l {:.2} {:.2} l {:.2} {:.2} l f",
+                                pdf_x + 2.0 * sx, pdf_y + 6.0 * sy,
+                                pdf_x + 5.5 * sx, pdf_y + 2.0 * sy,
+                                pdf_x + 12.0 * sx, pdf_y + 11.0 * sy,
+                                pdf_x + 11.0 * sx, pdf_y + 12.0 * sy,
+                                pdf_x + 5.5 * sx, pdf_y + 4.5 * sy,
+                                pdf_x + 3.0 * sx, pdf_y + 7.0 * sy,
+                                pdf_x + 2.0 * sx, pdf_y + 6.0 * sy,
                             );
+                        }
+                    }
+                    FormFieldType::RadioButton { checked, .. } => {
+                        // Draw a border square
+                        let _ = writeln!(stream, "0.6 0.6 0.6 RG"); // grey stroke
+                        let _ = writeln!(stream, "0.5 w");
+                        let _ =
+                            writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re S", pdf_x, pdf_y, w, h);
+                        if *checked {
+                            // Draw a filled circle
+                            let cx = pdf_x + w / 2.0;
+                            let cy = pdf_y + h / 2.0;
+                            let r = (w.min(h) / 2.0) * 0.6;
+                            let k = r * 0.5523;
+                            let _ = writeln!(stream, "0.2 0.2 0.2 rg");
                             let _ = writeln!(
                                 stream,
-                                "{:.2} {:.2} m {:.2} {:.2} l S",
-                                pdf_x + w - inset,
-                                pdf_y + inset,
-                                pdf_x + inset,
-                                pdf_y + h - inset
+                                "{:.2} {:.2} m {:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c {:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c {:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c {:.2} {:.2} {:.2} {:.2} {:.2} {:.2} c f",
+                                cx, cy + r,
+                                cx + k, cy + r, cx + r, cy + k, cx + r, cy,
+                                cx + r, cy - k, cx + k, cy - r, cx, cy - r,
+                                cx - k, cy - r, cx - r, cy - k, cx - r, cy,
+                                cx - r, cy + k, cx - k, cy + r, cx, cy + r,
                             );
                         }
                     }
                     FormFieldType::TextField {
                         value,
+                        placeholder,
                         font_size,
                         multiline,
                         password,
@@ -1766,13 +1785,123 @@ impl PdfWriter {
                             writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re B", pdf_x, pdf_y, w, h);
                         // Render value text when flattening
                         if flatten_forms {
-                            if let Some(ref val) = value {
-                                if !val.is_empty() {
-                                    let display_text = if *password {
-                                        "\u{2022}".repeat(val.len())
-                                    } else {
-                                        val.clone()
-                                    };
+                            let has_value = value.as_ref().is_some_and(|v| !v.is_empty());
+                            if has_value {
+                                let val = value.as_ref().unwrap();
+                                let display_text = if *password {
+                                    "\u{2022}".repeat(val.len())
+                                } else {
+                                    val.clone()
+                                };
+                                let font_idx = builder
+                                    .font_objects
+                                    .iter()
+                                    .enumerate()
+                                    .find(|(_, (key, _))| {
+                                        key.family == "Helvetica"
+                                            && key.weight == 400
+                                            && !key.italic
+                                    })
+                                    .map(|(i, _)| i)
+                                    .unwrap_or(0);
+                                if *multiline {
+                                    // Simple word-wrap for multiline
+                                    let metrics = crate::font::StandardFont::Helvetica.metrics();
+                                    let max_w = w - 4.0;
+                                    let mut lines: Vec<String> = Vec::new();
+                                    for paragraph in display_text.split('\n') {
+                                        let mut line = String::new();
+                                        let mut line_w = 0.0;
+                                        for word in paragraph.split_whitespace() {
+                                            let word_w =
+                                                metrics.measure_string(word, *font_size, 0.0);
+                                            let space_w = if line.is_empty() {
+                                                0.0
+                                            } else {
+                                                metrics.measure_string(" ", *font_size, 0.0)
+                                            };
+                                            // Word wider than field — break at character boundary
+                                            if word_w > max_w {
+                                                let mut char_line = String::new();
+                                                let mut char_w = 0.0;
+                                                for ch in word.chars() {
+                                                    let cw = metrics.char_width(ch, *font_size);
+                                                    if !char_line.is_empty() && char_w + cw > max_w
+                                                    {
+                                                        if !line.is_empty() {
+                                                            lines.push(line.clone());
+                                                            line.clear();
+                                                            line_w = 0.0;
+                                                        }
+                                                        lines.push(char_line.clone());
+                                                        char_line.clear();
+                                                        char_w = 0.0;
+                                                    }
+                                                    char_line.push(ch);
+                                                    char_w += cw;
+                                                }
+                                                // Remaining chars join the current line
+                                                if !char_line.is_empty() {
+                                                    if !line.is_empty() {
+                                                        line.push(' ');
+                                                        line_w += metrics
+                                                            .measure_string(" ", *font_size, 0.0);
+                                                    }
+                                                    line.push_str(&char_line);
+                                                    line_w += char_w;
+                                                }
+                                                continue;
+                                            }
+                                            if !line.is_empty() && line_w + space_w + word_w > max_w
+                                            {
+                                                lines.push(line.clone());
+                                                line.clear();
+                                                line_w = 0.0;
+                                            }
+                                            if !line.is_empty() {
+                                                line.push(' ');
+                                                line_w += space_w;
+                                            }
+                                            line.push_str(word);
+                                            line_w += word_w;
+                                        }
+                                        if !line.is_empty() {
+                                            lines.push(line);
+                                        }
+                                    }
+                                    let text_y = pdf_y + h - font_size - 2.0;
+                                    for (i, line_text) in lines.iter().enumerate() {
+                                        let ly = text_y - (i as f64) * (font_size * 1.2);
+                                        if ly < pdf_y {
+                                            break;
+                                        }
+                                        let esc = Self::encode_winansi_text(line_text);
+                                        let _ = writeln!(
+                                            stream,
+                                            "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
+                                            font_idx,
+                                            font_size,
+                                            pdf_x + 2.0,
+                                            ly,
+                                            esc
+                                        );
+                                    }
+                                } else {
+                                    let escaped = Self::encode_winansi_text(&display_text);
+                                    let text_y = pdf_y + (h - font_size) / 2.0;
+                                    let _ = writeln!(
+                                        stream,
+                                        "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
+                                        font_idx,
+                                        font_size,
+                                        pdf_x + 2.0,
+                                        text_y,
+                                        escaped
+                                    );
+                                }
+                            } else if let Some(ref ph) = placeholder {
+                                if !ph.is_empty() {
+                                    // Render placeholder in grey
                                     let font_idx = builder
                                         .font_objects
                                         .iter()
@@ -1784,102 +1913,17 @@ impl PdfWriter {
                                         })
                                         .map(|(i, _)| i)
                                         .unwrap_or(0);
-                                    if *multiline {
-                                        // Simple word-wrap for multiline
-                                        let metrics =
-                                            crate::font::StandardFont::Helvetica.metrics();
-                                        let max_w = w - 4.0;
-                                        let mut lines: Vec<String> = Vec::new();
-                                        for paragraph in display_text.split('\n') {
-                                            let mut line = String::new();
-                                            let mut line_w = 0.0;
-                                            for word in paragraph.split_whitespace() {
-                                                let word_w =
-                                                    metrics.measure_string(word, *font_size, 0.0);
-                                                let space_w = if line.is_empty() {
-                                                    0.0
-                                                } else {
-                                                    metrics.measure_string(" ", *font_size, 0.0)
-                                                };
-                                                // Word wider than field — break at character boundary
-                                                if word_w > max_w {
-                                                    let mut char_line = String::new();
-                                                    let mut char_w = 0.0;
-                                                    for ch in word.chars() {
-                                                        let cw = metrics.char_width(ch, *font_size);
-                                                        if !char_line.is_empty()
-                                                            && char_w + cw > max_w
-                                                        {
-                                                            if !line.is_empty() {
-                                                                lines.push(line.clone());
-                                                                line.clear();
-                                                                line_w = 0.0;
-                                                            }
-                                                            lines.push(char_line.clone());
-                                                            char_line.clear();
-                                                            char_w = 0.0;
-                                                        }
-                                                        char_line.push(ch);
-                                                        char_w += cw;
-                                                    }
-                                                    // Remaining chars join the current line
-                                                    if !char_line.is_empty() {
-                                                        if !line.is_empty() {
-                                                            line.push(' ');
-                                                            line_w += metrics.measure_string(
-                                                                " ", *font_size, 0.0,
-                                                            );
-                                                        }
-                                                        line.push_str(&char_line);
-                                                        line_w += char_w;
-                                                    }
-                                                    continue;
-                                                }
-                                                if !line.is_empty()
-                                                    && line_w + space_w + word_w > max_w
-                                                {
-                                                    lines.push(line.clone());
-                                                    line.clear();
-                                                    line_w = 0.0;
-                                                }
-                                                if !line.is_empty() {
-                                                    line.push(' ');
-                                                    line_w += space_w;
-                                                }
-                                                line.push_str(word);
-                                                line_w += word_w;
-                                            }
-                                            if !line.is_empty() {
-                                                lines.push(line);
-                                            }
-                                        }
-                                        let text_y = pdf_y + h - font_size - 2.0;
-                                        for (i, line_text) in lines.iter().enumerate() {
-                                            let ly = text_y - (i as f64) * (font_size * 1.2);
-                                            if ly < pdf_y {
-                                                break;
-                                            }
-                                            let esc = Self::encode_winansi_text(line_text);
-                                            let _ =
-                                                writeln!(
-                                                stream,
-                                                "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
-                                                font_idx, font_size, pdf_x + 2.0, ly, esc
-                                            );
-                                        }
-                                    } else {
-                                        let escaped = Self::encode_winansi_text(&display_text);
-                                        let text_y = pdf_y + (h - font_size) / 2.0;
-                                        let _ = writeln!(
-                                            stream,
-                                            "BT /F{} {:.1} Tf 0 g {:.2} {:.2} Td ({}) Tj ET",
-                                            font_idx,
-                                            font_size,
-                                            pdf_x + 2.0,
-                                            text_y,
-                                            escaped
-                                        );
-                                    }
+                                    let escaped = Self::encode_winansi_text(ph);
+                                    let text_y = pdf_y + (h - font_size) / 2.0;
+                                    let _ = writeln!(
+                                        stream,
+                                        "BT /F{} {:.1} Tf 0.6 g {:.2} {:.2} Td ({}) Tj ET",
+                                        font_idx,
+                                        font_size,
+                                        pdf_x + 2.0,
+                                        text_y,
+                                        escaped
+                                    );
                                 }
                             }
                         }

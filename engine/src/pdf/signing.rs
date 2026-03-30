@@ -378,6 +378,8 @@ fn build_incremental_update(
     // --- Signature Field Widget ---
     xref_entries.push((sig_field_id, buf.len()));
 
+    let sig_name = next_signature_name(original);
+
     let rect = if config.visible {
         let x = config.x.unwrap_or(0.0);
         let y = config.y.unwrap_or(0.0);
@@ -395,7 +397,7 @@ fn build_incremental_update(
     };
 
     let sig_field = format!(
-        "{sig_field_id} 0 obj\n<<\n/Type /Annot\n/Subtype /Widget\n/FT /Sig\n/T (Signature1)\n/V {sig_dict_id} 0 R\n/Rect {rect}\n/P {page_ref} 0 R\n/F 132\n{ap_entry}>>\nendobj\n",
+        "{sig_field_id} 0 obj\n<<\n/Type /Annot\n/Subtype /Widget\n/FT /Sig\n/T ({sig_name})\n/V {sig_dict_id} 0 R\n/Rect {rect}\n/P {page_ref} 0 R\n/F 132\n{ap_entry}>>\nendobj\n",
         page_ref = scan.first_page_obj
     );
     buf.extend_from_slice(sig_field.as_bytes());
@@ -420,13 +422,24 @@ fn build_incremental_update(
         fields
     };
 
-    let dr_entry = if config.visible {
-        " /DR << /Font << /Helv << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>"
-    } else {
-        ""
-    };
+    // Preserve existing AcroForm metadata (DA, NeedAppearances) from the original PDF
+    let acroform_meta = find_existing_acroform_metadata(original, scan.root_obj);
+
+    let mut acroform_entries = format!("/Fields [{all_fields}] /SigFlags 3");
+    if acroform_meta.need_appearances {
+        acroform_entries.push_str(" /NeedAppearances true");
+    }
+    if let Some(ref da) = acroform_meta.da {
+        acroform_entries.push_str(&format!(" /DA ({})", escape_pdf_string(da)));
+    }
+    if config.visible {
+        acroform_entries.push_str(
+            " /DR << /Font << /Helv << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> >> >>",
+        );
+    }
+
     let mut catalog = format!(
-        "{new_catalog_id} 0 obj\n<<\n/Type /Catalog\n/Pages {pages_ref} 0 R\n/AcroForm << /Fields [{all_fields}] /SigFlags 3{dr_entry} >>\n"
+        "{new_catalog_id} 0 obj\n<<\n/Type /Catalog\n/Pages {pages_ref} 0 R\n/AcroForm << {acroform_entries} >>\n"
     );
 
     // Preserve /Lang if present
@@ -836,6 +849,31 @@ fn format_display_date() -> String {
     format!("{year:04}-{month:02}-{day:02} {hours:02}:{minutes:02} UTC")
 }
 
+/// Parse a DER tag-length-value header, returning (tag, content_length, header_size).
+/// Handles both single-byte and multi-byte DER length encoding.
+fn parse_der_tag_length(bytes: &[u8]) -> Option<(u8, usize, usize)> {
+    if bytes.len() < 2 {
+        return None;
+    }
+    let tag = bytes[0];
+    let first = bytes[1];
+    if first < 0x80 {
+        // Short form: length is a single byte
+        Some((tag, first as usize, 2))
+    } else {
+        // Long form: first byte = 0x80 | num_length_bytes
+        let num_bytes = (first & 0x7F) as usize;
+        if num_bytes == 0 || num_bytes > 4 || bytes.len() < 2 + num_bytes {
+            return None;
+        }
+        let mut len: usize = 0;
+        for i in 0..num_bytes {
+            len = (len << 8) | (bytes[2 + i] as usize);
+        }
+        Some((tag, len, 2 + num_bytes))
+    }
+}
+
 /// Extract the Common Name (CN) from a DER-encoded X.509 certificate's Subject.
 fn extract_cn_from_cert_der(cert_der: &[u8]) -> Option<String> {
     use der::Decode;
@@ -850,15 +888,10 @@ fn extract_cn_from_cert_der(cert_der: &[u8]) -> Option<String> {
             if atv.oid == cn_oid {
                 // The value is an ANY — try to extract as UTF8String or PrintableString
                 let value_bytes = atv.value.to_der().ok()?;
-                // DER: tag + length + content. Skip tag and length to get the string bytes.
-                if value_bytes.len() < 2 {
-                    return None;
-                }
-                let tag = value_bytes[0];
-                let len = value_bytes[1] as usize;
-                if value_bytes.len() >= 2 + len {
-                    let s = std::str::from_utf8(&value_bytes[2..2 + len]).ok()?;
-                    // Filter for printable ASCII + common punctuation (UTF8String or PrintableString)
+                let (tag, len, hdr) = parse_der_tag_length(&value_bytes)?;
+                if value_bytes.len() >= hdr + len {
+                    let s = std::str::from_utf8(&value_bytes[hdr..hdr + len]).ok()?;
+                    // Filter for UTF8String (0x0C), PrintableString (0x13), IA5String (0x16)
                     if tag == 0x0C || tag == 0x13 || tag == 0x16 {
                         return Some(s.to_string());
                     }
@@ -925,6 +958,86 @@ fn find_catalog_string(text: &str, obj_id: usize, key: &str) -> Option<String> {
     }
     let end = trimmed[1..].find(')')? + 1;
     Some(trimmed[1..end].to_string())
+}
+
+/// Metadata extracted from an existing AcroForm dictionary.
+struct AcroFormMetadata {
+    need_appearances: bool,
+    da: Option<String>,
+}
+
+/// Extract AcroForm metadata (/NeedAppearances, /DA) from the original PDF's catalog.
+fn find_existing_acroform_metadata(pdf: &[u8], root_obj: usize) -> AcroFormMetadata {
+    let text = String::from_utf8_lossy(pdf);
+    let obj_header = format!("{root_obj} 0 obj");
+    let obj_start = match text.find(&obj_header) {
+        Some(pos) => pos,
+        None => {
+            return AcroFormMetadata {
+                need_appearances: false,
+                da: None,
+            }
+        }
+    };
+    let obj_section = &text[obj_start..];
+    let obj_end = match obj_section.find("endobj") {
+        Some(pos) => pos,
+        None => {
+            return AcroFormMetadata {
+                need_appearances: false,
+                da: None,
+            }
+        }
+    };
+    let obj_content = &obj_section[..obj_end];
+
+    let acroform_pos = match obj_content.find("/AcroForm") {
+        Some(pos) => pos,
+        None => {
+            return AcroFormMetadata {
+                need_appearances: false,
+                da: None,
+            }
+        }
+    };
+    let after_acroform = &obj_content[acroform_pos..];
+
+    let need_appearances = after_acroform.contains("/NeedAppearances true");
+
+    // Extract /DA (default appearance) string
+    let da = if let Some(da_pos) = after_acroform.find("/DA") {
+        let after_da = after_acroform[da_pos + 3..].trim_start();
+        if let Some(stripped) = after_da.strip_prefix('(') {
+            stripped.find(')').map(|end| stripped[..end].to_string())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    AcroFormMetadata {
+        need_appearances,
+        da,
+    }
+}
+
+/// Determine the next unique signature field name by scanning for existing `/T (SignatureN)` entries.
+fn next_signature_name(pdf: &[u8]) -> String {
+    let text = String::from_utf8_lossy(pdf);
+    let mut max_num = 0u32;
+    let prefix = "/T (Signature";
+    let mut pos = 0;
+    while let Some(idx) = text[pos..].find(prefix) {
+        let after = &text[pos + idx + prefix.len()..];
+        if let Some(end) = after.find(')') {
+            if let Ok(n) = after[..end].parse::<u32>() {
+                max_num = max_num.max(n);
+            }
+        }
+        pos = pos + idx + prefix.len();
+    }
+    format!("Signature{}", max_num + 1)
 }
 
 /// Find existing AcroForm /Fields references from the original PDF.

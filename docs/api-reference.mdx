@@ -484,21 +484,22 @@ Pass `flattenForms=true` as a query parameter on any render endpoint (sync or as
 
 `POST /v1/sign`
 
-Apply a PKCS#7 digital signature to an existing PDF. Send the raw PDF bytes as the request body.
+Apply a PKCS#7 digital signature to an existing PDF.
 
 **Headers:**
 - `Authorization: Bearer forme_sk_...`
-- `Content-Type: application/pdf`
+- `Content-Type: application/json`
 
-**Query params:**
+**JSON body:**
 
-| Param | Required | Description |
+| Field | Required | Description |
 |-------|----------|-------------|
-| `cert` | Yes | Base64-encoded X.509 certificate (PEM) |
-| `key` | Yes | Base64-encoded private key (PEM) |
+| `pdf` | Yes | Base64-encoded PDF bytes |
+| `certificatePem` | Yes | X.509 certificate in PEM format |
+| `privateKeyPem` | Yes | Private key in PEM format |
 | `reason` | No | Signing reason (e.g., "Approved") |
 | `location` | No | Signing location (e.g., "San Francisco, CA") |
-| `contactInfo` | No | Signer contact info |
+| `contact` | No | Signer contact info |
 
 **Response:** `200 OK` with `Content-Type: application/pdf` body (the signed PDF).
 
