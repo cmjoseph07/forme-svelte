@@ -73,10 +73,7 @@ Pass the compiled template JSON and data directly in the request body. No templa
 ```bash curl
 curl -X POST http://localhost:3000/v1/render \
   -H "Content-Type: application/json" \
-  -d '{
-    "template": { ... },
-    "data": { "customer": "Acme", "amount": 1500 }
-  }' \
+  -d '{"template": {"children": [{"kind": {"type": "Page"}, "children": [{"kind": {"type": "Text", "content": "Hello"}}]}]}, "data": {"customer": "Acme"}}' \
   --output invoice.pdf
 ```
 
@@ -342,7 +339,7 @@ Self-hosters who need these features can upgrade to the hosted service at any ti
 |--|-----------|-------------------|
 | Dependencies | Chromium + LibreOffice | None |
 | Image size | ~1GB | ~50MB |
-| Cold start | 2-5s | <100ms |
+| Cold start | 2-5s | under 100ms |
 | Input | HTML, Markdown, Office docs | JSX templates (compiled to JSON) |
 | Page breaks | Chromium-dependent | Engine-native |
 | AcroForms | No | Yes |
