@@ -8,11 +8,22 @@ All notable changes to the Forme monorepo are documented in this file.
 - **AcroForm components**: `<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>` for creating fillable PDF forms
 - **Form flattening**: `flattenForms` render option converts interactive fields to static content
 - **PDF/UA-1 accessibility**: `<Document pdfUa>` generates tagged PDFs with structure tree, tab order, role map, and artifact tagging
-- **PDF/A archival**: `<Document pdfa="a-2b">` for long-term document preservation (supports `a-2b`, `a-2u`, `a-3b`)
-- **Digital signatures**: `<Document signature={{ cert, key }}>` applies PKCS#7 detached signatures with X.509 certificates
+- **PDF/A archival**: `<Document pdfa="2b">` for long-term document preservation (supports `2b`, `2a`)
+- **Digital signatures**: `<Document signature={{ certificatePem, privateKeyPem }}>` applies PKCS#7 detached signatures with X.509 certificates
 - **`/v1/sign` API endpoint**: Sign existing PDFs via the hosted API
 - **`/v1/render/:slug?flattenForms=true`**: Flatten form fields via query parameter on render endpoints
 - New docs pages: Forms, Accessibility, Archival, Digital Signatures
+
+### Fixed
+- Checked checkboxes now render a checkmark instead of an X (interactive and flattened)
+- Multi-byte DER length parsing in certificate CN extraction
+- Form flattening renders placeholder text in grey when field value is empty
+- Signing preserves existing AcroForm metadata (NeedAppearances, DA)
+- Unique signature field names for double-signing (Signature1, Signature2, ...)
+- Form fields tagged as /Form in structure tree for PDF/UA compliance
+
+### Breaking
+- Removed unused `page` field from `SignatureConfig`
 
 ## [0.7.13] - 2026-03-28
 

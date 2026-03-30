@@ -13,6 +13,17 @@
 - `Document.pdf_ua`, `Document.pdfa`, `Document.signature` fields
 - `Image.alt` and `Svg.alt` emit `/Alt` entries in structure elements for PDF/UA
 
+### Fixed
+- `extract_cn_from_cert_der()` handles multi-byte DER lengths (CN > 127 bytes)
+- Checkbox appearance: checkmark instead of X; radio button: filled circle
+- `flatten_forms` renders placeholder text in grey when value is empty
+- Signing preserves existing AcroForm `/NeedAppearances` and `/DA` metadata
+- Unique signature field names (`Signature1`, `Signature2`) for double-signing
+- Form fields tagged as `/Form` role in structure tree (PDF/UA compliance)
+
+### Removed
+- `SignatureConfig.page` field (was accepted but silently ignored)
+
 ## [0.7.13] - 2026-03-28
 
 ### Added

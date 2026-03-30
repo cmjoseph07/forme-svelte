@@ -89,7 +89,7 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Tailwind CSS**: `tw("p-4 text-lg font-bold bg-blue-500")` converts Tailwind classes to Forme style objects. Full color palette, grid, arbitrary values, negative values, fractions.
 - **Fillable forms**: AcroForm components — `<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>`. Fill and flatten for non-editable delivery.
 - **PDF/UA accessibility**: `<Document pdfUa>` generates PDF/UA-1 compliant documents with structure tree, tab order, role map, and artifact tagging.
-- **PDF/A archival**: `<Document pdfa="a-2b">` for long-term preservation. Supports PDF/A-2b, PDF/A-2u, and PDF/A-3b.
+- **PDF/A archival**: `<Document pdfa="2b">` for long-term preservation. Supports PDF/A-2b and PDF/A-2a.
 - **Digital signatures**: PKCS#7 signatures with X.509 certificates via the `signature` prop or `/v1/sign` API endpoint.
 
 ## Browser Usage
@@ -181,10 +181,10 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | `<AreaChart>` | Multi-series area chart. `series`, `labels`, `showGrid`, `title`. |
 | `<DotPlot>` | Scatter plot. `groups`, `xLabel`, `yLabel`, `showLegend`, `dotSize`. |
 | `<Watermark>` | Rotated text behind page content. `text`, `fontSize`, `color`, `angle`. |
-| `<TextField>` | Form text input. `name`, `defaultValue`, `multiline`, `password`, `readOnly`. |
+| `<TextField>` | Form text input. `name`, `value`, `width`, `multiline`, `password`, `readOnly`. |
 | `<Checkbox>` | Form checkbox. `name`, `checked`. |
-| `<Dropdown>` | Form select dropdown. `name`, `options`, `defaultValue`. |
-| `<RadioButton>` | Form radio button. `name`, `group`, `checked`. |
+| `<Dropdown>` | Form select dropdown. `name`, `options`, `value`, `width`. |
+| `<RadioButton>` | Form radio button. `name`, `value`, `checked`. |
 | `<Fixed>` | Repeating header or footer. |
 | `<PageBreak>` | Force a page break. |
 
@@ -220,7 +220,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Tailwind CSS | `tw("p-4 text-lg font-bold")` utility | No | No |
 | Fillable forms | AcroForm (TextField, Checkbox, Dropdown, Radio) | No | HTML `<form>` (not PDF forms) |
 | PDF/UA accessibility | `<Document pdfUa>` | No | No |
-| PDF/A archival | `<Document pdfa="a-2b">` | No | No |
+| PDF/A archival | `<Document pdfa="2b">` | No | No |
 | Digital signatures | PKCS#7 via `signature` prop or API | No | No |
 | Dependencies | None (WASM) | yoga-layout | Chrome/Chromium |
 | Runs in-process | Yes | Yes | No (subprocess) |

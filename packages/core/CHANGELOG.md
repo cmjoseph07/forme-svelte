@@ -5,6 +5,7 @@
 ### Added
 - WASM rebuilt with AcroForm, PDF/UA, PDF/A, and digital signature support
 - `flattenForms` option in `renderDocument()` and `renderDocumentWithLayout()`
+- `signPdf()` function for signing existing PDFs without re-rendering
 
 ## [0.7.13] - 2026-03-28
 

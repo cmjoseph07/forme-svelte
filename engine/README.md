@@ -22,7 +22,7 @@ use forme::{render_json, Document, FormeError};
 - **Watermarks** — rotated text behind page content
 - **AcroForms** — fillable PDF forms (TextField, Checkbox, Dropdown, RadioButton) with form flattening
 - **PDF/UA-1** — accessibility compliance with structure tree, tab order, role map, artifact tagging
-- **PDF/A** — archival compliance (PDF/A-2b, PDF/A-2u, PDF/A-3b) with full font embedding and XMP metadata
+- **PDF/A** — archival compliance (PDF/A-2b, PDF/A-2a) with full font embedding and XMP metadata
 - **Digital signatures** — PKCS#7 detached signatures with X.509 certificates
 - **Templates** — expression language for dynamic documents (`$ref`, `$each`, `$if`)
 - **WASM** — compiles to WebAssembly for browser and serverless use

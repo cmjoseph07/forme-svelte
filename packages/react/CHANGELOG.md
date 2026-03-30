@@ -3,14 +3,17 @@
 ## [0.8.0] - 2026-03-29
 
 ### Added
-- `<TextField>` component with `name`, `defaultValue`, `multiline`, `password`, `readOnly`, `maxLength` props
-- `<Checkbox>` component with `name`, `checked` props
-- `<Dropdown>` component with `name`, `options`, `defaultValue` props
-- `<RadioButton>` component with `name`, `group`, `checked` props
+- `<TextField>` component with `name`, `value`, `width`, `multiline`, `password`, `readOnly`, `maxLength`, `fontSize` props
+- `<Checkbox>` component with `name`, `checked`, `width`, `height`, `readOnly` props
+- `<Dropdown>` component with `name`, `options`, `value`, `width`, `readOnly`, `fontSize` props
+- `<RadioButton>` component with `name`, `value`, `checked` props
 - `pdfUa` prop on `<Document>` for PDF/UA-1 accessibility compliance
-- `pdfa` prop on `<Document>` for PDF/A archival compliance (`"a-2b"`, `"a-2u"`, `"a-3b"`)
+- `pdfa` prop on `<Document>` for PDF/A archival compliance (`"2b"`, `"2a"`)
 - `signature` prop on `<Document>` for PKCS#7 digital signatures
 - `TextFieldProps`, `CheckboxProps`, `DropdownProps`, `RadioButtonProps` type exports
+
+### Removed
+- `page` field from `SignatureConfig` type (was never functional)
 
 ## [0.7.13] - 2026-03-28
 
