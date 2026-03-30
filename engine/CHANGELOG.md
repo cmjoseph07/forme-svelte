@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.8.1] - 2026-03-30
+
+### Fixed
+- Fix Latin Extended character widths in standard font tables (Å, Ä, Ö, etc. no longer stack)
+- Fix page number placeholder width mismatch during layout ({{pageNumber}} measured at actual width)
+
 ## [0.8.0] - 2026-03-29
 
 ### Added

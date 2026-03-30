@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.1] - 2026-03-30
+
+### Fixed
+- Engine fixes: Latin Extended character widths, page number placeholder measurement
+
 ## [0.8.0] - 2026-03-29
 
 ### Added

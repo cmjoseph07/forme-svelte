@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.1] - 2026-03-30
+
+### Changed
+- Version bump to match engine 0.8.1
+
 ## [0.7.11] - 2026-03-24
 
 ### Fixed
