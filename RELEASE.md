@@ -286,4 +286,5 @@ go get github.com/formepdf/forme-go@v0.8.0
 - **Go tag must be on the right repo**: The Go SDK is at `github.com/formepdf/forme-go`, not the monorepo. Tag there, not in the monorepo.
 - **Docker Rust version**: The server Dockerfile requires Rust 1.88+ due to dependencies. If the pinned version errors, check the current minimum required version and update `FROM rust:X.XX-bookworm` accordingly. Using `rust:latest` is a safe fallback.
 - **Docker buildx context**: Run the buildx build from the monorepo root (`forme/`), not from `server/`. The Dockerfile copies both `engine/` and `server/` directories.
+- **PyPI stale dist/**: `twine upload dist/*` uploads everything in `dist/`, including old versions. Clean old builds first (`rm dist/formepdf-0.*.whl dist/formepdf-0.*.tar.gz`) or upload only the target version (`twine upload dist/formepdf-{version}*`).
 - **PyPI token scope**: Make sure the PyPI token has upload rights for the `formepdf` project specifically (project-scoped token), not just your account.
