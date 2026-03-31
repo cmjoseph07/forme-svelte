@@ -1267,7 +1267,7 @@ impl PdfWriter {
                             matches!(first.font_style, FontStyle::Italic | FontStyle::Oblique);
                         let font_key = FontKey {
                             family: first.font_family.clone(),
-                            weight: if first.font_weight >= 600 { 700 } else { 400 },
+                            weight: first.font_weight,
                             italic,
                         };
                         let font_name = format!("F{}", idx);
@@ -1671,7 +1671,7 @@ impl PdfWriter {
                             matches!(first.font_style, FontStyle::Italic | FontStyle::Oblique);
                         let fk = FontKey {
                             family: first.font_family.clone(),
-                            weight: if first.font_weight >= 600 { 700 } else { 400 },
+                            weight: first.font_weight,
                             italic,
                         };
                         let idx = self.font_index(
@@ -2268,7 +2268,7 @@ impl PdfWriter {
                             matches!(glyph.font_style, FontStyle::Italic | FontStyle::Oblique);
                         let key = FontKey {
                             family: glyph.font_family.clone(),
-                            weight: if glyph.font_weight >= 600 { 700 } else { 400 },
+                            weight: glyph.font_weight,
                             italic,
                         };
                         let usage = font_usage.entry(key).or_insert_with(|| FontUsage {
@@ -2847,18 +2847,25 @@ impl PdfWriter {
         font_objects: &[(FontKey, usize)],
     ) -> usize {
         let italic = matches!(font_style, FontStyle::Italic | FontStyle::Oblique);
-        let snapped_weight = if weight >= 600 { 700 } else { 400 };
 
-        // Exact match
+        // Exact weight match
         for (i, (key, _)) in font_objects.iter().enumerate() {
-            if key.family == family && key.weight == snapped_weight && key.italic == italic {
+            if key.family == family && key.weight == weight && key.italic == italic {
+                return i;
+            }
+        }
+
+        // Fallback: snapped weight (400/700)
+        let snapped = if weight >= 600 { 700 } else { 400 };
+        for (i, (key, _)) in font_objects.iter().enumerate() {
+            if key.family == family && key.weight == snapped && key.italic == italic {
                 return i;
             }
         }
 
         // Fallback: try Helvetica with same weight/style
         for (i, (key, _)) in font_objects.iter().enumerate() {
-            if key.family == "Helvetica" && key.weight == snapped_weight && key.italic == italic {
+            if key.family == "Helvetica" && key.weight == snapped && key.italic == italic {
                 return i;
             }
         }

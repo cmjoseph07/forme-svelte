@@ -8088,3 +8088,87 @@ fn test_render_performance() {
     assert_valid_pdf(&pdf);
     assert!(layout.pages.len() >= 2, "Should produce multiple pages");
 }
+
+#[test]
+fn test_multi_weight_font_resolution() {
+    // Register the same font family at 3 different weights.
+    // The PDF serializer should embed 3 separate font objects, not collapse them to 1.
+    use base64::Engine as _;
+    let font_data = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/fonts/NotoSans-Regular.ttf"
+    ))
+    .unwrap();
+    let font_b64 = base64::engine::general_purpose::STANDARD.encode(&font_data);
+
+    fn text_with_weight(content: &str, weight: u32) -> Node {
+        Node {
+            kind: NodeKind::Text {
+                content: content.to_string(),
+                href: None,
+                runs: vec![],
+            },
+            style: Style {
+                font_family: Some("TestFont".into()),
+                font_weight: Some(weight),
+                font_size: Some(14.0),
+                ..Style::default()
+            },
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }
+    }
+
+    let doc = Document {
+        children: vec![
+            text_with_weight("Light text", 200),
+            text_with_weight("Regular text", 400),
+            text_with_weight("Bold text", 700),
+        ],
+        fonts: vec![
+            FontEntry {
+                family: "TestFont".into(),
+                src: font_b64.clone(),
+                weight: 200,
+                italic: false,
+            },
+            FontEntry {
+                family: "TestFont".into(),
+                src: font_b64.clone(),
+                weight: 400,
+                italic: false,
+            },
+            FontEntry {
+                family: "TestFont".into(),
+                src: font_b64,
+                weight: 700,
+                italic: false,
+            },
+        ],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        tagged: false,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdfa: None,
+        pdf_ua: false,
+        signature: None,
+    };
+
+    let pdf = forme::render(&doc).unwrap();
+    assert_valid_pdf(&pdf);
+
+    // The PDF should contain 3 distinct CIDFont entries for TestFont (one per weight)
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    let testfont_count = pdf_str.matches("/BaseFont /TestFont").count();
+    assert!(
+        testfont_count >= 3,
+        "Expected at least 3 distinct TestFont /BaseFont entries, got {}",
+        testfont_count
+    );
+}
