@@ -54,6 +54,17 @@ cd packages/resend && npm run build
 cd packages/sdk && npm run build       # TypeScript hosted API client
 cd packages/tailwind && npm run build  # tw() function, Tailwind v3
 cd packages/templates && npm run build # shared templates + Zod schemas
+
+# 9. Python SDK — rebuild WASM (only if engine/ changed)
+cd packages/python-sdk
+bash build_wasm.sh   # builds wasm32-wasip1 target, copies to formepdf/forme.wasm
+
+# 10. Go SDK — rebuild WASM (only if engine/ changed)
+# The Go SDK is a separate git repo at packages/go-sdk/
+# It uses //go:embed for the WASM binary (gitignored, must be present locally)
+cd packages/go-sdk
+bash templates/build_wasm.sh   # or copy from engine target:
+# cp ../../engine/target/wasm32-wasip1/release/forme.wasm templates/forme.wasm
 ```
 
 ---
@@ -79,8 +90,15 @@ Files to update when bumping (e.g. 0.7.13 -> 0.8.0):
 ### Non-npm packages
 - [ ] `engine/Cargo.toml` — `version = "0.8.0"`
 - [ ] `server/Cargo.toml` — `version = "0.8.0"`
-- [ ] `packages/python-sdk/pyproject.toml` (or `setup.cfg`) — `version = "0.8.0"`
-- [ ] Go SDK `packages/go-sdk/` — update module version constant if any; tag is the version signal
+- [ ] `packages/python-sdk/pyproject.toml` — `version = "0.8.0"`
+- [ ] Go SDK `packages/go-sdk/` — no version file; versioned by git tag
+
+### SDK WASM binaries (if engine/ changed)
+- [ ] `packages/python-sdk/formepdf/forme.wasm` — rebuild via `bash build_wasm.sh`
+- [ ] `packages/go-sdk/templates/forme.wasm` — rebuild via `bash templates/build_wasm.sh` or copy from `engine/target/wasm32-wasip1/release/forme.wasm`
+- Both use the `wasm32-wasip1` target with `--features wasm-raw` (C-ABI exports for non-JS hosts)
+- The Python SDK WASM is gitignored — use `git add -f` to commit it
+- The Go SDK WASM is gitignored — use `git add -f` to commit it (separate git repo)
 
 ### Cross-package dependency references
 Update peer/runtime dependencies that pin to the formepdf packages:
@@ -258,7 +276,8 @@ go get github.com/formepdf/forme-go@v0.8.0
 
 ## Common Mistakes
 
-- **Stale WASM**: If `engine/` changed, must rebuild `packages/core` (`npm run build`) before anything else. The WASM binary is ~5.1MB (grew from 4.8MB in 0.7.x when signatures were added).
+- **Stale WASM**: If `engine/` changed, must rebuild `packages/core` (`npm run build`) before anything else. The WASM binary is ~5.1MB (grew from 4.8MB in 0.7.x when signatures were added). **Also rebuild** the Python SDK (`packages/python-sdk/build_wasm.sh`) and Go SDK (`packages/go-sdk/templates/build_wasm.sh`) WASM binaries — these are separate wasm32-wasip1 builds, not the wasm-pack JS build.
+- **SDK WASM is gitignored**: Both `packages/python-sdk/formepdf/forme.wasm` and `packages/go-sdk/templates/forme.wasm` are in `.gitignore`. Use `git add -f` to stage them. The Go SDK is a separate git repo — commit and tag there independently.
 - **Stale dist/**: Always rebuild `packages/renderer` before VS Code or CLI. A stale `dist/` can silently ship broken code.
 - **VS Code copies**: The VS Code esbuild config copies WASM from `packages/core/pkg/` and preview HTML from `packages/renderer/dist/preview/`. These are snapshots — rebuild VS Code after rebuilding core or renderer.
 - **Lockfile**: Run `npm install` from root after version bumps to update `package-lock.json`.
