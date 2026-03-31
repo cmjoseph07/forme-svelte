@@ -1,0 +1,40 @@
+[project]
+name = "formepdf"
+version = "0.8.2"
+description = "Python SDK for the Forme hosted PDF API"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [
+    { name = "Dan Molitor", email = "danmolitor91@gmail.com" },
+]
+keywords = ["pdf", "api", "sdk", "forme"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Typing :: Typed",
+]
+
+[project.optional-dependencies]
+local = ["wasmtime>=20.0"]
+
+[project.urls]
+Homepage = "https://formepdf.com"
+Documentation = "https://docs.formepdf.com"
+Repository = "https://github.com/formepdf/forme"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["formepdf"]
+artifacts = ["formepdf/forme.wasm"]
