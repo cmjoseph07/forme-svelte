@@ -7,6 +7,7 @@
 - Rust crate (`forme-pdf` on crates.io) follows the same version
 - Go SDK (`github.com/formepdf/forme-go`) uses a `v0.8.0` git tag
 - VS Code extension has its own independent version (e.g. `0.8.2`) since it publishes to the Marketplace separately
+- Docker image (`formepdf/forme`) follows the same version — tagged as `{version}` and `latest`
 
 ---
 
@@ -77,6 +78,7 @@ Files to update when bumping (e.g. 0.7.13 -> 0.8.0):
 
 ### Non-npm packages
 - [ ] `engine/Cargo.toml` — `version = "0.8.0"`
+- [ ] `server/Cargo.toml` — `version = "0.8.0"`
 - [ ] `packages/python-sdk/pyproject.toml` (or `setup.cfg`) — `version = "0.8.0"`
 - [ ] Go SDK `packages/go-sdk/` — update module version constant if any; tag is the version signal
 
@@ -96,6 +98,7 @@ Update peer/runtime dependencies that pin to the formepdf packages:
 
 ### Changelogs
 - [ ] `engine/CHANGELOG.md`
+- [ ] `server/CHANGELOG.md`
 - [ ] `packages/react/CHANGELOG.md`
 - [ ] `packages/core/CHANGELOG.md`
 - [ ] `packages/renderer/CHANGELOG.md`
@@ -162,6 +165,32 @@ cargo publish
 # Note: cargo publish does a dry run check first; add --dry-run to verify before publishing
 ```
 
+### Docker image
+
+Build and push multi-platform image from the monorepo root:
+
+```bash
+# One-time builder setup (if not already done)
+docker buildx create --name multiplatform --use
+docker buildx inspect --bootstrap
+
+docker login
+
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -f server/Dockerfile \
+  -t formepdf/forme:{version} \
+  -t formepdf/forme:latest \
+  --push \
+  .
+
+# Verify
+docker run --rm -p 3000:3000 formepdf/forme:{version}
+curl http://localhost:3000/health
+```
+
+Note: The Dockerfile requires Rust 1.88+ due to dependencies. Use `rust:latest` in the Dockerfile if the pinned version is too old.
+
 ### Go SDK
 
 The Go SDK is published via git tag — pkg.go.dev indexes it automatically.
@@ -207,6 +236,11 @@ npm init -y
 npm install @formepdf/react @formepdf/core @formepdf/cli
 # Run a minimal render
 
+# Docker image
+docker run --rm -p 3000:3000 formepdf/forme:{version}
+curl http://localhost:3000/health
+# Should return {"status":"ok","version":"{version}"}
+
 # PyPI
 pip install formepdf==0.8.0
 python -c "import formepdf; print(formepdf.__version__)"
@@ -231,4 +265,6 @@ go get github.com/formepdf/forme-go@v0.8.0
 - **npm cache**: Can't republish the same version. If you published broken code, bump the version.
 - **crates.io is permanent**: Same rule — can't yank and republish the same version. Use `--dry-run` first.
 - **Go tag must be on the right repo**: The Go SDK is at `github.com/formepdf/forme-go`, not the monorepo. Tag there, not in the monorepo.
+- **Docker Rust version**: The server Dockerfile requires Rust 1.88+ due to dependencies. If the pinned version errors, check the current minimum required version and update `FROM rust:X.XX-bookworm` accordingly. Using `rust:latest` is a safe fallback.
+- **Docker buildx context**: Run the buildx build from the monorepo root (`forme/`), not from `server/`. The Dockerfile copies both `engine/` and `server/` directories.
 - **PyPI token scope**: Make sure the PyPI token has upload rights for the `formepdf` project specifically (project-scoped token), not just your account.
