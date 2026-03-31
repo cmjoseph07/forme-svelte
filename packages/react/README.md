@@ -33,17 +33,37 @@ const pdfBytes = await renderDocument(doc);
 
 ## Components
 
-- `Document` - Root container
+### Layout
+- `Document` - Root container (fonts, metadata, tagged PDF, PDF/A, signatures)
 - `Page` - A page with size, margins, and orientation
 - `View` - Flex container (like div)
 - `Text` - Text content with font styling
-- `Image` - JPEG and PNG images
-- `Table`, `Row`, `Cell` - Tables with automatic header repetition
+- `Image` - JPEG, PNG, and WebP images
 - `Fixed` - Fixed headers and footers
 - `PageBreak` - Explicit page break
-- `Svg` - Basic SVG rendering
+
+### Tables
+- `Table`, `Row`, `Cell` - Tables with automatic header repetition across pages
+
+### Graphics
+- `Svg` - SVG rendering (rect, circle, line, path, arc)
 - `QrCode` - Vector QR codes
 - `Barcode` - 1D barcodes (Code 128, Code 39, EAN-13, EAN-8, Codabar)
+- `Canvas` - Arbitrary vector drawing via callback API
+- `Watermark` - Rotated text behind page content
+
+### Charts
+- `BarChart` - Vertical bar charts with grouped series
+- `LineChart` - Line charts with multiple series
+- `PieChart` - Pie and donut charts
+- `AreaChart` - Filled area charts
+- `DotPlot` - Dot plot with grouped data points
+
+### Form Fields
+- `TextField` - Text input field
+- `Checkbox` - Checkbox with label
+- `Dropdown` - Select dropdown with options
+- `RadioButton` - Radio button with group support
 
 ## Docs
 

@@ -130,6 +130,12 @@ Update peer/runtime dependencies that pin to the formepdf packages:
 - [ ] `packages/templates/CHANGELOG.md`
 - [ ] `packages/vscode/CHANGELOG.md`
 
+### READMEs (if new components, APIs, or capabilities were added)
+- [ ] `README.md` (root) — features list, component table
+- [ ] `packages/react/README.md` — component list, usage examples
+- [ ] `packages/core/README.md` — API surface, render functions
+- [ ] `packages/cli/README.md` — CLI commands, flags
+
 ### Lockfile
 - [ ] Run `npm install` from root to update `package-lock.json`
 
