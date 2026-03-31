@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.8.2] - 2026-03-30
+
+### Fixed
+- Engine fix: PDF serializer now respects custom font weights (multiple weights per family no longer collapse to 400/700)
+
 ## [0.8.1] - 2026-03-30
 
 ### Fixed
