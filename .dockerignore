@@ -1,0 +1,7 @@
+engine/target/
+server/target/
+node_modules/
+packages/*/node_modules/
+packages/*/dist/
+packages/core/pkg/
+.git/
