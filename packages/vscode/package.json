@@ -18,6 +18,7 @@
   "activationEvents": [
     "onLanguage:typescriptreact",
     "onLanguage:javascriptreact",
+    "onLanguage:python",
     "onView:forme.componentTree",
     "onCommand:forme.openPreview",
     "onCommand:forme.openPreviewToSide"

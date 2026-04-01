@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { readFile, writeFile } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
 import { dirname, basename, join } from 'node:path';
 import { renderFromFile, renderFromSource } from '@formepdf/renderer';
 import type { LayoutStore, SelectionEvent } from './layout-store.js';
@@ -295,7 +296,7 @@ export class FormePreviewPanel {
   private async sendDataState() {
     // Auto-detect companion data file
     const filePath = this.fileUri.fsPath;
-    const base = filePath.replace(/\.(tsx|jsx|ts|js)$/, '');
+    const base = filePath.replace(/\.(tsx|jsx|ts|js|py)$/, '');
 
     const dataFiles = [
       `${base}.data.json`,
@@ -379,8 +380,13 @@ export class FormePreviewPanel {
 
     const filePath = this.fileUri.fsPath;
 
+    // Python files use a separate render path
+    if (filePath.endsWith('.py')) {
+      return this.renderPython(filePath);
+    }
+
     // Find companion data file
-    const base = filePath.replace(/\.(tsx|jsx|ts|js)$/, '');
+    const base = filePath.replace(/\.(tsx|jsx|ts|js|py)$/, '');
     const dataCandidates = [
       `${base}.data.json`,
       `${base}-data.json`,
@@ -451,10 +457,130 @@ export class FormePreviewPanel {
     }
   }
 
+  private async renderPython(filePath: string) {
+    const start = Date.now();
+    const pythonPath = await this.findPythonInterpreter();
+    if (!pythonPath) {
+      vscode.window.showErrorMessage(
+        'Python not found. Install Python or the VS Code Python extension.',
+      );
+      return;
+    }
+
+    // Pass companion data file path as env var if it exists
+    const base = filePath.replace(/\.py$/, '');
+    const dataCandidates = [
+      `${base}.data.json`,
+      `${base}-data.json`,
+      `${base}.json`,
+    ];
+    const env: Record<string, string> = { ...process.env as Record<string, string> };
+    for (const candidate of dataCandidates) {
+      try {
+        await readFile(candidate);
+        env.FORME_DATA = candidate;
+        break;
+      } catch {
+        continue;
+      }
+    }
+
+    try {
+      const pdfBytes = await new Promise<Buffer>((resolve, reject) => {
+        execFile(
+          pythonPath,
+          [filePath],
+          { maxBuffer: 50 * 1024 * 1024, encoding: 'buffer', cwd: dirname(filePath), env },
+          (error, stdout, stderr) => {
+            if (error) {
+              const stderrStr = stderr ? stderr.toString('utf-8') : '';
+              reject(new Error(stderrStr || error.message));
+              return;
+            }
+            if (stderr && stderr.length > 0) {
+              const stderrStr = stderr.toString('utf-8').trim();
+              // Only treat stderr as error if stdout is empty
+              if (!stdout || stdout.length === 0) {
+                reject(new Error(stderrStr));
+                return;
+              }
+            }
+            resolve(stdout as Buffer);
+          },
+        );
+      });
+
+      // Validate PDF header
+      if (pdfBytes.length < 5 || pdfBytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
+        this.panel.webview.postMessage({
+          type: 'error',
+          message: 'Output is not a valid PDF. Make sure your script writes PDF bytes to stdout.\n\nExample:\n  import sys\n  sys.stdout.buffer.write(pdf_bytes)',
+        });
+        this.statusBarItem.text = `$(error) Forme: invalid output`;
+        return;
+      }
+
+      const renderTimeMs = Date.now() - start;
+      this.lastPdf = new Uint8Array(pdfBytes);
+      const pdfBase64 = pdfBytes.toString('base64');
+
+      this.panel.webview.postMessage({
+        type: 'pdfData',
+        pdf: pdfBase64,
+        layout: null,
+        renderTime: renderTimeMs,
+      });
+
+      this.statusBarItem.text = `$(file-pdf) Python · ${renderTimeMs}ms`;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.panel.webview.postMessage({
+        type: 'error',
+        message: `Script error:\n\n${message}`,
+      });
+      this.statusBarItem.text = `$(error) Forme: script error`;
+    }
+  }
+
+  private async findPythonInterpreter(): Promise<string | null> {
+    // Try the VS Code Python extension first
+    try {
+      const pythonExt = vscode.extensions.getExtension('ms-python.python');
+      if (pythonExt) {
+        if (!pythonExt.isActive) {
+          await pythonExt.activate();
+        }
+        const api = pythonExt.exports;
+        // Modern API (2023+): getActiveEnvironmentPath
+        if (api?.environments?.getActiveEnvironmentPath) {
+          const envPath = api.environments.getActiveEnvironmentPath();
+          if (envPath?.path) return envPath.path;
+        }
+        // Older API: settings.getExecutionDetails
+        if (api?.settings?.getExecutionDetails) {
+          const details = api.settings.getExecutionDetails(this.fileUri);
+          if (details?.execCommand?.[0]) return details.execCommand[0];
+        }
+      }
+    } catch {
+      // Python extension API failed, fall through to fallback
+    }
+
+    // Fallback: check python3, then python
+    for (const cmd of ['python3', 'python']) {
+      const found = await new Promise<boolean>((resolve) => {
+        execFile(cmd, ['--version'], (error) => resolve(!error));
+      });
+      if (found) return cmd;
+    }
+
+    return null;
+  }
+
   private async downloadPdf() {
     if (!this.lastPdf) return;
 
-    const templateName = basename(this.fileUri.fsPath).replace(/\.(tsx|jsx|ts|js)$/, '');
+    const templateName = basename(this.fileUri.fsPath).replace(/\.(tsx|jsx|ts|js|py)$/, '');
     const pdfName = `${templateName}.pdf`;
 
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];

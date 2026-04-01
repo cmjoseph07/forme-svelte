@@ -5,6 +5,21 @@ import { ComponentTreeProvider } from './component-tree-provider.js';
 import { InspectorViewProvider } from './inspector-view-provider.js';
 
 export function activate(context: vscode.ExtensionContext) {
+  // One-time welcome message on first install
+  const hasShownWelcome = context.globalState.get('forme.welcomeShown');
+  if (!hasShownWelcome) {
+    context.globalState.update('forme.welcomeShown', true);
+    vscode.window.showInformationMessage(
+      'Welcome to Forme! Sign up at app.formepdf.com to manage templates, get an API key, and render from your application.',
+      'Sign Up',
+      'Dismiss',
+    ).then(selection => {
+      if (selection === 'Sign Up') {
+        vscode.env.openExternal(vscode.Uri.parse('https://app.formepdf.com/sign-up'));
+      }
+    });
+  }
+
   const store = new LayoutStore();
   const treeProvider = new ComponentTreeProvider();
   const inspectorProvider = new InspectorViewProvider(context.extensionUri);
@@ -113,11 +128,14 @@ function updateFormeContext(editor: vscode.TextEditor | undefined) {
 }
 
 function detectFormeFile(doc: vscode.TextDocument): boolean {
-  if (!['typescriptreact', 'javascriptreact'].includes(doc.languageId)) {
-    return false;
-  }
   const text = doc.getText();
-  return text.includes('@formepdf/react') || text.includes('formepdf');
+  if (['typescriptreact', 'javascriptreact'].includes(doc.languageId)) {
+    return text.includes('@formepdf/react') || text.includes('formepdf');
+  }
+  if (doc.languageId === 'python') {
+    return text.includes('import formepdf') || text.includes('from formepdf');
+  }
+  return false;
 }
 
 function maybeAutoOpen(
