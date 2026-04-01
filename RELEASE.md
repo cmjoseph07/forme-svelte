@@ -136,6 +136,9 @@ Update peer/runtime dependencies that pin to the formepdf packages:
 - [ ] `packages/core/README.md` — API surface, render functions
 - [ ] `packages/cli/README.md` — CLI commands, flags
 
+### Docs (if user-facing behavior changed)
+- [ ] `docs/` — Mintlify docs at docs.formepdf.com. Update pages affected by the release (e.g. `components.mdx`, `charts.mdx`, `styles.mdx`, `svg.mdx`). New props, changed defaults, and new components all need doc updates.
+
 ### Lockfile
 - [ ] Run `npm install` from root to update `package-lock.json`
 
