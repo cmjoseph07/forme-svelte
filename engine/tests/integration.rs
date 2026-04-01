@@ -8172,3 +8172,133 @@ fn test_multi_weight_font_resolution() {
         testfont_count
     );
 }
+
+#[test]
+fn test_svg_opacity_produces_ext_gstate() {
+    let doc = Document {
+        children: vec![Node {
+            kind: NodeKind::Svg {
+                width: 100.0,
+                height: 100.0,
+                view_box: None,
+                content: r##"<rect x="0" y="0" width="100" height="100" fill="#ff0000" opacity="0.5"/>"##
+                    .to_string(),
+            },
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }],
+        fonts: vec![],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        tagged: false,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdfa: None,
+        pdf_ua: false,
+        signature: None,
+    };
+
+    let pdf = forme::render(&doc).unwrap();
+    assert_valid_pdf(&pdf);
+
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    // Should contain an ExtGState with 0.5 opacity
+    assert!(
+        pdf_str.contains("/ca 0.5000") && pdf_str.contains("/CA 0.5000"),
+        "PDF should contain ExtGState with 0.5 opacity for SVG element"
+    );
+    // Should reference the GS in the content stream
+    assert!(
+        pdf_str.contains("/GS"),
+        "PDF content stream should reference a graphics state"
+    );
+}
+
+#[test]
+fn test_svg_fill_opacity_produces_ext_gstate() {
+    let doc = Document {
+        children: vec![Node {
+            kind: NodeKind::Svg {
+                width: 100.0,
+                height: 100.0,
+                view_box: None,
+                content: r##"<rect x="0" y="0" width="50" height="50" fill="#00ff00" fill-opacity="0.3"/>"##
+                    .to_string(),
+            },
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }],
+        fonts: vec![],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        tagged: false,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdfa: None,
+        pdf_ua: false,
+        signature: None,
+    };
+
+    let pdf = forme::render(&doc).unwrap();
+    assert_valid_pdf(&pdf);
+
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    assert!(
+        pdf_str.contains("/ca 0.3000") && pdf_str.contains("/CA 0.3000"),
+        "PDF should contain ExtGState with 0.3 opacity for fill-opacity"
+    );
+}
+
+#[test]
+fn test_svg_inherited_group_opacity() {
+    let doc = Document {
+        children: vec![Node {
+            kind: NodeKind::Svg {
+                width: 200.0,
+                height: 200.0,
+                view_box: None,
+                content: r#"<g opacity="0.5"><rect x="0" y="0" width="100" height="100" fill="blue"/></g>"#
+                    .to_string(),
+            },
+            style: Style::default(),
+            children: vec![],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }],
+        fonts: vec![],
+        metadata: Metadata::default(),
+        default_page: PageConfig::default(),
+        tagged: false,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdfa: None,
+        pdf_ua: false,
+        signature: None,
+    };
+
+    let pdf = forme::render(&doc).unwrap();
+    assert_valid_pdf(&pdf);
+
+    let pdf_str = String::from_utf8_lossy(&pdf);
+    // Group opacity 0.5 should be inherited by the rect
+    assert!(
+        pdf_str.contains("/ca 0.5000"),
+        "PDF should contain ExtGState with inherited group opacity 0.5"
+    );
+}

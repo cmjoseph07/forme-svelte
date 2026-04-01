@@ -276,12 +276,15 @@ export interface SvgProps {
   width: number;
   height: number;
   viewBox?: string;
-  content: string;
+  /** SVG markup string (inner content). If children are provided, this takes priority. */
+  content?: string;
   style?: Style;
   /** Optional hyperlink URL — makes the SVG clickable. */
   href?: string;
   /** Alt text for accessibility. */
   alt?: string;
+  /** JSX SVG children (path, rect, circle, g, etc.). Alternative to the content prop. */
+  children?: ReactNode;
 }
 
 export interface QrCodeProps {

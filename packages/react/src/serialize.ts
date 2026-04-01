@@ -1,4 +1,4 @@
-import { type ReactElement, isValidElement, Children, Fragment } from 'react';
+import { type ReactElement, type ReactNode, isValidElement, Children, Fragment } from 'react';
 import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
@@ -529,12 +529,13 @@ function serializeFixed(element: ReactElement): FormeNode {
 }
 
 function serializeSvg(element: ReactElement): FormeNode {
-  const props = element.props as { width: number; height: number; viewBox?: string; content: string; style?: Style; href?: string; alt?: string };
+  const props = element.props as { width: number; height: number; viewBox?: string; content?: string; style?: Style; href?: string; alt?: string; children?: ReactNode };
+  const content = props.content ?? (props.children ? svgChildrenToString(props.children) : '');
   const kind: FormeNodeKind = {
     type: 'Svg',
     width: props.width,
     height: props.height,
-    content: props.content,
+    content,
   };
   if (props.viewBox) (kind as { view_box?: string }).view_box = props.viewBox;
 
@@ -547,6 +548,53 @@ function serializeSvg(element: ReactElement): FormeNode {
   if (props.href) node.href = props.href;
   if (props.alt) node.alt = props.alt;
   return node;
+}
+
+/** Map camelCase SVG prop names to kebab-case attribute names. */
+const svgCamelToKebab: Record<string, string> = {
+  strokeWidth: 'stroke-width',
+  strokeLinecap: 'stroke-linecap',
+  strokeLinejoin: 'stroke-linejoin',
+  strokeMiterlimit: 'stroke-miterlimit',
+  strokeDasharray: 'stroke-dasharray',
+  strokeDashoffset: 'stroke-dashoffset',
+  strokeOpacity: 'stroke-opacity',
+  fillOpacity: 'fill-opacity',
+  fillRule: 'fill-rule',
+  clipPath: 'clip-path',
+  clipRule: 'clip-rule',
+};
+
+function escapeXmlAttr(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function svgChildrenToString(children: ReactNode): string {
+  let result = '';
+  Children.forEach(children, (child) => {
+    if (typeof child === 'string') {
+      result += child.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      return;
+    }
+    if (!isValidElement(child)) return;
+    const tag = typeof child.type === 'string' ? child.type : null;
+    if (!tag) return;
+    const { children: nested, ...attrs } = child.props as Record<string, unknown>;
+    const attrStr = Object.entries(attrs)
+      .filter(([, v]) => v !== undefined && v !== null)
+      .map(([k, v]) => {
+        const name = svgCamelToKebab[k] ?? k;
+        return `${name}="${escapeXmlAttr(String(v))}"`;
+      })
+      .join(' ');
+    const open = attrStr ? `<${tag} ${attrStr}` : `<${tag}`;
+    if (nested) {
+      result += `${open}>${svgChildrenToString(nested as ReactNode)}</${tag}>`;
+    } else {
+      result += `${open}/>`;
+    }
+  });
+  return result;
 }
 
 function serializeQrCode(element: ReactElement): FormeNode {

@@ -1520,7 +1520,7 @@ impl PdfWriter {
                     let _ = writeln!(stream, "0 0 {:.2} {:.2} re W n", svg_w, svg_h);
                 }
 
-                Self::write_svg_commands(stream, commands);
+                Self::write_svg_commands(stream, commands, &builder.ext_gstate_map);
 
                 let _ = writeln!(stream, "Q");
                 if tagged_mcid.is_some() {
@@ -2387,6 +2387,15 @@ impl PdfWriter {
                         }
                     }
                 }
+                DrawCommand::Svg { commands, .. } => {
+                    for cmd in commands {
+                        if let crate::svg::SvgCommand::SetOpacity(opacity) = cmd {
+                            if *opacity < 1.0 {
+                                opacities.push(*opacity);
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
             Self::collect_opacities_recursive(&element.children, opacities);
@@ -3047,7 +3056,11 @@ impl PdfWriter {
     }
 
     /// Write SVG drawing commands to a PDF content stream.
-    fn write_svg_commands(stream: &mut String, commands: &[SvgCommand]) {
+    fn write_svg_commands(
+        stream: &mut String,
+        commands: &[SvgCommand],
+        ext_gstate_map: &HashMap<u64, (usize, String)>,
+    ) {
         for cmd in commands {
             match cmd {
                 SvgCommand::MoveTo(x, y) => {
@@ -3101,6 +3114,11 @@ impl PdfWriter {
                 }
                 SvgCommand::RestoreState => {
                     let _ = writeln!(stream, "Q");
+                }
+                SvgCommand::SetOpacity(opacity) => {
+                    if let Some((_, gs_name)) = ext_gstate_map.get(&opacity.to_bits()) {
+                        let _ = writeln!(stream, "/{} gs", gs_name);
+                    }
                 }
             }
         }
