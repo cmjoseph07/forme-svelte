@@ -46,7 +46,7 @@ const pdfBytes = await renderDocument(doc);
 - `Table`, `Row`, `Cell` - Tables with automatic header repetition across pages
 
 ### Graphics
-- `Svg` - SVG rendering (rect, circle, line, path, arc)
+- `Svg` - SVG rendering via `content` string or JSX children (rect, circle, line, path, arc, opacity)
 - `QrCode` - Vector QR codes
 - `Barcode` - 1D barcodes (Code 128, Code 39, EAN-13, EAN-8, Codabar)
 - `Canvas` - Arbitrary vector drawing via callback API

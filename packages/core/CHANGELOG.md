@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3] - 2026-04-01
+
+### Added
+- SVG opacity support and Svg children API (via engine + react rebuild)
+
+### Fixed
+- Page style inheritance: `<Page style={{ fontFamily }}>` now propagates to children
+
 ## [0.8.2] - 2026-03-30
 
 ### Fixed

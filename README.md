@@ -70,7 +70,7 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Table overflow**: Table cells with content taller than a page are preserved across page breaks, not silently clipped.
 - **Absolute positioning**: `position: 'absolute'` with `top`, `right`, `bottom`, `left` relative to the parent View.
 - **Column flex**: `justifyContent` and `alignItems` work in both row and column directions.
-- **SVG**: Inline SVG rendering with support for `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and `path` elements.
+- **SVG**: Inline SVG rendering with support for `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and `path` elements. Supports `opacity`, `fill-opacity`, and `stroke-opacity`. Pass SVG as a `content` string or as JSX children.
 - **QR codes**: Built-in `<QrCode>` component. Vector-based, crisp at any zoom level.
 - **Barcodes**: Built-in `<Barcode>` component. Code 128, Code 39, EAN-13, EAN-8, Codabar. Vector-based.
 - **Text overflow**: `textOverflow: 'ellipsis'` truncates single-line text with "..." when it exceeds available width. Also supports `'clip'`.
@@ -171,7 +171,7 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | `<Table>` | Table with column definitions. |
 | `<Row>` | Table row. `header` for repeating on page breaks. |
 | `<Cell>` | Table cell. `colSpan`, `rowSpan`. |
-| `<Svg>` | Inline SVG graphics. `href`, `alt`. |
+| `<Svg>` | Inline SVG graphics. `content` string or JSX children. `href`, `alt`. |
 | `<QrCode>` | QR code. `data`, `size`, `color`. Vector-based. |
 | `<Barcode>` | 1D barcode. `data`, `format`, `width`, `height`, `color`. Code 128, Code 39, EAN-13, EAN-8, Codabar. |
 | `<Canvas>` | Arbitrary vector drawing via `draw` callback. |

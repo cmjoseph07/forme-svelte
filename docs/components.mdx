@@ -339,7 +339,7 @@ Cells can contain any Forme element, not just Text.
 
 ## Svg
 
-Renders inline SVG graphics. Supports basic SVG elements: `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and `path`.
+Renders inline SVG graphics. Supports basic SVG elements: `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon`, and `path`. Elements support `opacity`, `fill-opacity`, and `stroke-opacity` attributes with proper inheritance through `<g>` groups.
 
 ### Props
 
@@ -348,10 +348,13 @@ Renders inline SVG graphics. Supports basic SVG elements: `rect`, `circle`, `ell
 | `width` | `number` | (required) | Display width in points |
 | `height` | `number` | (required) | Display height in points |
 | `viewBox` | `string` | - | SVG viewBox attribute (e.g., `"0 0 100 100"`) |
-| `content` | `string` | (required) | SVG markup string containing the elements to render |
+| `content` | `string` | - | SVG markup string containing the elements to render |
+| `children` | `ReactNode` | - | JSX children as an alternative to `content` |
 | `style` | `Style` | - | Additional style properties (margin, etc.) |
 
-### Example
+Provide either `content` (a raw SVG string) or JSX `children` — not both. If both are provided, `content` takes priority.
+
+### Example — content string
 
 ```tsx
 {/* Simple shapes */}
@@ -366,6 +369,25 @@ Renders inline SVG graphics. Supports basic SVG elements: `rect`, `circle`, `ell
 <Svg width={200} height={100} viewBox="0 0 200 100"
   content='<path d="M10 80 Q 95 10 180 80" fill="none" stroke="#ef4444" stroke-width="3" />' />
 ```
+
+### Example — JSX children
+
+```tsx
+{/* Same shapes using JSX syntax */}
+<Svg width={100} height={100} viewBox="0 0 100 100">
+  <rect x="10" y="10" width="80" height="80" fill="#3b82f6" rx="8" />
+</Svg>
+
+{/* Grouped elements with inherited opacity */}
+<Svg width={200} height={100} viewBox="0 0 200 100">
+  <g opacity="0.5">
+    <rect x="10" y="10" width="80" height="80" fill="#3b82f6" />
+    <circle cx="150" cy="50" r="40" fill="#ef4444" />
+  </g>
+</Svg>
+```
+
+JSX children are serialized to SVG XML automatically. CamelCase props like `strokeWidth` are converted to their kebab-case SVG equivalents (`stroke-width`).
 
 SVG content is rendered directly into the PDF using native PDF drawing operations, not rasterized. This produces crisp vector output at any zoom level.
 

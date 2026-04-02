@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "forme-pdf"
-version = "0.8.2"
+version = "0.8.3"
 dependencies = [
  "barcoders",
  "base64",

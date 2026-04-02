@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3] - 2026-04-01
+
+### Added
+- `<Svg>` children API: JSX children as alternative to `content` string prop, with camelCase→kebab-case attribute mapping and XML escaping
+
+### Fixed
+- `serializePage()` now reads and maps the `style` prop instead of discarding it — `<Page style={{ fontFamily: "..." }}>` works correctly
+
 ## [0.8.2] - 2026-03-30
 
 _Dependency bump only._

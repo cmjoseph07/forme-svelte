@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.3] - 2026-04-01
+
+### Added
+- SVG element opacity support: `opacity`, `fill-opacity`, and `stroke-opacity` attributes rendered via PDF ExtGState with inheritance through `<g>` groups
+
+### Fixed
+- Page node style now resolves against root style, so properties like `fontFamily` set on `<Page style={...}>` correctly inherit to child nodes
+
 ## [0.8.2] - 2026-03-30
 
 ### Fixed

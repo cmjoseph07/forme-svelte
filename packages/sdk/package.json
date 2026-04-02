@@ -1,6 +1,6 @@
 {
   "name": "@formepdf/sdk",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "description": "TypeScript client for the Forme hosted PDF API",
   "type": "module",
   "main": "./dist/index.js",

@@ -30,6 +30,9 @@ RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/
 
 COPY --from=builder /app/server/target/release/forme-server /usr/local/bin/forme-server
 
+RUN useradd -r -s /bin/false forme
+USER forme
+
 ENV HTTP_PORT=3000
 EXPOSE 3000
 

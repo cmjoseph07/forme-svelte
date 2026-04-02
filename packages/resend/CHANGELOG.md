@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.8.3] - 2026-04-01
+
+_Dependency bump only._
+
 ## [0.8.2] - 2026-03-30
 
 _Dependency bump only._
