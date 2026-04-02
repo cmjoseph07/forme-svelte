@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
       'Dismiss',
     ).then(selection => {
       if (selection === 'Sign Up') {
-        vscode.env.openExternal(vscode.Uri.parse('https://app.formepdf.com/sign-up'));
+        vscode.env.openExternal(vscode.Uri.parse('https://accounts.formepdf.com/sign-up?redirect_url=https%3A%2F%2Fapp.formepdf.com%2F'));
       }
     });
   }
