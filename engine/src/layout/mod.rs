@@ -900,7 +900,9 @@ impl LayoutEngine {
                     // AND has a fixed height matching the page content area.
                     // The fixed height ensures flex-grow page-level detection
                     // works correctly (layout_children uses parent height).
-                    let mut page_root = root_style.clone();
+                    // Resolve the Page node's own style so properties like
+                    // fontFamily set on <Page style={...}> inherit to children.
+                    let mut page_root = node.style.resolve(Some(&root_style), cursor.content_width);
                     page_root.height = SizeConstraint::Fixed(cursor.content_height);
 
                     let cx = cursor.content_x;

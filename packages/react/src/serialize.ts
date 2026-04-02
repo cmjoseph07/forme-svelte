@@ -211,7 +211,7 @@ export function serialize(element: ReactElement): FormeDocument {
 // ─── Page serialization ──────────────────────────────────────────────
 
 function serializePage(element: ReactElement): FormeNode {
-  const props = element.props as { size?: string | { width: number; height: number }; margin?: number | string | number[] | Edges; children?: unknown };
+  const props = element.props as { size?: string | { width: number; height: number }; margin?: number | string | number[] | Edges; style?: Style; children?: unknown };
 
   let size: FormePageSize = 'A4';
   if (props.size !== undefined) {
@@ -233,7 +233,7 @@ function serializePage(element: ReactElement): FormeNode {
 
   return {
     kind: { type: 'Page', config },
-    style: {},
+    style: props.style ? mapStyle(props.style) : {},
     children,
     sourceLocation: extractSourceLocation(element),
   };

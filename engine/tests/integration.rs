@@ -8181,8 +8181,9 @@ fn test_svg_opacity_produces_ext_gstate() {
                 width: 100.0,
                 height: 100.0,
                 view_box: None,
-                content: r##"<rect x="0" y="0" width="100" height="100" fill="#ff0000" opacity="0.5"/>"##
-                    .to_string(),
+                content:
+                    r##"<rect x="0" y="0" width="100" height="100" fill="#ff0000" opacity="0.5"/>"##
+                        .to_string(),
             },
             style: Style::default(),
             children: vec![],
