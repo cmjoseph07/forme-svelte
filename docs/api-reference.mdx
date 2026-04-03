@@ -28,6 +28,8 @@ Renders a PDF from a template and returns the file directly.
 
 **Optional fields:**
 - `s3` — upload the PDF to your S3 bucket instead of returning bytes (see [S3 Upload](#s3-upload) below)
+- `save` — `boolean`, default `true`. Every render is auto-saved to your [Documents](https://app.formepdf.com/dashboard/documents) with `source: "generated"`. Set `false` to skip saving.
+- `saveName` — `string`, optional custom document name. Default: `{slug}-{YYYY-MM-DD}` (e.g. `invoice-2026-04-03`).
 
 <CodeGroup>
 

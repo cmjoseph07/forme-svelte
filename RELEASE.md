@@ -8,6 +8,7 @@
 - Go SDK (`github.com/formepdf/forme-go`) uses a `v0.8.0` git tag
 - VS Code extension has its own independent version (e.g. `0.8.2`) since it publishes to the Marketplace separately
 - Docker image (`formepdf/forme`) follows the same version — tagged as `{version}` and `latest`
+- Rasterizer Docker image (`formepdf/rasterizer`) follows the same version as the engine (e.g. `0.8.0`)
 
 ---
 
@@ -91,6 +92,7 @@ Files to update when bumping (e.g. 0.7.13 -> 0.8.0):
 - [ ] `engine/Cargo.toml` — `version = "0.8.0"`
 - [ ] `server/Cargo.toml` — `version = "0.8.0"`
 - [ ] `packages/python-sdk/pyproject.toml` — `version = "0.8.0"`
+- [ ] `rasterizer/Cargo.toml` — `version = "0.8.0"`
 - [ ] Go SDK `packages/go-sdk/` — no version file; versioned by git tag
 
 ### SDK WASM binaries (if engine/ changed)
@@ -218,6 +220,29 @@ curl http://localhost:3000/health
 
 Note: The Dockerfile requires Rust 1.88+ due to dependencies. Use `rust:latest` in the Dockerfile if the pinned version is too old.
 
+### Rasterizer Docker image
+
+Build and push multi-platform rasterizer image from the monorepo root:
+
+```bash
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  -f rasterizer/Dockerfile \
+  -t formepdf/rasterizer:{version} \
+  -t formepdf/rasterizer:latest \
+  --push \
+  .
+
+# Verify
+docker run --rm -p 3001:3001 formepdf/rasterizer:{version}
+curl http://localhost:3001/health
+```
+
+After publishing, update `forme-dashboard/packages/api/Dockerfile` to reference the new tag:
+```dockerfile
+FROM formepdf/rasterizer:{version} AS rasterizer
+```
+
 ### Go SDK
 
 The Go SDK is published via git tag — pkg.go.dev indexes it automatically.
@@ -297,3 +322,4 @@ go get github.com/formepdf/forme-go@v0.8.0
 - **Docker buildx context**: Run the buildx build from the monorepo root (`forme/`), not from `server/`. The Dockerfile copies both `engine/` and `server/` directories.
 - **PyPI stale dist/**: `twine upload dist/*` uploads everything in `dist/`, including old versions. Clean old builds first (`rm dist/formepdf-0.*.whl dist/formepdf-0.*.tar.gz`) or upload only the target version (`twine upload dist/formepdf-{version}*`).
 - **PyPI token scope**: Make sure the PyPI token has upload rights for the `formepdf` project specifically (project-scoped token), not just your account.
+- **Rasterizer version in dashboard Dockerfile**: After publishing a new `formepdf/rasterizer` tag, update the `FROM formepdf/rasterizer:{version}` line in `forme-dashboard/packages/api/Dockerfile`. Otherwise the dashboard will use the old rasterizer.
