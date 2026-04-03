@@ -35,7 +35,7 @@ fn format_xmp_date() -> String {
     let hours = time_of_day / 3600;
     let minutes = (time_of_day % 3600) / 60;
     let seconds = time_of_day % 60;
-    let (year, month, day) = super::signing::epoch_days_to_ymd(days);
+    let (year, month, day) = super::certify::epoch_days_to_ymd(days);
     format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
@@ -734,7 +734,7 @@ pub fn redact_pdf(pdf_bytes: &[u8], regions: &[RedactionRegion]) -> Result<Vec<u
 
     let trailer_section = &pdf_bytes[scan.trailer_pos..scan.startxref_pos];
     if let Some(info_id) = find_ref_in_bytes(trailer_section, b"/Info") {
-        let date = super::signing::format_pdf_date();
+        let date = super::certify::format_pdf_date();
         xref_entries.push((info_id, buf.len()));
         let info = format!("{info_id} 0 obj\n<< /Producer (Forme) /ModDate ({date}) >>\nendobj\n");
         buf.extend_from_slice(info.as_bytes());
@@ -1312,7 +1312,7 @@ mod tests {
             pdf_ua: false,
             embedded_data: None,
             flatten_forms: false,
-            signature: None,
+            certification: None,
         };
 
         let pdf_bytes = crate::render(&doc).expect("render should succeed");
@@ -1362,7 +1362,7 @@ mod tests {
             pdf_ua: false,
             embedded_data: None,
             flatten_forms: false,
-            signature: None,
+            certification: None,
         };
 
         let pdf_bytes = crate::render(&doc).expect("render should succeed");
@@ -1401,7 +1401,7 @@ mod tests {
             pdf_ua: false,
             embedded_data: None,
             flatten_forms: false,
-            signature: None,
+            certification: None,
         };
 
         let pdf_bytes = crate::render(&doc).expect("render should succeed");
@@ -1476,7 +1476,7 @@ mod tests {
             pdf_ua: false,
             embedded_data: None,
             flatten_forms: false,
-            signature: None,
+            certification: None,
         };
 
         let pdf_bytes = crate::render(&doc).expect("render should succeed");
@@ -1633,7 +1633,7 @@ mod tests {
             pdf_ua: false,
             embedded_data: None,
             flatten_forms: false,
-            signature: None,
+            certification: None,
         };
 
         let pdf_bytes = crate::render(&doc).expect("render should succeed");
@@ -1678,7 +1678,7 @@ mod tests {
             pdf_ua: false,
             embedded_data: None,
             flatten_forms: false,
-            signature: None,
+            certification: None,
         };
 
         let pdf_bytes = crate::render(&doc).expect("render should succeed");

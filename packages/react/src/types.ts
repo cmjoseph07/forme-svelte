@@ -166,16 +166,16 @@ export interface Style {
 
 // ─── Component prop types ────────────────────────────────────────────
 
-export interface SignatureConfig {
+export interface CertificationConfig {
   /** PEM-encoded X.509 certificate. */
   certificatePem: string;
   /** PEM-encoded RSA private key (PKCS#8). */
   privateKeyPem: string;
-  /** Reason for signing (e.g. "Approved"). */
+  /** Reason for certification (e.g. "Approved"). */
   reason?: string;
-  /** Location of signing (e.g. "New York, NY"). */
+  /** Location of certification (e.g. "New York, NY"). */
   location?: string;
-  /** Contact info for the signer. */
+  /** Contact info for the certifier. */
   contact?: string;
   /** Whether to show a visible signature annotation on the page. */
   visible?: boolean;
@@ -188,6 +188,9 @@ export interface SignatureConfig {
   /** Height in points for visible signature. */
   height?: number;
 }
+
+/** @deprecated Use CertificationConfig */
+export type SignatureConfig = CertificationConfig;
 
 export interface DocumentProps {
   title?: string;
@@ -204,8 +207,10 @@ export interface DocumentProps {
   pdfa?: '2a' | '2b';
   /** When true, the PDF claims PDF/UA-1 conformance. Forces tagging. */
   pdfUa?: boolean;
-  /** Digital signature configuration. Signs the PDF with an X.509 certificate. */
-  signature?: SignatureConfig;
+  /** Digital certification configuration. Certifies the PDF with an X.509 certificate. */
+  certification?: CertificationConfig;
+  /** @deprecated Use certification */
+  signature?: CertificationConfig;
   fonts?: FontRegistration[];
   children?: ReactNode;
 }
@@ -592,7 +597,7 @@ export interface FormeDocument {
   pdfa?: '2a' | '2b';
   pdfUa?: boolean;
   flattenForms?: boolean;
-  signature?: SignatureConfig;
+  certification?: CertificationConfig;
 }
 
 export interface FormeMetadata {

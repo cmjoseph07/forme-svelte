@@ -1354,6 +1354,7 @@ class Document(_Component):
         tagged: bool = False,
         pdfa: Optional[str] = None,
         pdf_ua: bool = False,
+        certification: Optional[Dict[str, Any]] = None,
         signature: Optional[Dict[str, Any]] = None,
     ):
         self.children = list(children)
@@ -1366,7 +1367,11 @@ class Document(_Component):
         self.tagged = tagged
         self.pdfa = pdfa
         self.pdf_ua = pdf_ua
-        self.signature = signature
+        if signature is not None and certification is None:
+            import warnings
+            warnings.warn("signature= is deprecated, use certification=", DeprecationWarning, stacklevel=2)
+            certification = signature
+        self.certification = certification
 
     def to_dict(self) -> Dict[str, Any]:
         doc: Dict[str, Any] = {
@@ -1400,8 +1405,8 @@ class Document(_Component):
         if self.pdf_ua:
             doc["pdfUa"] = True
 
-        if self.signature:
-            doc["signature"] = self.signature
+        if self.certification:
+            doc["certification"] = self.certification
 
         return doc
 
@@ -1433,7 +1438,7 @@ class Document(_Component):
         return render_pdf(json.dumps(doc))
 
 
-def sign(
+def certify(
     pdf: bytes,
     certificate: str,
     private_key: str,
@@ -1441,20 +1446,20 @@ def sign(
     location: Optional[str] = None,
     contact: Optional[str] = None,
 ) -> bytes:
-    """Sign PDF bytes with an X.509 certificate.
+    """Certify PDF bytes with an X.509 certificate.
 
     Args:
         pdf: Raw PDF file bytes.
         certificate: PEM-encoded X.509 certificate.
         private_key: PEM-encoded RSA private key (PKCS#8).
-        reason: Optional reason for signing.
-        location: Optional location of signing.
-        contact: Optional contact info for the signer.
+        reason: Optional reason for certification.
+        location: Optional location of certification.
+        contact: Optional contact info for the certifier.
 
     Returns:
-        Signed PDF file bytes.
+        Certified PDF file bytes.
     """
-    from .wasm import sign_pdf
+    from .wasm import certify_pdf
 
     config = {
         "certificatePem": certificate,
@@ -1466,4 +1471,21 @@ def sign(
         config["location"] = location
     if contact is not None:
         config["contact"] = contact
-    return sign_pdf(pdf, json.dumps(config))
+    return certify_pdf(pdf, json.dumps(config))
+
+
+def sign(
+    pdf: bytes,
+    certificate: str,
+    private_key: str,
+    reason: Optional[str] = None,
+    location: Optional[str] = None,
+    contact: Optional[str] = None,
+) -> bytes:
+    """Sign PDF bytes with an X.509 certificate.
+
+    .. deprecated:: Use certify instead.
+    """
+    import warnings
+    warnings.warn("sign() is deprecated, use certify()", DeprecationWarning, stacklevel=2)
+    return certify(pdf, certificate, private_key, reason, location, contact)

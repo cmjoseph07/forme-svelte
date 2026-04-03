@@ -62,10 +62,10 @@ pub struct Document {
     #[serde(default)]
     pub flatten_forms: bool,
 
-    /// Digital signature configuration. When set, the rendered PDF is signed
+    /// Digital certification configuration. When set, the rendered PDF is certified
     /// with the specified X.509 certificate and RSA private key.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub signature: Option<SignatureConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "signature")]
+    pub certification: Option<CertificationConfig>,
 }
 
 /// PDF/A conformance level.
@@ -98,10 +98,10 @@ pub struct RedactionRegion {
     pub color: Option<String>,
 }
 
-/// Configuration for digitally signing a PDF with an X.509 certificate.
+/// Configuration for digitally certifying a PDF with an X.509 certificate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SignatureConfig {
+pub struct CertificationConfig {
     /// PEM-encoded X.509 certificate.
     pub certificate_pem: String,
     /// PEM-encoded RSA private key (PKCS#8).

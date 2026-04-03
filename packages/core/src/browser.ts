@@ -234,16 +234,19 @@ export async function renderTemplateWithLayout(
   return result;
 }
 
-// ── PDF signing ──────────────────────────────────────────────────────
+// ── PDF certification ────────────────────────────────────────────────
 
-export async function signPdf(
+export async function certifyPdf(
   pdfBytes: Uint8Array,
   config: { certificatePem: string; privateKeyPem: string; reason?: string; location?: string; contact?: string; visible?: boolean; page?: number; x?: number; y?: number; width?: number; height?: number },
 ): Promise<Uint8Array> {
   await ensureInit();
-  const { sign_pdf } = await import('../pkg/forme.js');
-  return sign_pdf(pdfBytes, JSON.stringify(config));
+  const { certify_pdf } = await import('../pkg/forme.js');
+  return certify_pdf(pdfBytes, JSON.stringify(config));
 }
+
+/** @deprecated Use certifyPdf */
+export const signPdf = certifyPdf;
 
 // ── PDF redaction ────────────────────────────────────────────────────
 

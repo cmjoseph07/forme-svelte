@@ -26,9 +26,9 @@
 //! producing 5 PDF objects per font: FontFile2, FontDescriptor, CIDFont,
 //! ToUnicode CMap, and the root Type0 dictionary.
 
+pub mod certify;
 pub mod merge;
 pub mod redaction;
-pub mod signing;
 pub(crate) mod tagged;
 pub(crate) mod xmp;
 

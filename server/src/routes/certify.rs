@@ -10,16 +10,16 @@ use crate::errors::ApiError;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SignRequest {
+pub struct CertifyRequest {
     /// Base64-encoded PDF bytes.
     pub pdf: String,
     /// PEM-encoded X.509 certificate.
     pub certificate_pem: String,
     /// PEM-encoded RSA private key (PKCS#8).
     pub private_key_pem: String,
-    /// Reason for signing.
+    /// Reason for certification.
     pub reason: Option<String>,
-    /// Location of signing.
+    /// Location of certification.
     pub location: Option<String>,
     /// Contact info.
     pub contact: Option<String>,
@@ -36,15 +36,15 @@ pub struct SignRequest {
     pub height: Option<f64>,
 }
 
-/// POST /v1/sign — sign an existing PDF with an X.509 certificate.
-pub async fn sign(Json(payload): Json<SignRequest>) -> Result<Response, ApiError> {
+/// POST /v1/certify — certify an existing PDF with an X.509 certificate.
+pub async fn certify(Json(payload): Json<CertifyRequest>) -> Result<Response, ApiError> {
     let b64 = base64::engine::general_purpose::STANDARD;
 
     let pdf_bytes = b64
         .decode(&payload.pdf)
         .map_err(|e| ApiError::BadRequest(format!("Invalid base64 PDF: {e}")))?;
 
-    let config = forme::SignatureConfig {
+    let config = forme::CertificationConfig {
         certificate_pem: payload.certificate_pem,
         private_key_pem: payload.private_key_pem,
         reason: payload.reason,
@@ -57,15 +57,16 @@ pub async fn sign(Json(payload): Json<SignRequest>) -> Result<Response, ApiError
         height: payload.height,
     };
 
-    let signed_bytes = tokio::task::spawn_blocking(move || forme::sign_pdf(&pdf_bytes, &config))
-        .await
-        .map_err(|e| ApiError::Internal(format!("Sign task failed: {e}")))?
-        .map_err(ApiError::from)?;
+    let certified_bytes =
+        tokio::task::spawn_blocking(move || forme::certify_pdf(&pdf_bytes, &config))
+            .await
+            .map_err(|e| ApiError::Internal(format!("Certify task failed: {e}")))?
+            .map_err(ApiError::from)?;
 
     Ok((
         StatusCode::OK,
         [(header::CONTENT_TYPE, "application/pdf")],
-        signed_bytes,
+        certified_bytes,
     )
         .into_response())
 }

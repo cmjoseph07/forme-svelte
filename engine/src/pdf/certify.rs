@@ -1,6 +1,6 @@
-//! # PDF Digital Signatures
+//! # PDF Digital Certification
 //!
-//! Signs PDF files using X.509 certificates with PKCS#7 detached signatures.
+//! Certifies PDF files using X.509 certificates with PKCS#7 detached signatures.
 //! Uses incremental update to append signature objects without modifying the
 //! original PDF content.
 //!
@@ -13,7 +13,7 @@
 //!    DER-encoded signature into the placeholder.
 
 use crate::error::FormeError;
-use crate::model::SignatureConfig;
+use crate::model::CertificationConfig;
 
 use der::Encode;
 use pkcs8::{DecodePrivateKey, EncodePublicKey};
@@ -39,11 +39,11 @@ struct PdfScanResult {
     first_page_obj: usize,
 }
 
-/// Sign PDF bytes with an X.509 certificate, producing a valid digitally signed PDF.
+/// Certify PDF bytes with an X.509 certificate, producing a valid digitally certified PDF.
 ///
 /// Works on any valid PDF — either freshly rendered or loaded from disk.
 /// Uses incremental update to preserve the original PDF bytes.
-pub fn sign_pdf(pdf_bytes: &[u8], config: &SignatureConfig) -> Result<Vec<u8>, FormeError> {
+pub fn certify_pdf(pdf_bytes: &[u8], config: &CertificationConfig) -> Result<Vec<u8>, FormeError> {
     // Parse certificate and private key
     let cert = parse_pem_certificate(&config.certificate_pem)?;
     let private_key = parse_pem_private_key(&config.private_key_pem)?;
@@ -256,7 +256,7 @@ fn find_first_page_obj(text: &str) -> Option<usize> {
 fn build_incremental_update(
     original: &[u8],
     scan: &PdfScanResult,
-    config: &SignatureConfig,
+    config: &CertificationConfig,
     cert_der: &[u8],
 ) -> Result<(Vec<u8>, usize), FormeError> {
     let mut buf = Vec::from(original);

@@ -1,9 +1,9 @@
+pub mod certify;
 pub mod health;
 pub mod merge;
 pub mod rasterize;
 pub mod redact;
 pub mod render;
-pub mod sign;
 
 use std::sync::Arc;
 
@@ -22,7 +22,9 @@ pub fn router(config: Arc<Config>) -> Router {
     let api = Router::new()
         .route("/v1/render", post(render::render_inline))
         .route("/v1/render/{slug}", post(render::render_slug))
-        .route("/v1/sign", post(sign::sign))
+        .route("/v1/certify", post(certify::certify))
+        // Deprecated alias — same handler, will add deprecation headers later
+        .route("/v1/sign", post(certify::certify))
         .route("/v1/rasterize", post(rasterize::rasterize))
         .route("/v1/merge", post(merge::merge))
         .route("/v1/redact", post(redact::redact))

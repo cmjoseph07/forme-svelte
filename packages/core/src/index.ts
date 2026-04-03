@@ -160,7 +160,7 @@ export async function renderPdfWithLayout(json: string): Promise<RenderWithLayou
   return result;
 }
 
-export interface SignatureConfig {
+export interface CertificationConfig {
   certificatePem: string;
   privateKeyPem: string;
   reason?: string;
@@ -173,6 +173,9 @@ export interface SignatureConfig {
   width?: number;
   height?: number;
 }
+
+/** @deprecated Use CertificationConfig */
+export type SignatureConfig = CertificationConfig;
 
 export interface RenderDocumentOptions {
   /** Data to embed as a hidden JSON attachment in the PDF. */
@@ -222,13 +225,16 @@ export async function renderTemplateWithLayout(templateJson: string, dataJson: s
   return result;
 }
 
-// ── PDF signing ──────────────────────────────────────────────────────
+// ── PDF certification ────────────────────────────────────────────────
 
-export async function signPdf(pdfBytes: Uint8Array, config: SignatureConfig): Promise<Uint8Array> {
+export async function certifyPdf(pdfBytes: Uint8Array, config: CertificationConfig): Promise<Uint8Array> {
   await ensureInit();
-  const { sign_pdf } = await import('../pkg/forme.js');
-  return sign_pdf(pdfBytes, JSON.stringify(config));
+  const { certify_pdf } = await import('../pkg/forme.js');
+  return certify_pdf(pdfBytes, JSON.stringify(config));
 }
+
+/** @deprecated Use certifyPdf */
+export const signPdf = certifyPdf;
 
 // ── PDF redaction ────────────────────────────────────────────────────
 

@@ -5,12 +5,12 @@ pub fn render_pdf(json: &str) -> Result<Vec<u8>, JsValue> {
     crate::render_json(json).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
-/// Sign PDF bytes with an X.509 certificate (PKCS#7 detached signature).
+/// Certify PDF bytes with an X.509 certificate (PKCS#7 detached signature).
 #[wasm_bindgen]
-pub fn sign_pdf(pdf_bytes: &[u8], config_json: &str) -> Result<Vec<u8>, JsValue> {
-    let config: crate::model::SignatureConfig =
+pub fn certify_pdf(pdf_bytes: &[u8], config_json: &str) -> Result<Vec<u8>, JsValue> {
+    let config: crate::model::CertificationConfig =
         serde_json::from_str(config_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
-    crate::sign_pdf(pdf_bytes, &config).map_err(|e| JsValue::from_str(&e.to_string()))
+    crate::certify_pdf(pdf_bytes, &config).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 /// Merge multiple PDFs into a single document.

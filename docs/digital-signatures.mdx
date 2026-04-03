@@ -1,16 +1,16 @@
 ---
 title: Digital Signatures
 sidebarTitle: Signatures
-description: Apply PKCS#7 digital signatures to PDFs for contracts, compliance, and legal documents.
+description: Apply PKCS#7 digital certifications to PDFs for contracts, compliance, and legal documents.
 ---
 
-Digital signatures cryptographically prove that a PDF has not been tampered with since signing and identify the signer. They are required or expected for contracts, regulatory filings, legal documents, and compliance workflows. Forme supports PKCS#7 detached signatures using X.509 certificates, implemented in pure Rust with no external signing service.
+Digital signatures cryptographically prove that a PDF has not been tampered with since certification and identify the certifier. They are required or expected for contracts, regulatory filings, legal documents, and compliance workflows. Forme supports PKCS#7 detached signatures using X.509 certificates, implemented in pure Rust with no external signing service.
 
 ---
 
-## Signing at Render Time
+## Certifying at Render Time
 
-Pass the `signature` prop on the Document component to sign the PDF during rendering. You need an X.509 certificate and its corresponding RSA private key in PEM format.
+Pass the `certification` prop on the Document component to certify the PDF during rendering. You need an X.509 certificate and its corresponding RSA private key in PEM format.
 
 ```tsx
 import { readFileSync } from 'fs';
@@ -23,7 +23,7 @@ const privateKeyPem = readFileSync('./key.pem', 'utf-8');
 const pdfBytes = await renderDocument(
   <Document
     title="Service Agreement"
-    signature={{
+    certification={{
       certificatePem,
       privateKeyPem,
       reason: 'Approved',
@@ -41,31 +41,33 @@ const pdfBytes = await renderDocument(
 );
 ```
 
-### Signature Props
+### Certification Props
 
 | Prop | Type | Required | Description |
 |------|------|----------|-------------|
 | `certificatePem` | `string` | Yes | X.509 certificate in PEM format. |
 | `privateKeyPem` | `string` | Yes | RSA private key in PEM format (PKCS#8). |
-| `reason` | `string` | No | Reason for signing (e.g., "Approved", "Reviewed"). Shown in signature details. |
-| `location` | `string` | No | Signing location (e.g., "San Francisco, CA"). |
-| `contact` | `string` | No | Signer contact information (e.g., email address). |
+| `reason` | `string` | No | Reason for certification (e.g., "Approved", "Reviewed"). Shown in signature details. |
+| `location` | `string` | No | Certification location (e.g., "San Francisco, CA"). |
+| `contact` | `string` | No | Certifier contact information (e.g., email address). |
+
+<Note>The `signature` prop is still accepted as a deprecated alias for `certification`.</Note>
 
 ---
 
-## Standalone Signing via `signPdf()`
+## Standalone Certification via `certifyPdf()`
 
-Use `signPdf()` to sign an existing PDF without re-rendering it:
+Use `certifyPdf()` to certify an existing PDF without re-rendering it:
 
 ```tsx
-import { signPdf } from '@formepdf/core';
+import { certifyPdf } from '@formepdf/core';
 import { readFileSync, writeFileSync } from 'fs';
 
 const pdfBytes = readFileSync('contract.pdf');
 const certificatePem = readFileSync('./cert.pem', 'utf-8');
 const privateKeyPem = readFileSync('./key.pem', 'utf-8');
 
-const signedPdf = await signPdf(pdfBytes, {
+const certifiedPdf = await certifyPdf(pdfBytes, {
   certificatePem,
   privateKeyPem,
   reason: 'Approved',
@@ -73,19 +75,21 @@ const signedPdf = await signPdf(pdfBytes, {
   contact: 'legal@acme.com',
 });
 
-writeFileSync('signed-contract.pdf', signedPdf);
+writeFileSync('certified-contract.pdf', certifiedPdf);
 ```
+
+<Note>`signPdf()` is still exported as a deprecated alias for `certifyPdf()`.</Note>
 
 ---
 
-## Signing via the Hosted API
+## Certification via the Hosted API
 
-Use the `/v1/sign` endpoint to apply a digital signature to a PDF you have already rendered or received from another source.
+Use the `/v1/certify` endpoint to apply a digital signature to a PDF you have already rendered or received from another source.
 
 <CodeGroup>
 
 ```bash curl
-curl -X POST https://api.formepdf.com/v1/sign \
+curl -X POST https://api.formepdf.com/v1/certify \
   -H "Authorization: Bearer forme_sk_abc123..." \
   -H "Content-Type: application/json" \
   -d "{
@@ -96,7 +100,7 @@ curl -X POST https://api.formepdf.com/v1/sign \
     \"location\": \"San Francisco, CA\",
     \"contact\": \"legal@acme.com\"
   }" \
-  --output signed-contract.pdf
+  --output certified-contract.pdf
 ```
 
 ```javascript Node.js
@@ -106,7 +110,7 @@ const pdf = fs.readFileSync('contract.pdf').toString('base64');
 const certificatePem = fs.readFileSync('cert.pem', 'utf-8');
 const privateKeyPem = fs.readFileSync('key.pem', 'utf-8');
 
-const res = await fetch('https://api.formepdf.com/v1/sign', {
+const res = await fetch('https://api.formepdf.com/v1/certify', {
   method: 'POST',
   headers: {
     Authorization: 'Bearer forme_sk_abc123...',
@@ -122,8 +126,8 @@ const res = await fetch('https://api.formepdf.com/v1/sign', {
   }),
 });
 
-const signedPdf = Buffer.from(await res.arrayBuffer());
-fs.writeFileSync('signed-contract.pdf', signedPdf);
+const certifiedPdf = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync('certified-contract.pdf', certifiedPdf);
 ```
 
 ```python Python
@@ -137,7 +141,7 @@ cert_pem = open("cert.pem").read()
 key_pem = open("key.pem").read()
 
 res = requests.post(
-    "https://api.formepdf.com/v1/sign",
+    "https://api.formepdf.com/v1/certify",
     headers={
         "Authorization": "Bearer forme_sk_abc123...",
         "Content-Type": "application/json",
@@ -152,7 +156,7 @@ res = requests.post(
     },
 )
 
-with open("signed-contract.pdf", "wb") as f:
+with open("certified-contract.pdf", "wb") as f:
     f.write(res.content)
 ```
 
@@ -182,21 +186,23 @@ func main() {
 		"contact":        "legal@acme.com",
 	})
 
-	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/sign", bytes.NewReader(body))
+	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/certify", bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
 	req.Header.Set("Content-Type", "application/json")
 
 	res, _ := http.DefaultClient.Do(req)
 	defer res.Body.Close()
 
-	out, _ := os.Create("signed-contract.pdf")
+	out, _ := os.Create("certified-contract.pdf")
 	io.Copy(out, res.Body)
 }
 ```
 
 </CodeGroup>
 
-The endpoint returns `200 OK` with the signed PDF as the response body (`Content-Type: application/pdf`).
+The endpoint returns `200 OK` with the certified PDF as the response body (`Content-Type: application/pdf`).
+
+<Note>The deprecated `/v1/sign` endpoint still works and routes to the same handler.</Note>
 
 ---
 
@@ -208,7 +214,7 @@ To add a visible signature annotation, set `visible: true` and specify the posit
 
 ```tsx
 <Document
-  signature={{
+  certification={{
     certificatePem,
     privateKeyPem,
     reason: 'Approved',
@@ -262,6 +268,6 @@ This creates `key.pem` (private key) and `cert.pem` (certificate) in the current
 - **Leaf certificate only.** Only the signing certificate is embedded in the signature. Intermediate CA certificates are not included. PDF viewers may show "unknown signer" if they cannot build the full chain to a trusted root.
 - **No timestamp authority (TSA).** Signatures do not include a trusted timestamp from a TSA server. The signing date is set from the server clock but is not cryptographically verified by a third party.
 - **No Long-Term Validation (LTV).** CRL and OCSP responses are not embedded. Signature validity cannot be verified after the signing certificate expires.
-- **One signature per render.** Each render operation applies a single signature. To apply multiple signatures (e.g., co-signers), sign sequentially using the `/v1/sign` endpoint.
+- **One signature per render.** Each render operation applies a single signature. To apply multiple signatures (e.g., co-signers), certify sequentially using the `/v1/certify` endpoint.
 - **Self-signed certificates show "unknown signer" in Acrobat.** This is expected. Acrobat only trusts certificates from its trusted root store. Self-signed certs are fine for testing and internal workflows.
 - **Helvetica only in signature appearance text.** Visible signature annotations use the PDF built-in Helvetica font. Custom fonts are not supported in signature form field appearances.

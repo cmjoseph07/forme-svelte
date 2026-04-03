@@ -482,9 +482,9 @@ Pass `flattenForms=true` as a query parameter on any render endpoint (sync or as
 
 ---
 
-## Sign PDF
+## Certify PDF
 
-`POST /v1/sign`
+`POST /v1/certify`
 
 Apply a PKCS#7 digital signature to an existing PDF.
 
@@ -499,11 +499,13 @@ Apply a PKCS#7 digital signature to an existing PDF.
 | `pdf` | Yes | Base64-encoded PDF bytes |
 | `certificatePem` | Yes | X.509 certificate in PEM format |
 | `privateKeyPem` | Yes | Private key in PEM format |
-| `reason` | No | Signing reason (e.g., "Approved") |
-| `location` | No | Signing location (e.g., "San Francisco, CA") |
-| `contact` | No | Signer contact info |
+| `reason` | No | Certification reason (e.g., "Approved") |
+| `location` | No | Certification location (e.g., "San Francisco, CA") |
+| `contact` | No | Certifier contact info |
 
-**Response:** `200 OK` with `Content-Type: application/pdf` body (the signed PDF).
+**Response:** `200 OK` with `Content-Type: application/pdf` body (the certified PDF).
+
+<Note>The deprecated `POST /v1/sign` endpoint still works and routes to the same handler.</Note>
 
 ---
 

@@ -48,8 +48,8 @@ pub mod wasm_raw;
 
 pub use error::FormeError;
 pub use layout::LayoutInfo;
+pub use model::{CertificationConfig, ColumnDef, ColumnWidth, FontEntry, RedactionRegion, TextRun};
 pub use model::{ChartDataPoint, ChartSeries, DotPlotGroup};
-pub use model::{ColumnDef, ColumnWidth, FontEntry, RedactionRegion, SignatureConfig, TextRun};
 pub use model::{Document, Metadata, Node, NodeKind, PageConfig, PageSize};
 pub use style::Style;
 
@@ -57,13 +57,16 @@ use font::FontContext;
 use layout::LayoutEngine;
 use pdf::PdfWriter;
 
-/// Sign PDF bytes with an X.509 certificate.
+/// Certify PDF bytes with an X.509 certificate.
 ///
-/// Takes arbitrary PDF bytes and a signature configuration, and returns
+/// Takes arbitrary PDF bytes and a certification configuration, and returns
 /// new PDF bytes with a valid digital signature. Uses incremental update
 /// to preserve the original PDF content.
-pub fn sign_pdf(pdf_bytes: &[u8], config: &model::SignatureConfig) -> Result<Vec<u8>, FormeError> {
-    pdf::signing::sign_pdf(pdf_bytes, config)
+pub fn certify_pdf(
+    pdf_bytes: &[u8],
+    config: &model::CertificationConfig,
+) -> Result<Vec<u8>, FormeError> {
+    pdf::certify::certify_pdf(pdf_bytes, config)
 }
 
 /// Redact regions of a PDF by overlaying opaque rectangles.
@@ -89,7 +92,7 @@ pub fn merge_pdfs(pdfs: &[&[u8]]) -> Result<Vec<u8>, FormeError> {
 /// Render a document to PDF bytes.
 ///
 /// This is the primary entry point. Takes a document tree and returns
-/// the raw bytes of a valid PDF file. If the document has a `signature`
+/// the raw bytes of a valid PDF file. If the document has a `certification`
 /// configuration, the output PDF is digitally signed.
 pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
     let mut font_context = FontContext::new();
@@ -121,8 +124,8 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
         document.embedded_data.as_deref(),
         document.flatten_forms,
     )?;
-    let pdf = if let Some(ref sig_config) = document.signature {
-        pdf::signing::sign_pdf(&pdf, sig_config)?
+    let pdf = if let Some(ref sig_config) = document.certification {
+        pdf::certify::certify_pdf(&pdf, sig_config)?
     } else {
         pdf
     };
@@ -133,7 +136,7 @@ pub fn render(document: &Document) -> Result<Vec<u8>, FormeError> {
 ///
 /// Same as `render()` but also returns `LayoutInfo` describing the
 /// position and dimensions of every element on every page.
-/// If the document has a `signature` configuration, the output PDF
+/// If the document has a `certification` configuration, the output PDF
 /// is digitally signed.
 pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), FormeError> {
     let mut font_context = FontContext::new();
@@ -166,8 +169,8 @@ pub fn render_with_layout(document: &Document) -> Result<(Vec<u8>, LayoutInfo), 
         document.embedded_data.as_deref(),
         document.flatten_forms,
     )?;
-    let pdf = if let Some(ref sig_config) = document.signature {
-        pdf::signing::sign_pdf(&pdf, sig_config)?
+    let pdf = if let Some(ref sig_config) = document.certification {
+        pdf::certify::certify_pdf(&pdf, sig_config)?
     } else {
         pdf
     };
