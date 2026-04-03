@@ -31,9 +31,10 @@ export type {
   LayoutInfo,
   RenderWithLayoutResult,
   RenderDocumentOptions,
+  RedactionRegion,
 } from './index.js';
 
-import type { LayoutInfo, RenderWithLayoutResult, RenderDocumentOptions } from './index.js';
+import type { LayoutInfo, RenderWithLayoutResult, RenderDocumentOptions, RedactionRegion } from './index.js';
 
 // ── WASM initialization ────────────────────────────────────────────
 
@@ -242,6 +243,34 @@ export async function signPdf(
   await ensureInit();
   const { sign_pdf } = await import('../pkg/forme.js');
   return sign_pdf(pdfBytes, JSON.stringify(config));
+}
+
+// ── PDF redaction ────────────────────────────────────────────────────
+
+export async function redactPdf(
+  pdfBytes: Uint8Array,
+  regions: RedactionRegion[],
+): Promise<Uint8Array> {
+  await ensureInit();
+  const { redact_pdf } = await import('../pkg/forme.js');
+  return redact_pdf(pdfBytes, JSON.stringify(regions));
+}
+
+// ── PDF merging ──────────────────────────────────────────────────────
+
+/**
+ * Merge multiple PDF documents into a single PDF.
+ *
+ * @param pdfs - Array of PDF byte arrays to merge in order.
+ * @returns The merged PDF as a Uint8Array.
+ */
+export async function mergePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
+  await ensureInit();
+  const { merge_pdfs } = await import('../pkg/forme.js');
+  const base64Pdfs = pdfs.map((pdf) =>
+    btoa(Array.from(pdf, (b) => String.fromCharCode(b)).join('')),
+  );
+  return merge_pdfs(JSON.stringify(base64Pdfs));
 }
 
 // ── Data extraction (browser-native decompression) ──────────────────

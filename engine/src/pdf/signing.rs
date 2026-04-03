@@ -796,7 +796,7 @@ fn escape_pdf_string(s: &str) -> String {
 }
 
 /// Format current time as PDF date string: D:YYYYMMDDHHmmss+00'00'
-fn format_pdf_date() -> String {
+pub(super) fn format_pdf_date() -> String {
     // Use std::time to get seconds since epoch, then manually compute date components.
     // No chrono dependency needed.
     let now = std::time::SystemTime::now()
@@ -818,7 +818,7 @@ fn format_pdf_date() -> String {
 }
 
 /// Convert days since 1970-01-01 to (year, month, day).
-fn epoch_days_to_ymd(days: u64) -> (u64, u64, u64) {
+pub(super) fn epoch_days_to_ymd(days: u64) -> (u64, u64, u64) {
     // Civil calendar algorithm from Howard Hinnant
     let z = days + 719468;
     let era = z / 146097;

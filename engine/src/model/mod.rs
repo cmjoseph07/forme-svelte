@@ -79,6 +79,25 @@ pub enum PdfAConformance {
     A2b,
 }
 
+/// A rectangular region to redact in an existing PDF.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedactionRegion {
+    /// 0-indexed page number.
+    pub page: usize,
+    /// X coordinate in points from the left edge of the page.
+    pub x: f64,
+    /// Y coordinate in points from the top edge (web/screen coordinates).
+    /// The engine converts to PDF bottom-origin internally — do NOT flip before calling.
+    pub y: f64,
+    /// Width of the redaction rectangle in points.
+    pub width: f64,
+    /// Height of the redaction rectangle in points.
+    pub height: f64,
+    /// Fill color as hex string (e.g. "#000000"). Defaults to black.
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
 /// Configuration for digitally signing a PDF with an X.509 certificate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

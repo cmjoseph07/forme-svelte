@@ -1,4 +1,7 @@
 pub mod health;
+pub mod merge;
+pub mod rasterize;
+pub mod redact;
 pub mod render;
 pub mod sign;
 
@@ -20,6 +23,9 @@ pub fn router(config: Arc<Config>) -> Router {
         .route("/v1/render", post(render::render_inline))
         .route("/v1/render/{slug}", post(render::render_slug))
         .route("/v1/sign", post(sign::sign))
+        .route("/v1/rasterize", post(rasterize::rasterize))
+        .route("/v1/merge", post(merge::merge))
+        .route("/v1/redact", post(redact::redact))
         .layer(middleware::from_fn_with_state(
             config.clone(),
             optional_auth,

@@ -13,6 +13,35 @@ pub fn sign_pdf(pdf_bytes: &[u8], config_json: &str) -> Result<Vec<u8>, JsValue>
     crate::sign_pdf(pdf_bytes, &config).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Merge multiple PDFs into a single document.
+/// Accepts a JSON array of base64-encoded PDF strings.
+#[wasm_bindgen]
+pub fn merge_pdfs(pdfs_json: &str) -> Result<Vec<u8>, JsValue> {
+    let b64_pdfs: Vec<String> =
+        serde_json::from_str(pdfs_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+
+    use base64::Engine as _;
+    let b64 = base64::engine::general_purpose::STANDARD;
+    let decoded: Vec<Vec<u8>> = b64_pdfs
+        .iter()
+        .map(|s| {
+            b64.decode(s)
+                .map_err(|e| JsValue::from_str(&format!("Invalid base64: {e}")))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    let refs: Vec<&[u8]> = decoded.iter().map(|v| v.as_slice()).collect();
+    crate::merge_pdfs(&refs).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Redact regions of a PDF by overlaying opaque rectangles.
+#[wasm_bindgen]
+pub fn redact_pdf(pdf_bytes: &[u8], redactions_json: &str) -> Result<Vec<u8>, JsValue> {
+    let regions: Vec<crate::model::RedactionRegion> =
+        serde_json::from_str(redactions_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    crate::redact_pdf(pdf_bytes, &regions).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 #[wasm_bindgen]
 pub fn render_pdf_with_layout(json: &str) -> Result<JsValue, JsValue> {
     let (pdf_bytes, layout_info) =

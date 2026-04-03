@@ -49,7 +49,7 @@ pub mod wasm_raw;
 pub use error::FormeError;
 pub use layout::LayoutInfo;
 pub use model::{ChartDataPoint, ChartSeries, DotPlotGroup};
-pub use model::{ColumnDef, ColumnWidth, FontEntry, SignatureConfig, TextRun};
+pub use model::{ColumnDef, ColumnWidth, FontEntry, RedactionRegion, SignatureConfig, TextRun};
 pub use model::{Document, Metadata, Node, NodeKind, PageConfig, PageSize};
 pub use style::Style;
 
@@ -64,6 +64,26 @@ use pdf::PdfWriter;
 /// to preserve the original PDF content.
 pub fn sign_pdf(pdf_bytes: &[u8], config: &model::SignatureConfig) -> Result<Vec<u8>, FormeError> {
     pdf::signing::sign_pdf(pdf_bytes, config)
+}
+
+/// Redact regions of a PDF by overlaying opaque rectangles.
+///
+/// Takes arbitrary PDF bytes and a list of redaction regions (page, x, y,
+/// width, height in top-origin coordinates). Returns new PDF bytes with
+/// the redaction rectangles drawn on top via incremental update.
+pub fn redact_pdf(
+    pdf_bytes: &[u8],
+    regions: &[model::RedactionRegion],
+) -> Result<Vec<u8>, FormeError> {
+    pdf::redaction::redact_pdf(pdf_bytes, regions)
+}
+
+/// Merge multiple PDFs into a single document.
+///
+/// Takes a slice of PDF byte slices and returns merged PDF bytes containing
+/// all pages in order. Requires at least 2 input PDFs.
+pub fn merge_pdfs(pdfs: &[&[u8]]) -> Result<Vec<u8>, FormeError> {
+    pdf::merge::merge_pdfs(pdfs)
 }
 
 /// Render a document to PDF bytes.
