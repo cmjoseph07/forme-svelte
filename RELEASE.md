@@ -2,13 +2,13 @@
 
 ## Version Strategy
 
-- Engine (Cargo) + all npm packages share the same version (e.g. 0.8.0)
+- Engine (Cargo) + all npm packages share the same version (e.g. 0.9.0)
 - Python SDK (`formepdf` on PyPI) follows the same version
 - Rust crate (`forme-pdf` on crates.io) follows the same version
-- Go SDK (`github.com/formepdf/forme-go`) uses a `v0.8.0` git tag
-- VS Code extension has its own independent version (e.g. `0.8.2`) since it publishes to the Marketplace separately
+- Go SDK (`github.com/formepdf/forme-go`) uses a `v0.9.0` git tag
+- VS Code extension has its own independent version (e.g. `0.9.0`) since it publishes to the Marketplace separately
 - Docker image (`formepdf/forme`) follows the same version — tagged as `{version}` and `latest`
-- Rasterizer Docker image (`formepdf/rasterizer`) follows the same version as the engine (e.g. `0.8.0`)
+- Rasterizer Docker image (`formepdf/rasterizer`) follows the same version as the engine (e.g. `0.9.0`)
 
 ---
 
@@ -72,7 +72,7 @@ bash templates/build_wasm.sh   # or copy from engine target:
 
 ## Version Bump Checklist
 
-Files to update when bumping (e.g. 0.7.13 -> 0.8.0):
+Files to update when bumping (e.g. 0.8.3 -> 0.9.0):
 
 ### npm packages
 - [ ] `packages/react/package.json`
@@ -89,10 +89,10 @@ Files to update when bumping (e.g. 0.7.13 -> 0.8.0):
 - [ ] `packages/vscode/package.json` — separate version, bump independently
 
 ### Non-npm packages
-- [ ] `engine/Cargo.toml` — `version = "0.8.0"`
-- [ ] `server/Cargo.toml` — `version = "0.8.0"`
-- [ ] `packages/python-sdk/pyproject.toml` — `version = "0.8.0"`
-- [ ] `rasterizer/Cargo.toml` — `version = "0.8.0"`
+- [ ] `engine/Cargo.toml` — `version = "0.9.0"`
+- [ ] `server/Cargo.toml` — `version = "0.9.0"`
+- [ ] `packages/python-sdk/pyproject.toml` — `version = "0.9.0"`
+- [ ] `rasterizer/Cargo.toml` — `version = "0.9.0"`
 - [ ] Go SDK `packages/go-sdk/` — no version file; versioned by git tag
 
 ### SDK WASM binaries (if engine/ changed)
@@ -254,12 +254,12 @@ go test ./...
 
 # Push to the Go SDK repo
 git add .
-git commit -m "Release v0.8.0"
+git commit -m "Release v0.9.0"
 git push origin main
 
 # Tag the release (Go modules use the tag as the version)
-git tag v0.8.0
-git push origin v0.8.0
+git tag v0.9.0
+git push origin v0.9.0
 
 # pkg.go.dev will index it automatically within ~30 minutes
 # Verify at: https://pkg.go.dev/github.com/formepdf/forme-go
@@ -270,9 +270,9 @@ git push origin v0.8.0
 ## Git Tag (monorepo)
 
 ```bash
-git tag v0.8.0
+git tag v0.9.0
 git push origin main
-git push origin v0.8.0
+git push origin v0.9.0
 ```
 
 ---
@@ -283,7 +283,7 @@ Verify the published packages actually work before announcing:
 
 ```bash
 # npm — fresh install test
-mkdir /tmp/test-forme-080 && cd /tmp/test-forme-080
+mkdir /tmp/test-forme-090 && cd /tmp/test-forme-090
 npm init -y
 npm install @formepdf/react @formepdf/core @formepdf/cli
 # Run a minimal render
@@ -294,16 +294,16 @@ curl http://localhost:3000/health
 # Should return {"status":"ok","version":"{version}"}
 
 # PyPI
-pip install formepdf==0.8.0
+pip install formepdf==0.9.0
 python -c "import formepdf; print(formepdf.__version__)"
 
 # crates.io
-cargo add forme-pdf@0.8.0
+cargo add forme-pdf@0.9.0
 # or check https://crates.io/crates/forme-pdf
 
 # Go
-go get github.com/formepdf/forme-go@v0.8.0
-# Check https://pkg.go.dev/github.com/formepdf/forme-go@v0.8.0
+go get github.com/formepdf/forme-go@v0.9.0
+# Check https://pkg.go.dev/github.com/formepdf/forme-go@v0.9.0
 ```
 
 ---
