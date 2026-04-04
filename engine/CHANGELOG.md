@@ -3,6 +3,11 @@
 ## [0.9.0] - 2026-04-04
 
 ### Added
+- `certify_pdf()` — apply a PKCS#7 digital signature to an existing PDF
+- `redact_pdf()` — redact regions from a PDF (removes underlying text)
+- `redact_text()` — find text by pattern and redact matching regions
+- `find_text_regions()` — find text regions in a PDF without redacting
+- `merge_pdfs()` — combine multiple PDFs into one
 - PKCS#1 private key auto-conversion: `parse_pem_private_key()` now accepts both PKCS#8 (`BEGIN PRIVATE KEY`) and PKCS#1 (`BEGIN RSA PRIVATE KEY`) formats, falling back automatically
 
 ### Fixed
