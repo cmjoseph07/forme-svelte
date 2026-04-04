@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.9.0] - 2026-04-04
+
+### Added
+- Engine: PKCS#1 private key auto-conversion for digital signatures
+- Engine: WASI timestamp fix for Python/Go SDK WASM builds
+
 ## [0.8.3] - 2026-04-01
 
 ### Added

@@ -813,12 +813,12 @@ fn escape_pdf_string(s: &str) -> String {
 }
 
 /// Get current Unix timestamp in seconds, portable across native and WASM.
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 pub(super) fn current_timestamp_secs() -> u64 {
     (js_sys::Date::now() / 1000.0) as u64
 }
 
-#[cfg(not(target_arch = "wasm32"))]
+#[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub(super) fn current_timestamp_secs() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

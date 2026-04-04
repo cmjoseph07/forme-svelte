@@ -2,6 +2,24 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.9.0] - 2026-04-04
+
+### Added
+- **PKCS#1 auto-conversion**: Digital signatures now accept both PKCS#8 and PKCS#1 (RSA) private key formats — PKCS#1 keys are automatically converted
+- **Self-hosted server parity**: Field names, validation rules, error shapes, and query parameters aligned with the hosted API
+
+### Changed
+- **Certify field names**: `certificatePem` → `certificate`, `privateKeyPem` → `privateKey` (old names still accepted)
+- **Self-hosted redact**: Validates preset names, enforces max 20 presets, validates regex patterns before execution
+- **Self-hosted render**: Supports `?flattenForms=true` query parameter, returns `Content-Disposition` header on slug renders
+- **Self-hosted errors**: Resource listing endpoints return `{ "error": "...", "code": "NOT_IMPLEMENTED" }` instead of plain error strings
+
+### Removed
+- `/v1/sign` endpoint — use `/v1/certify` instead
+
+### Fixed
+- WASI timestamp: Python SDK and Go SDK WASM builds now use `std::time::SystemTime` instead of browser-only `js_sys::Date`
+
 ## [0.8.0] - 2026-03-29
 
 ### Added

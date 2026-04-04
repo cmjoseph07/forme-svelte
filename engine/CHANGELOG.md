@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0] - 2026-04-04
+
+### Added
+- PKCS#1 private key auto-conversion: `parse_pem_private_key()` now accepts both PKCS#8 (`BEGIN PRIVATE KEY`) and PKCS#1 (`BEGIN RSA PRIVATE KEY`) formats, falling back automatically
+
+### Fixed
+- WASI timestamp: `current_timestamp_secs()` now uses `std::time::SystemTime` on wasm32-wasip1 targets instead of `js_sys::Date` (which is only available in browser WASM)
+
 ## [0.8.3] - 2026-04-01
 
 ### Added
