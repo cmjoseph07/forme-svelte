@@ -47,6 +47,25 @@ pub fn redact_pdf(pdf_bytes: &[u8], redactions_json: &str) -> Result<Vec<u8>, Js
     crate::redact_pdf(pdf_bytes, &regions).map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
+/// Find text regions matching patterns in a PDF.
+/// Returns JSON string of Vec<RedactionRegion>.
+#[wasm_bindgen]
+pub fn find_text_regions(pdf_bytes: &[u8], patterns_json: &str) -> Result<String, JsValue> {
+    let patterns: Vec<crate::model::RedactionPattern> =
+        serde_json::from_str(patterns_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    let regions = crate::find_text_regions(pdf_bytes, &patterns)
+        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+    serde_json::to_string(&regions).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
+/// Redact text matching patterns from a PDF.
+#[wasm_bindgen]
+pub fn redact_text(pdf_bytes: &[u8], patterns_json: &str) -> Result<Vec<u8>, JsValue> {
+    let patterns: Vec<crate::model::RedactionPattern> =
+        serde_json::from_str(patterns_json).map_err(|e| JsValue::from_str(&e.to_string()))?;
+    crate::redact_text(pdf_bytes, &patterns).map_err(|e| JsValue::from_str(&e.to_string()))
+}
+
 #[wasm_bindgen]
 pub fn render_pdf_with_layout(json: &str) -> Result<JsValue, JsValue> {
     let (pdf_bytes, layout_info) =

@@ -18,7 +18,7 @@
 //! 5. Write an incremental update (new objects + xref + trailer with /Prev).
 
 use crate::error::FormeError;
-use crate::model::RedactionRegion;
+use crate::model::{PatternType, RedactionPattern, RedactionRegion};
 use miniz_oxide::deflate::compress_to_vec_zlib;
 use miniz_oxide::inflate::decompress_to_vec_zlib;
 
@@ -1249,6 +1249,447 @@ fn find_catalog_dict_content(text: &str, obj_id: usize, key: &str) -> Option<Str
     None
 }
 
+// ── Text search redaction ───────────────────────────────────────────
+
+/// A character with its approximate position in PDF user space.
+struct CharPosition {
+    #[allow(dead_code)]
+    ch: char,
+    x: f64,
+    y: f64,
+    font_size: f64,
+}
+
+/// Decode text content from a PDF string operand token.
+///
+/// Handles `(literal strings)` with escape sequences and `<hex strings>`.
+/// Assumes WinAnsi (single-byte) encoding — CIDFont/CJK text won't decode correctly.
+fn decode_pdf_string(token_bytes: &[u8]) -> String {
+    if token_bytes.is_empty() {
+        return String::new();
+    }
+
+    // Literal string: (...)
+    if token_bytes[0] == b'(' && token_bytes.last() == Some(&b')') {
+        let inner = &token_bytes[1..token_bytes.len() - 1];
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < inner.len() {
+            if inner[i] == b'\\' && i + 1 < inner.len() {
+                i += 1;
+                match inner[i] {
+                    b'n' => out.push(b'\n'),
+                    b'r' => out.push(b'\r'),
+                    b't' => out.push(b'\t'),
+                    b'b' => out.push(8),
+                    b'f' => out.push(12),
+                    b'(' => out.push(b'('),
+                    b')' => out.push(b')'),
+                    b'\\' => out.push(b'\\'),
+                    d if d.is_ascii_digit() => {
+                        // Octal escape: up to 3 digits
+                        let mut val = (d - b'0') as u16;
+                        for _ in 0..2 {
+                            if i + 1 < inner.len() && inner[i + 1].is_ascii_digit() {
+                                i += 1;
+                                val = val * 8 + (inner[i] - b'0') as u16;
+                            }
+                        }
+                        out.push(val as u8);
+                    }
+                    other => out.push(other),
+                }
+            } else {
+                out.push(inner[i]);
+            }
+            i += 1;
+        }
+        // Best-effort UTF-8, fall back to latin1-style
+        String::from_utf8(out.clone()).unwrap_or_else(|_| out.iter().map(|&b| b as char).collect())
+    }
+    // Hex string: <...>
+    else if token_bytes[0] == b'<' && token_bytes.last() == Some(&b'>') {
+        let hex = &token_bytes[1..token_bytes.len() - 1];
+        let hex_str: String = hex
+            .iter()
+            .filter(|b| !b.is_ascii_whitespace())
+            .map(|&b| b as char)
+            .collect();
+        let mut out = Vec::new();
+        let chars: Vec<char> = hex_str.chars().collect();
+        let mut i = 0;
+        while i + 1 < chars.len() {
+            let hi = chars[i].to_digit(16).unwrap_or(0) as u8;
+            let lo = chars[i + 1].to_digit(16).unwrap_or(0) as u8;
+            out.push(hi * 16 + lo);
+            i += 2;
+        }
+        if i < chars.len() {
+            // Odd number of hex digits: last digit padded with 0
+            let hi = chars[i].to_digit(16).unwrap_or(0) as u8;
+            out.push(hi * 16);
+        }
+        String::from_utf8(out.clone()).unwrap_or_else(|_| out.iter().map(|&b| b as char).collect())
+    } else {
+        String::new()
+    }
+}
+
+/// Extract text content with approximate positions from a decompressed content stream.
+///
+/// Returns a list of text blocks, each being a string and its per-character positions.
+/// Text within a BT/ET block is grouped; a new block starts on significant y-position changes.
+fn extract_text_with_positions(content: &[u8]) -> Vec<(String, Vec<CharPosition>)> {
+    let tokens = tokenize_content_stream(content);
+    let mut state = TextState::new();
+    let mut in_text = false;
+    let mut operand_stack: Vec<&Token> = Vec::new();
+
+    let mut blocks: Vec<(String, Vec<CharPosition>)> = Vec::new();
+    let mut current_text = String::new();
+    let mut current_chars: Vec<CharPosition> = Vec::new();
+    let mut current_line_y: Option<f64> = None;
+
+    let flush_block = |text: &mut String,
+                       chars: &mut Vec<CharPosition>,
+                       blocks: &mut Vec<(String, Vec<CharPosition>)>| {
+        if !text.is_empty() {
+            blocks.push((std::mem::take(text), std::mem::take(chars)));
+        } else {
+            chars.clear();
+        }
+    };
+
+    for token in &tokens {
+        match token {
+            Token::Operand(_) => {
+                operand_stack.push(token);
+            }
+            Token::Operator(op) => {
+                let op_str = std::str::from_utf8(op).unwrap_or("");
+
+                match op_str {
+                    "BT" => {
+                        in_text = true;
+                        state.reset();
+                        current_line_y = None;
+                        operand_stack.clear();
+                    }
+                    "ET" => {
+                        in_text = false;
+                        flush_block(&mut current_text, &mut current_chars, &mut blocks);
+                        current_line_y = None;
+                        operand_stack.clear();
+                    }
+                    "Td" | "TD" if in_text => {
+                        if operand_stack.len() >= 2 {
+                            let ty = parse_operand_f64(operand_stack[operand_stack.len() - 1]);
+                            let tx = parse_operand_f64(operand_stack[operand_stack.len() - 2]);
+                            state.apply_td(tx, ty);
+                        }
+                        // Check for line break (significant y change)
+                        if let Some(prev_y) = current_line_y {
+                            if (state.ty() - prev_y).abs() > state.font_size * 0.5 {
+                                flush_block(&mut current_text, &mut current_chars, &mut blocks);
+                            }
+                        }
+                        current_line_y = Some(state.ty());
+                        operand_stack.clear();
+                    }
+                    "Tm" if in_text => {
+                        if operand_stack.len() >= 6 {
+                            let n = operand_stack.len();
+                            let a = parse_operand_f64(operand_stack[n - 6]);
+                            let b = parse_operand_f64(operand_stack[n - 5]);
+                            let c = parse_operand_f64(operand_stack[n - 4]);
+                            let d = parse_operand_f64(operand_stack[n - 3]);
+                            let e = parse_operand_f64(operand_stack[n - 2]);
+                            let f = parse_operand_f64(operand_stack[n - 1]);
+                            state.apply_tm(a, b, c, d, e, f);
+                        }
+                        if let Some(prev_y) = current_line_y {
+                            if (state.ty() - prev_y).abs() > state.font_size * 0.5 {
+                                flush_block(&mut current_text, &mut current_chars, &mut blocks);
+                            }
+                        }
+                        current_line_y = Some(state.ty());
+                        operand_stack.clear();
+                    }
+                    "T*" if in_text => {
+                        state.apply_t_star();
+                        flush_block(&mut current_text, &mut current_chars, &mut blocks);
+                        current_line_y = Some(state.ty());
+                        operand_stack.clear();
+                    }
+                    "Tf" if in_text => {
+                        if operand_stack.len() >= 2 {
+                            let size = parse_operand_f64(operand_stack[operand_stack.len() - 1]);
+                            if size > 0.0 {
+                                state.font_size = size;
+                            }
+                        }
+                        operand_stack.clear();
+                    }
+                    "Tj" if in_text => {
+                        // (string) Tj — show text
+                        if let Some(Token::Operand(data)) = operand_stack.last() {
+                            let text = decode_pdf_string(data);
+                            let char_width = state.font_size * 0.5;
+                            for (ci, ch) in text.chars().enumerate() {
+                                current_chars.push(CharPosition {
+                                    ch,
+                                    x: state.tx() + ci as f64 * char_width,
+                                    y: state.ty(),
+                                    font_size: state.font_size,
+                                });
+                            }
+                            current_text.push_str(&text);
+                        }
+                        operand_stack.clear();
+                    }
+                    "TJ" if in_text => {
+                        // [(string) kern (string) kern ...] TJ
+                        if let Some(Token::Operand(data)) = operand_stack.last() {
+                            let array_inner = if data.len() >= 2
+                                && data[0] == b'['
+                                && data[data.len() - 1] == b']'
+                            {
+                                &data[1..data.len() - 1]
+                            } else {
+                                data.as_slice()
+                            };
+                            let mut x_offset = state.tx();
+                            let char_width = state.font_size * 0.5;
+                            let sub_tokens = tokenize_content_stream(array_inner);
+                            for sub_tok in &sub_tokens {
+                                if let Token::Operand(sub_data) = sub_tok {
+                                    if sub_data.starts_with(b"(") || sub_data.starts_with(b"<") {
+                                        let text = decode_pdf_string(sub_data);
+                                        for (ci, ch) in text.chars().enumerate() {
+                                            current_chars.push(CharPosition {
+                                                ch,
+                                                x: x_offset + ci as f64 * char_width,
+                                                y: state.ty(),
+                                                font_size: state.font_size,
+                                            });
+                                        }
+                                        current_text.push_str(&text);
+                                        x_offset += text.chars().count() as f64 * char_width;
+                                    } else {
+                                        // Numeric kerning value
+                                        let kern: f64 = std::str::from_utf8(sub_data)
+                                            .ok()
+                                            .and_then(|s| s.trim().parse().ok())
+                                            .unwrap_or(0.0);
+                                        x_offset -= kern / 1000.0 * state.font_size;
+                                    }
+                                }
+                            }
+                        }
+                        operand_stack.clear();
+                    }
+                    op_s if in_text && (op_s == "'" || op_s == "\"") => {
+                        state.apply_t_star();
+                        flush_block(&mut current_text, &mut current_chars, &mut blocks);
+                        current_line_y = Some(state.ty());
+                        // Show text (last operand for ', last for " after spacing args)
+                        if let Some(Token::Operand(data)) = operand_stack.last() {
+                            let text = decode_pdf_string(data);
+                            let char_width = state.font_size * 0.5;
+                            for (ci, ch) in text.chars().enumerate() {
+                                current_chars.push(CharPosition {
+                                    ch,
+                                    x: state.tx() + ci as f64 * char_width,
+                                    y: state.ty(),
+                                    font_size: state.font_size,
+                                });
+                            }
+                            current_text.push_str(&text);
+                        }
+                        operand_stack.clear();
+                    }
+                    _ => {
+                        operand_stack.clear();
+                    }
+                }
+            }
+        }
+    }
+
+    // Flush any remaining text
+    flush_block(&mut current_text, &mut current_chars, &mut blocks);
+    blocks
+}
+
+/// Find text regions in a PDF that match the given patterns.
+///
+/// Returns `RedactionRegion` structs in web top-origin coordinates, ready to be
+/// passed directly to `redact_pdf()`.
+///
+/// ## Limitations
+/// - Only searches direct page content streams (not Form XObjects).
+/// - Assumes WinAnsi (single-byte) encoding — CIDFont/CJK text won't match.
+/// - Width estimation is approximate (`char_count × font_size × 0.5`).
+pub fn find_text_regions(
+    pdf_bytes: &[u8],
+    patterns: &[RedactionPattern],
+) -> Result<Vec<RedactionRegion>, FormeError> {
+    if patterns.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Pre-compile regex patterns
+    #[cfg(feature = "regex")]
+    let compiled_regexes: Vec<Option<regex::Regex>> = {
+        let mut regexes = Vec::with_capacity(patterns.len());
+        for p in patterns {
+            match p.pattern_type {
+                PatternType::Regex => {
+                    let re = regex::Regex::new(&p.pattern).map_err(|e| {
+                        FormeError::RenderError(format!(
+                            "Invalid regex pattern '{}': {e}",
+                            p.pattern
+                        ))
+                    })?;
+                    regexes.push(Some(re));
+                }
+                PatternType::Literal => regexes.push(None),
+            }
+        }
+        regexes
+    };
+
+    let scan = scan_pdf_metadata(pdf_bytes)?;
+    let pages = collect_pages(pdf_bytes, &scan)?;
+
+    let mut regions = Vec::new();
+
+    for (page_idx, page_info) in pages.iter().enumerate() {
+        let media_height = page_info.media_box_height;
+
+        // Extract and decompress content streams
+        let content_obj_ids = parse_contents_obj_ids(&page_info.contents_ref);
+        let mut combined_stream = Vec::new();
+        for &obj_id in &content_obj_ids {
+            match extract_and_decompress_stream(pdf_bytes, obj_id) {
+                Ok(decompressed) => {
+                    if !combined_stream.is_empty() {
+                        combined_stream.push(b'\n');
+                    }
+                    combined_stream.extend_from_slice(&decompressed);
+                }
+                Err(_) => continue,
+            }
+        }
+
+        if combined_stream.is_empty() {
+            continue;
+        }
+
+        let text_blocks = extract_text_with_positions(&combined_stream);
+
+        #[allow(unused_variables)]
+        for (pat_idx, pattern) in patterns.iter().enumerate() {
+            // Skip if pattern is page-specific and doesn't match this page
+            if let Some(target_page) = pattern.page {
+                if target_page != page_idx {
+                    continue;
+                }
+            }
+
+            for (block_text, block_chars) in &text_blocks {
+                if block_chars.is_empty() {
+                    continue;
+                }
+
+                let matches: Vec<(usize, usize)> = match pattern.pattern_type {
+                    PatternType::Literal => {
+                        let lower_text = block_text.to_lowercase();
+                        let lower_pattern = pattern.pattern.to_lowercase();
+                        let mut found = Vec::new();
+                        let mut start = 0;
+                        while let Some(pos) = lower_text[start..].find(&lower_pattern) {
+                            let abs_pos = start + pos;
+                            // Convert byte offset to char offset
+                            let char_start = block_text[..abs_pos].chars().count();
+                            let char_end = char_start + pattern.pattern.chars().count();
+                            found.push((char_start, char_end));
+                            start = abs_pos + lower_pattern.len();
+                        }
+                        found
+                    }
+                    PatternType::Regex => {
+                        #[cfg(feature = "regex")]
+                        {
+                            if let Some(re) = &compiled_regexes[pat_idx] {
+                                re.find_iter(block_text)
+                                    .map(|m| {
+                                        let char_start = block_text[..m.start()].chars().count();
+                                        let char_end = char_start
+                                            + block_text[m.start()..m.end()].chars().count();
+                                        (char_start, char_end)
+                                    })
+                                    .collect()
+                            } else {
+                                Vec::new()
+                            }
+                        }
+                        #[cfg(not(feature = "regex"))]
+                        {
+                            return Err(FormeError::RenderError(
+                                "Regex patterns require the 'regex' feature. \
+                                 Use PatternType::Literal or enable the 'regex' Cargo feature."
+                                    .to_string(),
+                            ));
+                        }
+                    }
+                };
+
+                for (char_start, char_end) in matches {
+                    if char_start >= block_chars.len() || char_end == 0 {
+                        continue;
+                    }
+                    let end_idx = (char_end - 1).min(block_chars.len() - 1);
+                    let first = &block_chars[char_start];
+                    let last = &block_chars[end_idx];
+                    let font_size = first.font_size;
+
+                    // Bounding box in PDF bottom-origin coords
+                    let pdf_x = first.x;
+                    let pdf_width = (last.x - first.x) + font_size * 0.5;
+                    let pdf_width = pdf_width.max(font_size * 0.5); // minimum width
+
+                    // Convert to web top-origin
+                    let web_y = media_height - (first.y + font_size * 0.8);
+                    let height = font_size * 1.1;
+
+                    regions.push(RedactionRegion {
+                        page: page_idx,
+                        x: pdf_x,
+                        y: web_y,
+                        width: pdf_width,
+                        height,
+                        color: pattern.color.clone(),
+                    });
+                }
+            }
+        }
+    }
+
+    Ok(regions)
+}
+
+/// Find text matching patterns and redact all matches in one step.
+///
+/// Convenience wrapper: calls `find_text_regions()` then `redact_pdf()`.
+pub fn redact_text(pdf_bytes: &[u8], patterns: &[RedactionPattern]) -> Result<Vec<u8>, FormeError> {
+    let regions = find_text_regions(pdf_bytes, patterns)?;
+    if regions.is_empty() {
+        return Ok(pdf_bytes.to_vec());
+    }
+    redact_pdf(pdf_bytes, &regions)
+}
+
 // ── Color parsing ───────────────────────────────────────────────────
 
 /// Parse a hex color string to (r, g, b) in 0-1 range for PDF operators.
@@ -1724,5 +2165,303 @@ mod tests {
             !new_section.contains("SecretApp"),
             "Original creator should not appear in incremental update"
         );
+    }
+
+    // ── Text-search redaction tests ──────────────────────────────────────
+
+    #[test]
+    fn test_decode_pdf_string_literal() {
+        assert_eq!(decode_pdf_string(b"(Hello)"), "Hello");
+        assert_eq!(decode_pdf_string(b"(Hello World)"), "Hello World");
+    }
+
+    #[test]
+    fn test_decode_pdf_string_escapes() {
+        assert_eq!(decode_pdf_string(b"(line1\\nline2)"), "line1\nline2");
+        assert_eq!(decode_pdf_string(b"(a\\\\b)"), "a\\b");
+        assert_eq!(decode_pdf_string(b"(open\\(paren)"), "open(paren");
+        assert_eq!(decode_pdf_string(b"(close\\)paren)"), "close)paren");
+    }
+
+    #[test]
+    fn test_decode_pdf_string_hex() {
+        assert_eq!(decode_pdf_string(b"<48656C6C6F>"), "Hello");
+        assert_eq!(decode_pdf_string(b"<48 65 6C 6C 6F>"), "Hello");
+    }
+
+    #[test]
+    fn test_decode_pdf_string_empty() {
+        assert_eq!(decode_pdf_string(b"()"), "");
+        assert_eq!(decode_pdf_string(b"<>"), "");
+        assert_eq!(decode_pdf_string(b""), "");
+    }
+
+    #[test]
+    fn test_extract_text_with_positions_basic() {
+        let stream = b"BT /F1 12 Tf 72 720 Td (Hello World) Tj ET";
+        let blocks = extract_text_with_positions(stream);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].0, "Hello World");
+        assert_eq!(blocks[0].1.len(), 11); // 11 chars
+                                           // First char should be at x≈72 (the Td x position)
+        assert!((blocks[0].1[0].x - 72.0).abs() < 1.0);
+        assert_eq!(blocks[0].1[0].font_size, 12.0);
+    }
+
+    #[test]
+    fn test_extract_text_with_positions_tj_array() {
+        // TJ array with kerning: [(H) -50 (ello)]
+        let stream = b"BT /F1 10 Tf 0 700 Td [(H) -50 (ello)] TJ ET";
+        let blocks = extract_text_with_positions(stream);
+        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks[0].0, "Hello");
+    }
+
+    #[test]
+    fn test_find_text_literal() {
+        let doc = crate::model::Document {
+            children: vec![crate::model::Node::page(
+                crate::model::PageConfig::default(),
+                crate::style::Style::default(),
+                vec![crate::model::Node::text(
+                    "John Smith works at Acme Corp",
+                    crate::style::Style::default(),
+                )],
+            )],
+            metadata: crate::model::Metadata::default(),
+            default_page: crate::model::PageConfig::default(),
+            fonts: vec![],
+            default_style: None,
+            tagged: false,
+            pdfa: None,
+            pdf_ua: false,
+            embedded_data: None,
+            flatten_forms: false,
+            certification: None,
+        };
+
+        let pdf_bytes = crate::render(&doc).expect("render should succeed");
+
+        let patterns = vec![RedactionPattern {
+            pattern: "john smith".to_string(), // lowercase — should match case-insensitive
+            pattern_type: PatternType::Literal,
+            page: None,
+            color: None,
+        }];
+
+        let regions = find_text_regions(&pdf_bytes, &patterns).expect("should succeed");
+        assert!(
+            !regions.is_empty(),
+            "Should find 'John Smith' via case-insensitive literal search"
+        );
+        assert_eq!(regions[0].page, 0);
+        assert!(regions[0].width > 0.0);
+        assert!(regions[0].height > 0.0);
+    }
+
+    #[test]
+    fn test_find_text_no_match() {
+        let doc = crate::model::Document {
+            children: vec![crate::model::Node::page(
+                crate::model::PageConfig::default(),
+                crate::style::Style::default(),
+                vec![crate::model::Node::text(
+                    "Hello World",
+                    crate::style::Style::default(),
+                )],
+            )],
+            metadata: crate::model::Metadata::default(),
+            default_page: crate::model::PageConfig::default(),
+            fonts: vec![],
+            default_style: None,
+            tagged: false,
+            pdfa: None,
+            pdf_ua: false,
+            embedded_data: None,
+            flatten_forms: false,
+            certification: None,
+        };
+
+        let pdf_bytes = crate::render(&doc).expect("render should succeed");
+
+        let patterns = vec![RedactionPattern {
+            pattern: "xyznotfound".to_string(),
+            pattern_type: PatternType::Literal,
+            page: None,
+            color: None,
+        }];
+
+        let regions = find_text_regions(&pdf_bytes, &patterns).expect("should succeed");
+        assert!(regions.is_empty(), "Should return empty vec, not error");
+    }
+
+    #[cfg(feature = "regex")]
+    #[test]
+    fn test_find_text_regex() {
+        let doc = crate::model::Document {
+            children: vec![crate::model::Node::page(
+                crate::model::PageConfig::default(),
+                crate::style::Style::default(),
+                vec![crate::model::Node::text(
+                    "SSN: 123-45-6789 and phone 555-0100",
+                    crate::style::Style::default(),
+                )],
+            )],
+            metadata: crate::model::Metadata::default(),
+            default_page: crate::model::PageConfig::default(),
+            fonts: vec![],
+            default_style: None,
+            tagged: false,
+            pdfa: None,
+            pdf_ua: false,
+            embedded_data: None,
+            flatten_forms: false,
+            certification: None,
+        };
+
+        let pdf_bytes = crate::render(&doc).expect("render should succeed");
+
+        let patterns = vec![RedactionPattern {
+            pattern: r"\d{3}-\d{2}-\d{4}".to_string(),
+            pattern_type: PatternType::Regex,
+            page: None,
+            color: None,
+        }];
+
+        let regions = find_text_regions(&pdf_bytes, &patterns).expect("should succeed");
+        assert_eq!(
+            regions.len(),
+            1,
+            "Should find exactly one SSN-pattern match"
+        );
+    }
+
+    #[test]
+    fn test_redact_text_end_to_end() {
+        let doc = crate::model::Document {
+            children: vec![crate::model::Node::page(
+                crate::model::PageConfig::default(),
+                crate::style::Style::default(),
+                vec![crate::model::Node::text(
+                    "Confidential: John Smith SSN 123-45-6789",
+                    crate::style::Style::default(),
+                )],
+            )],
+            metadata: crate::model::Metadata::default(),
+            default_page: crate::model::PageConfig::default(),
+            fonts: vec![],
+            default_style: None,
+            tagged: false,
+            pdfa: None,
+            pdf_ua: false,
+            embedded_data: None,
+            flatten_forms: false,
+            certification: None,
+        };
+
+        let pdf_bytes = crate::render(&doc).expect("render should succeed");
+
+        let patterns = vec![RedactionPattern {
+            pattern: "John Smith".to_string(),
+            pattern_type: PatternType::Literal,
+            page: None,
+            color: Some("#ff0000".to_string()),
+        }];
+
+        let result = redact_text(&pdf_bytes, &patterns).expect("redact_text should succeed");
+        assert!(
+            result.len() > pdf_bytes.len(),
+            "Should produce incremental update"
+        );
+        assert!(result.starts_with(b"%PDF"));
+    }
+
+    #[test]
+    fn test_redact_text_no_match_returns_original() {
+        let doc = crate::model::Document {
+            children: vec![crate::model::Node::page(
+                crate::model::PageConfig::default(),
+                crate::style::Style::default(),
+                vec![crate::model::Node::text(
+                    "Hello World",
+                    crate::style::Style::default(),
+                )],
+            )],
+            metadata: crate::model::Metadata::default(),
+            default_page: crate::model::PageConfig::default(),
+            fonts: vec![],
+            default_style: None,
+            tagged: false,
+            pdfa: None,
+            pdf_ua: false,
+            embedded_data: None,
+            flatten_forms: false,
+            certification: None,
+        };
+
+        let pdf_bytes = crate::render(&doc).expect("render should succeed");
+
+        let patterns = vec![RedactionPattern {
+            pattern: "notfound".to_string(),
+            pattern_type: PatternType::Literal,
+            page: None,
+            color: None,
+        }];
+
+        let result = redact_text(&pdf_bytes, &patterns).expect("should succeed");
+        assert_eq!(
+            result, pdf_bytes,
+            "No match → return original bytes unchanged"
+        );
+    }
+
+    #[test]
+    fn test_find_text_page_filter() {
+        // Two-page document
+        let doc = crate::model::Document {
+            children: vec![
+                crate::model::Node::page(
+                    crate::model::PageConfig::default(),
+                    crate::style::Style::default(),
+                    vec![crate::model::Node::text(
+                        "Page one content",
+                        crate::style::Style::default(),
+                    )],
+                ),
+                crate::model::Node::page(
+                    crate::model::PageConfig::default(),
+                    crate::style::Style::default(),
+                    vec![crate::model::Node::text(
+                        "Page two content",
+                        crate::style::Style::default(),
+                    )],
+                ),
+            ],
+            metadata: crate::model::Metadata::default(),
+            default_page: crate::model::PageConfig::default(),
+            fonts: vec![],
+            default_style: None,
+            tagged: false,
+            pdfa: None,
+            pdf_ua: false,
+            embedded_data: None,
+            flatten_forms: false,
+            certification: None,
+        };
+
+        let pdf_bytes = crate::render(&doc).expect("render should succeed");
+
+        // Search only page 1 for "content" — should find it
+        let patterns = vec![RedactionPattern {
+            pattern: "content".to_string(),
+            pattern_type: PatternType::Literal,
+            page: Some(1),
+            color: None,
+        }];
+
+        let regions = find_text_regions(&pdf_bytes, &patterns).expect("should succeed");
+        for r in &regions {
+            assert_eq!(r.page, 1, "All matches should be on page 1");
+        }
     }
 }

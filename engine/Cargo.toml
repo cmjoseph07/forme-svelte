@@ -53,9 +53,11 @@ wasm-bindgen = { version = "0.2", optional = true }
 js-sys = { version = "0.3", optional = true }
 serde-wasm-bindgen = { version = "0.6", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
+regex = { version = "1", optional = true }
 
 [features]
-wasm = ["wasm-bindgen", "js-sys", "serde-wasm-bindgen", "getrandom", "console_error_panic_hook"]
+regex = ["dep:regex"]
+wasm = ["wasm-bindgen", "js-sys", "serde-wasm-bindgen", "getrandom", "console_error_panic_hook", "regex"]
 wasm-raw = []  # C-ABI exports for non-JS WASM hosts (Python wasmtime, Go wazero)
 visual-tests = []
 

@@ -48,7 +48,10 @@ pub mod wasm_raw;
 
 pub use error::FormeError;
 pub use layout::LayoutInfo;
-pub use model::{CertificationConfig, ColumnDef, ColumnWidth, FontEntry, RedactionRegion, TextRun};
+pub use model::{
+    CertificationConfig, ColumnDef, ColumnWidth, FontEntry, PatternType, RedactionPattern,
+    RedactionRegion, TextRun,
+};
 pub use model::{ChartDataPoint, ChartSeries, DotPlotGroup};
 pub use model::{Document, Metadata, Node, NodeKind, PageConfig, PageSize};
 pub use style::Style;
@@ -79,6 +82,28 @@ pub fn redact_pdf(
     regions: &[model::RedactionRegion],
 ) -> Result<Vec<u8>, FormeError> {
     pdf::redaction::redact_pdf(pdf_bytes, regions)
+}
+
+/// Find text regions matching patterns in a PDF.
+///
+/// Searches PDF content streams for literal or regex patterns and returns
+/// redaction regions (in web top-origin coordinates) for each match.
+pub fn find_text_regions(
+    pdf_bytes: &[u8],
+    patterns: &[model::RedactionPattern],
+) -> Result<Vec<RedactionRegion>, FormeError> {
+    pdf::redaction::find_text_regions(pdf_bytes, patterns)
+}
+
+/// Redact text matching patterns from a PDF.
+///
+/// Convenience wrapper: finds text regions matching the patterns, then
+/// applies coordinate-based redaction to all matches.
+pub fn redact_text(
+    pdf_bytes: &[u8],
+    patterns: &[model::RedactionPattern],
+) -> Result<Vec<u8>, FormeError> {
+    pdf::redaction::redact_text(pdf_bytes, patterns)
 }
 
 /// Merge multiple PDFs into a single document.

@@ -98,6 +98,30 @@ pub struct RedactionRegion {
     pub color: Option<String>,
 }
 
+/// How to interpret a text pattern for redaction search.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum PatternType {
+    /// Exact string match (case-insensitive).
+    Literal,
+    /// Regular expression pattern.
+    Regex,
+}
+
+/// A text pattern to search for in a PDF for redaction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RedactionPattern {
+    /// The search string (literal text or regex pattern).
+    pub pattern: String,
+    /// Whether to interpret `pattern` as literal text or a regex.
+    pub pattern_type: PatternType,
+    /// Restrict search to a specific page (0-indexed). None = all pages.
+    #[serde(default)]
+    pub page: Option<usize>,
+    /// Fill color for the redaction overlay. Defaults to black.
+    #[serde(default)]
+    pub color: Option<String>,
+}
+
 /// Configuration for digitally certifying a PDF with an X.509 certificate.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

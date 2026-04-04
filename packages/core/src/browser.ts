@@ -32,9 +32,10 @@ export type {
   RenderWithLayoutResult,
   RenderDocumentOptions,
   RedactionRegion,
+  RedactionPattern,
 } from './index.js';
 
-import type { LayoutInfo, RenderWithLayoutResult, RenderDocumentOptions, RedactionRegion } from './index.js';
+import type { LayoutInfo, RenderWithLayoutResult, RenderDocumentOptions, RedactionRegion, RedactionPattern } from './index.js';
 
 // ── WASM initialization ────────────────────────────────────────────
 
@@ -257,6 +258,39 @@ export async function redactPdf(
   await ensureInit();
   const { redact_pdf } = await import('../pkg/forme.js');
   return redact_pdf(pdfBytes, JSON.stringify(regions));
+}
+
+// ── Text-search redaction ─────────────────────────────────────────────
+
+/**
+ * Find text regions matching patterns in a PDF.
+ *
+ * Searches PDF content streams for literal or regex patterns and returns
+ * redaction regions (in web top-origin coordinates) for each match.
+ */
+export async function findTextRegions(
+  pdfBytes: Uint8Array,
+  patterns: RedactionPattern[],
+): Promise<RedactionRegion[]> {
+  await ensureInit();
+  const { find_text_regions } = await import('../pkg/forme.js');
+  const json = find_text_regions(pdfBytes, JSON.stringify(patterns));
+  return JSON.parse(json) as RedactionRegion[];
+}
+
+/**
+ * Redact text matching patterns from a PDF.
+ *
+ * Convenience wrapper: finds all text matching the patterns, then
+ * applies coordinate-based redaction to each match.
+ */
+export async function redactText(
+  pdfBytes: Uint8Array,
+  patterns: RedactionPattern[],
+): Promise<Uint8Array> {
+  await ensureInit();
+  const { redact_text } = await import('../pkg/forme.js');
+  return redact_text(pdfBytes, JSON.stringify(patterns));
 }
 
 // ── PDF merging ──────────────────────────────────────────────────────
