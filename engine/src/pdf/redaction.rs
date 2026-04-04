@@ -26,10 +26,7 @@ use miniz_oxide::inflate::decompress_to_vec_zlib;
 
 /// Format current time as ISO 8601 for XMP: YYYY-MM-DDTHH:MM:SSZ
 fn format_xmp_date() -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = super::certify::current_timestamp_secs();
     let days = now / 86400;
     let time_of_day = now % 86400;
     let hours = time_of_day / 3600;

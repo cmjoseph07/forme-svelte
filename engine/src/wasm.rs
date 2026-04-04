@@ -1,5 +1,10 @@
 use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen(start)]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
+
 #[wasm_bindgen]
 pub fn render_pdf(json: &str) -> Result<Vec<u8>, JsValue> {
     crate::render_json(json).map_err(|e| JsValue::from_str(&e.to_string()))

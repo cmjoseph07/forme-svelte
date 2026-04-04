@@ -795,14 +795,23 @@ fn escape_pdf_string(s: &str) -> String {
     out
 }
 
-/// Format current time as PDF date string: D:YYYYMMDDHHmmss+00'00'
-pub(super) fn format_pdf_date() -> String {
-    // Use std::time to get seconds since epoch, then manually compute date components.
-    // No chrono dependency needed.
-    let now = std::time::SystemTime::now()
+/// Get current Unix timestamp in seconds, portable across native and WASM.
+#[cfg(target_arch = "wasm32")]
+pub(super) fn current_timestamp_secs() -> u64 {
+    (js_sys::Date::now() / 1000.0) as u64
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) fn current_timestamp_secs() -> u64 {
+    std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default()
-        .as_secs();
+        .as_secs()
+}
+
+/// Format current time as PDF date string: D:YYYYMMDDHHmmss+00'00'
+pub(super) fn format_pdf_date() -> String {
+    let now = current_timestamp_secs();
 
     // Convert epoch seconds to date components (UTC)
     let days = now / 86400;
@@ -835,10 +844,7 @@ pub(super) fn epoch_days_to_ymd(days: u64) -> (u64, u64, u64) {
 
 /// Format current time as a human-readable display date: YYYY-MM-DD HH:MM UTC
 fn format_display_date() -> String {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
+    let now = current_timestamp_secs();
 
     let days = now / 86400;
     let time_of_day = now % 86400;
