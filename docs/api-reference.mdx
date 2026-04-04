@@ -30,6 +30,7 @@ Renders a PDF from a template and returns the file directly.
 - `s3` — upload the PDF to your S3 bucket instead of returning bytes (see [S3 Upload](#s3-upload) below)
 - `save` — `boolean`, default `true`. Every render is auto-saved to your [Documents](https://app.formepdf.com/dashboard/documents) with `source: "generated"`. Set `false` to skip saving.
 - `saveName` — `string`, optional custom document name. Default: `{slug}-{YYYY-MM-DD}` (e.g. `invoice-2026-04-03`).
+- `metadata` — `object`, optional developer-defined key-value pairs stored on the saved document. Useful for tagging renders with your own identifiers (customer ID, department, environment, etc.). See [Metadata](#metadata) below.
 
 <CodeGroup>
 
@@ -482,6 +483,67 @@ Pass `flattenForms=true` as a query parameter on any render endpoint (sync or as
 
 ---
 
+## Redact PDF
+
+`POST /v1/redact`
+
+Redact sensitive content from an existing PDF by coordinates, text patterns, presets, or a saved redaction template.
+
+**JSON body:**
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `pdf` | Yes | Base64-encoded PDF bytes |
+| `redactions` | No | Array of coordinate-based regions `{page, x, y, width, height, color?}` |
+| `patterns` | No | Array of text search patterns `{pattern, pattern_type, page?, color?}` |
+| `presets` | No | Array of preset names: `"ssn"`, `"email"`, `"phone"`, `"date-of-birth"`, `"credit-card"` |
+| `template` | No | Slug of a saved redaction template (hosted API only) |
+
+At least one of `redactions`, `patterns`, `presets`, or `template` is required.
+
+```bash
+curl -X POST https://api.formepdf.com/v1/redact \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdf": "<base64>",
+    "presets": ["ssn", "email"],
+    "patterns": [{"pattern": "Jane Doe", "pattern_type": "Literal"}]
+  }' \
+  --output redacted.pdf
+```
+
+**Response:** `200 OK` with `Content-Type: application/pdf` body.
+
+### Redaction Templates
+
+Save reusable sets of patterns and presets as named templates, then reference them by slug in the API.
+
+**Create a template** in the [dashboard](https://app.formepdf.com/dashboard/redaction-templates) or via `POST /api/redaction-templates`.
+
+**Use a template by slug:**
+
+```json
+{
+  "pdf": "<base64>",
+  "template": "hipaa-patient-record"
+}
+```
+
+**Combine template + inline patterns** — both are merged:
+
+```json
+{
+  "pdf": "<base64>",
+  "template": "hipaa-patient-record",
+  "patterns": [{"pattern": "Jane Doe", "pattern_type": "Literal"}]
+}
+```
+
+<Note>Redaction templates require the hosted API. Self-hosted users should pass `patterns` and `presets` directly.</Note>
+
+---
+
 ## Certify PDF
 
 `POST /v1/certify`
@@ -506,6 +568,246 @@ Apply a PKCS#7 digital signature to an existing PDF.
 **Response:** `200 OK` with `Content-Type: application/pdf` body (the certified PDF).
 
 <Note>The deprecated `POST /v1/sign` endpoint still works and routes to the same handler.</Note>
+
+---
+
+## Metadata
+
+Tag rendered documents with your own key-value pairs for organization and retrieval.
+
+### Adding metadata
+
+Pass a `metadata` object in the render request body:
+
+```json
+{
+  "clientName": "Jane Smith",
+  "items": [{ "description": "Consulting", "quantity": 10, "unitPrice": 150 }],
+  "metadata": {
+    "customerId": "cust_123",
+    "department": "billing",
+    "environment": "production"
+  }
+}
+```
+
+Metadata is merged into the document record alongside system fields (`renderTimeMs`, `templateSlug`).
+
+### Filtering by metadata
+
+Query saved documents by metadata values:
+
+```bash
+curl "https://api.formepdf.com/api/documents?metadata.customerId=cust_123" \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+Multiple filters are ANDed together (maximum 5 per request):
+
+```bash
+curl "https://api.formepdf.com/api/documents?metadata.department=billing&metadata.environment=production" \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+### Limits
+
+| Constraint | Limit |
+|-----------|-------|
+| Keys per document | 20 |
+| Key length | 100 characters |
+| Value types | `string` or `number` |
+| String value length | 500 characters |
+| Metadata filters per query | 5 |
+
+---
+
+## Resources
+
+List and retrieve your templates, documents, redaction templates, and certificates programmatically.
+
+All resource endpoints return paginated responses:
+
+```json
+{
+  "data": [...],
+  "total": 42,
+  "limit": 20,
+  "offset": 0,
+  "hasMore": true
+}
+```
+
+**Pagination query params** (all endpoints):
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `limit` | 20 | Results per page (1–100) |
+| `offset` | 0 | Number of results to skip |
+
+---
+
+### List Templates
+
+`GET /v1/templates`
+
+Returns your templates (without JSX source or sample data).
+
+**Query params:** `search` — filter by name or slug.
+
+```bash
+curl https://api.formepdf.com/v1/templates \
+  -H "Authorization: Bearer forme_sk_abc123..."
+
+# Search by name
+curl "https://api.formepdf.com/v1/templates?search=invoice" \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response item:**
+```json
+{
+  "id": "clxyz...",
+  "name": "Invoice",
+  "slug": "invoice",
+  "documentType": "invoice",
+  "createdAt": "2024-01-15T12:00:00.000Z",
+  "updatedAt": "2024-01-20T15:30:00.000Z"
+}
+```
+
+### Get Template
+
+`GET /v1/templates/:slug`
+
+```bash
+curl https://api.formepdf.com/v1/templates/invoice \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response:** `{ "data": { ... } }` with the same fields as the list item.
+
+---
+
+### List Documents
+
+`GET /v1/documents`
+
+Returns your rendered documents with metadata.
+
+**Query params:**
+
+| Param | Description |
+|-------|-------------|
+| `source` | Filter by source: `generated`, `uploaded`, `redacted`, `merged`, `certified` |
+| `from` | ISO date — only documents created on or after |
+| `to` | ISO date — only documents created on or before |
+| `metadata.*` | Filter by metadata values (max 5 filters). Example: `metadata.customerId=cust_123` |
+
+```bash
+# All documents
+curl https://api.formepdf.com/v1/documents \
+  -H "Authorization: Bearer forme_sk_abc123..."
+
+# Filter by source and date range
+curl "https://api.formepdf.com/v1/documents?source=generated&from=2024-01-01&to=2024-01-31" \
+  -H "Authorization: Bearer forme_sk_abc123..."
+
+# Filter by metadata
+curl "https://api.formepdf.com/v1/documents?metadata.customerId=cust_123" \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response item:**
+```json
+{
+  "id": "clxyz...",
+  "name": "invoice-2024-01-15",
+  "source": "generated",
+  "templateId": "clxyz...",
+  "metadata": { "customerId": "cust_123" },
+  "expiresAt": null,
+  "createdAt": "2024-01-15T12:00:00.000Z",
+  "updatedAt": "2024-01-15T12:00:00.000Z",
+  "template": { "id": "clxyz...", "name": "Invoice", "slug": "invoice" }
+}
+```
+
+### Get Document
+
+`GET /v1/documents/:id`
+
+Returns a single document with a presigned download URL (1-hour expiry).
+
+```bash
+curl https://api.formepdf.com/v1/documents/clxyz... \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response:** `{ "data": { ...document, "downloadUrl": "https://..." } }`
+
+---
+
+### List Redaction Templates
+
+`GET /v1/redaction-templates`
+
+**Query params:** `search` — filter by name or slug.
+
+```bash
+curl https://api.formepdf.com/v1/redaction-templates \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response item:**
+```json
+{
+  "id": "clxyz...",
+  "name": "HIPAA Patient Record",
+  "slug": "hipaa-patient-record",
+  "description": "Redacts SSN, DOB, and patient names",
+  "patterns": [{ "pattern": "Patient:", "pattern_type": "Literal" }],
+  "presets": ["ssn", "date-of-birth"],
+  "createdAt": "2024-01-15T12:00:00.000Z",
+  "updatedAt": "2024-01-20T15:30:00.000Z"
+}
+```
+
+### Get Redaction Template
+
+`GET /v1/redaction-templates/:slug`
+
+```bash
+curl https://api.formepdf.com/v1/redaction-templates/hipaa-patient-record \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response:** `{ "data": { ... } }` with the same fields as the list item.
+
+---
+
+### List Certificates
+
+`GET /v1/certificates`
+
+Returns your uploaded signing certificates (without PEM data).
+
+```bash
+curl https://api.formepdf.com/v1/certificates \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+**Response item:**
+```json
+{
+  "id": "clxyz...",
+  "name": "Production Signing Cert",
+  "subject": "Acme Corp",
+  "expiresAt": "2025-12-31T23:59:59.000Z",
+  "createdAt": "2024-01-15T12:00:00.000Z"
+}
+```
+
+<Note>Resource listing endpoints require the hosted API (Team plan or above). Self-hosted users should manage resources through their own database.</Note>
 
 ---
 

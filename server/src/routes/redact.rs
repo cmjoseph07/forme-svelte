@@ -22,6 +22,8 @@ pub struct RedactRequest {
     /// Preset names (e.g. "ssn", "email") expanded to regex patterns.
     #[serde(default)]
     pub presets: Vec<String>,
+    /// Redaction template slug (hosted API only — not supported in self-hosted).
+    pub template: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +98,12 @@ fn builtin_presets() -> HashMap<&'static str, forme::RedactionPattern> {
 /// POST /v1/redact — redact regions of an existing PDF.
 pub async fn redact(Json(payload): Json<RedactRequest>) -> Result<Response, ApiError> {
     let b64 = base64::engine::general_purpose::STANDARD;
+
+    if payload.template.is_some() {
+        return Err(ApiError::BadRequest(
+            "Redaction templates require the hosted API. Pass patterns directly for self-hosted use.".to_string(),
+        ));
+    }
 
     let has_redactions = !payload.redactions.is_empty();
     let has_patterns = !payload.patterns.is_empty();
