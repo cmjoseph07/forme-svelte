@@ -48,6 +48,16 @@ fn main() -> Result<(), FormeError> {
 | `render_template(&str, &str)` | Evaluate a template with data, then render |
 | `render_template_with_layout(&str, &str)` | Evaluate a template with data, render, and return layout metadata |
 
+### PDF operations
+
+| Function | Description |
+|----------|-------------|
+| `merge_pdfs(&[&[u8]])` | Combine multiple PDFs into one |
+| `certify_pdf(&[u8], &str, &str, ...)` | Apply a PKCS#7 digital signature to an existing PDF |
+| `redact_pdf(&[u8], &[RedactionRegion])` | Redact regions from a PDF (removes underlying text) |
+| `redact_text(&[u8], &[TextSearchRedaction])` | Find text by pattern and redact matching regions |
+| `find_text_regions(&[u8], &[TextSearchPattern])` | Find text regions in a PDF without redacting |
+
 All functions return `Result<Vec<u8>, FormeError>` (or `Result<(Vec<u8>, LayoutInfo), FormeError>` for the `_with_layout` variants).
 
 ## Working with the Document struct
@@ -131,7 +141,11 @@ The engine supports:
 - **SVG** — inline rendering (rect, circle, line, path, arc)
 - **Charts** — BarChart, LineChart, PieChart, AreaChart, DotPlot
 - **QR codes & barcodes** — Code128, Code39, EAN13, EAN8, Codabar
-- **Tagged PDF / PDF/A-2a** — accessibility and archival compliance
+- **AcroForms** — fillable PDF forms (TextField, Checkbox, Dropdown, RadioButton) with form flattening
+- **Digital signatures** — PKCS#7 detached signatures with X.509 certificates (PKCS#1 and PKCS#8 keys)
+- **PDF/UA-1** — accessibility compliance with structure tree and artifact tagging
+- **PDF/A** — archival compliance (PDF/A-2b, PDF/A-2a)
+- **PDF operations** — merge, certify, redact, and text search on existing PDFs
 - **Embedded data** — attach JSON inside the PDF for round-tripping
 
 ## WASM
@@ -140,7 +154,7 @@ The crate compiles to WebAssembly. Enable the `wasm` feature for `wasm-bindgen` 
 
 ```toml
 [dependencies]
-forme-pdf = { version = "0.7", features = ["wasm"] }
+forme-pdf = { version = "0.9", features = ["wasm"] }
 ```
 
 This is how `@formepdf/core` works under the hood — the same engine, compiled to WASM and called from JavaScript.

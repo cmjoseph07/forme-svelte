@@ -63,7 +63,7 @@ client := forme.New(apiKey,
 | `RenderAsync(slug, data, asyncOpts)` | Start async render job | `(*AsyncResult, error)` |
 | `GetJob(jobID)` | Poll async job status | `(*JobResult, error)` |
 | `Merge(pdfs)` | Merge multiple PDFs | `([]byte, error)` |
-| `Certify(pdf, opts)` | Certify a PDF with X.509 certificate | `([]byte, error)` |
+| `Certify(pdfBytes, certPem, keyPem, opts)` | Certify a PDF with X.509 certificate | `([]byte, error)` |
 | `Redact(pdf, opts)` | Redact regions/patterns from a PDF | `([]byte, error)` |
 | `Rasterize(pdf, opts)` | Convert PDF pages to PNG images | `(*RasterizeResult, error)` |
 | `Extract(pdfBytes)` | Extract embedded data | `(map[string]any, error)` |
@@ -122,7 +122,7 @@ func main() {
 
 | Constructor | Description | Chainable methods |
 |-------------|-------------|-------------------|
-| `Document(children...)` | Root container | `.Title()`, `.Author()`, `.Subject()`, `.Lang()`, `.DefaultStyle()`, `.Fonts()`, `.Tagged()` |
+| `Document(children...)` | Root container | `.Title()`, `.Author()`, `.Subject()`, `.Lang()`, `.DefaultStyle()`, `.Fonts()`, `.Tagged()`, `.PdfA()`, `.PdfUA()`, `.FlattenForms()`, `.SetCertification()` |
 | `Page(children...)` | Page container | `.Size()`, `.Margin()` |
 | `View(children...)` | Flex/grid container | `.Style()`, `.Wrap()`, `.Bookmark()`, `.Href()` |
 | `Text(content, style?)` | Text element | `.Style()`, `.Href()`, `.Children()` |
@@ -135,6 +135,10 @@ func main() {
 | `BarChart(data)` | Bar chart | `.Width()`, `.Height()`, `.Color()`, `.Title()`, `.Style()` |
 | `LineChart(series, labels)` | Line chart | `.Width()`, `.Height()`, `.ShowPoints()`, `.Title()`, `.Style()` |
 | `PieChart(data)` | Pie/donut chart | `.Width()`, `.Height()`, `.Donut()`, `.Title()`, `.Style()` |
+| `TextField(name)` | Fillable text field | `.Value()`, `.Placeholder()`, `.FontSize()`, `.Multiline()`, `.Style()` |
+| `Checkbox(name)` | Fillable checkbox | `.Checked()`, `.Style()` |
+| `Dropdown(name, options)` | Fillable dropdown | `.Value()`, `.Style()` |
+| `RadioButton(name, value)` | Radio button | `.Checked()`, `.Style()` |
 | `PageBreak()` | Force page break | -- |
 | `Watermark(text)` | Rotated watermark | `.FontSize()`, `.Color()`, `.Angle()`, `.Style()` |
 
