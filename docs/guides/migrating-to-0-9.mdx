@@ -1,0 +1,118 @@
+---
+title: Migrating to 0.9.0
+sidebarTitle: Migrating to 0.9.0
+description: Breaking changes and upgrade guide for Forme 0.9.0 — sign to certify rename, new endpoints, and migration steps.
+---
+
+Forme 0.9.0 renames the signing API surface to better reflect the cryptographic nature of the operation (PKCS#7 certification, not e-signatures). Old names continue to work with deprecation warnings.
+
+---
+
+## Breaking Changes
+
+### sign → certify rename
+
+All signing API surfaces have been renamed:
+
+| Old (deprecated) | New | Where |
+|-------------------|-----|-------|
+| `signature` prop | `certification` prop | `<Document>` component |
+| `signPdf()` | `certifyPdf()` | `@formepdf/core` |
+| `SignatureConfig` | `CertificationConfig` | TypeScript types |
+| `POST /v1/sign` | `POST /v1/certify` | Hosted API |
+| `Sign()` | `Certify()` | Go SDK |
+| `sign_pdf()` | `certify_pdf()` | Python SDK |
+
+**Old names still work** — they are exported as deprecated aliases. No immediate code changes are required, but you should migrate before a future major version removes the aliases.
+
+---
+
+## Migration Examples
+
+### React (`<Document>` prop)
+
+```diff
+  <Document
+    title="Contract"
+-   signature={{
++   certification={{
+      certificatePem,
+      privateKeyPem,
+      reason: 'Approved',
+    }}
+  >
+```
+
+### Node.js (`@formepdf/core`)
+
+```diff
+- import { signPdf } from '@formepdf/core';
++ import { certifyPdf } from '@formepdf/core';
+
+- const signed = await signPdf(pdfBytes, config);
++ const certified = await certifyPdf(pdfBytes, config);
+```
+
+### API endpoint
+
+```diff
+- POST /v1/sign
++ POST /v1/certify
+```
+
+The request body is identical. No field names changed.
+
+### Go SDK
+
+```diff
+- signed, err := client.Sign(pdfBytes, opts)
++ certified, err := client.Certify(pdfBytes, opts)
+```
+
+### Python SDK
+
+```diff
+- signed = client.sign_pdf(pdf_bytes, opts)
++ certified = client.certify_pdf(pdf_bytes, opts)
+```
+
+---
+
+## New in 0.9.0
+
+### New API Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| [POST /v1/certify](/api-reference/certify) | Certify a PDF (renamed from `/v1/sign`) |
+| [POST /v1/redact](/api-reference/redact) | Redact text, patterns, or regions from a PDF |
+| [POST /v1/merge](/api-reference/merge) | Combine multiple PDFs into one |
+| [POST /v1/rasterize](/api-reference/rasterize) | Convert PDF pages to PNG images |
+
+### New Features
+
+- **[Documents archive](/concepts/documents)** — every render auto-saved with metadata
+- **[Certificate storage](/concepts/credentials)** — save certificates, reference by ID
+- **[Redaction templates](/concepts/redaction-templates)** — reusable pattern sets
+- **[Text-search redaction](/concepts/redaction)** — literal, regex, and preset patterns
+- **[Audit trail](/concepts/audit-trail)** — full operation history on documents
+- **Developer metadata** — tag renders with custom key-value pairs
+- **[Resource listing](/api-reference/render#resources)** — list templates, documents, certificates via API
+
+### Bug Fixes
+
+- SVG children API — JSX children auto-serialized to SVG content
+- SVG opacity support (opacity, fill-opacity, stroke-opacity)
+- Page style prop inheritance fix
+- WASM time panic fix in certify and redact (browser WASM)
+- PKCS#1 private key auto-conversion to PKCS#8
+
+---
+
+## Upgrade Checklist
+
+1. Update `@formepdf/react`, `@formepdf/core`, and `@formepdf/cli` to 0.9.0
+2. Search your codebase for `signature` prop, `signPdf`, `SignatureConfig`, `/v1/sign`
+3. Replace with `certification`, `certifyPdf`, `CertificationConfig`, `/v1/certify`
+4. Update Go/Python SDK method calls if applicable
+5. Test that existing certifications still verify correctly

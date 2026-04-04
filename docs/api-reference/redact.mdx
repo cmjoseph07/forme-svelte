@@ -1,0 +1,244 @@
+---
+title: Redact PDF
+sidebarTitle: Redact
+description: Redact sensitive content from PDFs with true content removal — by coordinates, text patterns, regex, presets, or saved templates.
+---
+
+`POST /v1/redact`
+
+Remove sensitive content from a PDF. Forme performs true redaction — text operators are removed from the PDF content stream, not just covered with a black box. Metadata is automatically scrubbed on every redaction.
+
+```
+Authorization: Bearer forme_sk_...
+```
+
+---
+
+## Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pdf` | `string` | Yes | Base64-encoded PDF bytes |
+| `redactions` | `array` | No | Coordinate-based redaction regions |
+| `patterns` | `array` | No | Text search patterns (max 50) |
+| `presets` | `array` | No | Built-in pattern presets |
+| `template` | `string` | No | Slug of a saved [redaction template](/concepts/redaction-templates) (hosted API only) |
+
+At least one of `redactions`, `patterns`, `presets`, or `template` is required. All can be combined in a single request — patterns from all sources are merged.
+
+---
+
+## Coordinate Redaction
+
+Redact specific rectangular regions by page coordinates.
+
+**RedactionRegion fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `page` | `number` | Yes | Page number (0-indexed) |
+| `x` | `number` | Yes | X coordinate in points from the left edge |
+| `y` | `number` | Yes | Y coordinate in points from the top edge |
+| `width` | `number` | Yes | Width in points |
+| `height` | `number` | Yes | Height in points |
+| `color` | `string` | No | Redaction box color (default: black) |
+
+```bash
+curl -X POST https://api.formepdf.com/v1/redact \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdf\": \"$(base64 -w0 document.pdf)\",
+    \"redactions\": [
+      {\"page\": 0, \"x\": 100, \"y\": 200, \"width\": 150, \"height\": 20}
+    ]
+  }" \
+  --output redacted.pdf
+```
+
+---
+
+## Text Pattern Redaction
+
+Find and redact text by literal string or regular expression.
+
+**RedactionPattern fields:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pattern` | `string` | Yes | Text to search for (literal string or regex) |
+| `pattern_type` | `string` | Yes | `"Literal"` or `"Regex"` |
+| `page` | `number` | No | Restrict to a specific page (0-indexed). Omit to search all pages. |
+| `color` | `string` | No | Redaction box color (default: black) |
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/redact \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdf\": \"$(base64 -w0 document.pdf)\",
+    \"patterns\": [
+      {\"pattern\": \"Jane Doe\", \"pattern_type\": \"Literal\"},
+      {\"pattern\": \"\\\\d{3}-\\\\d{2}-\\\\d{4}\", \"pattern_type\": \"Regex\"}
+    ]
+  }" \
+  --output redacted.pdf
+```
+
+```javascript Node.js
+import fs from 'fs';
+
+const pdf = fs.readFileSync('document.pdf').toString('base64');
+
+const res = await fetch('https://api.formepdf.com/v1/redact', {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer forme_sk_abc123...',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    pdf,
+    patterns: [
+      { pattern: 'Jane Doe', pattern_type: 'Literal' },
+      { pattern: '\\d{3}-\\d{2}-\\d{4}', pattern_type: 'Regex' },
+    ],
+  }),
+});
+
+const redacted = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync('redacted.pdf', redacted);
+```
+
+```python Python
+import requests
+import base64
+
+with open("document.pdf", "rb") as f:
+    pdf_b64 = base64.b64encode(f.read()).decode()
+
+res = requests.post(
+    "https://api.formepdf.com/v1/redact",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/json",
+    },
+    json={
+        "pdf": pdf_b64,
+        "patterns": [
+            {"pattern": "Jane Doe", "pattern_type": "Literal"},
+            {"pattern": r"\d{3}-\d{2}-\d{4}", "pattern_type": "Regex"},
+        ],
+    },
+)
+
+with open("redacted.pdf", "wb") as f:
+    f.write(res.content)
+```
+
+```go Go
+pdf, _ := os.ReadFile("document.pdf")
+
+body, _ := json.Marshal(map[string]any{
+	"pdf": base64.StdEncoding.EncodeToString(pdf),
+	"patterns": []map[string]string{
+		{"pattern": "Jane Doe", "pattern_type": "Literal"},
+		{"pattern": `\d{3}-\d{2}-\d{4}`, "pattern_type": "Regex"},
+	},
+})
+
+req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/redact", bytes.NewReader(body))
+req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+req.Header.Set("Content-Type", "application/json")
+
+res, _ := http.DefaultClient.Do(req)
+defer res.Body.Close()
+
+out, _ := os.Create("redacted.pdf")
+io.Copy(out, res.Body)
+```
+
+</CodeGroup>
+
+---
+
+## Presets
+
+Built-in patterns for common sensitive data types. Pass an array of preset names:
+
+| Preset | Matches |
+|--------|---------|
+| `ssn` | US Social Security Numbers (XXX-XX-XXXX) |
+| `email` | Email addresses |
+| `phone` | US phone numbers |
+| `date-of-birth` | Date patterns (MM/DD/YYYY, YYYY-MM-DD, etc.) |
+| `credit-card` | Credit card numbers |
+
+```bash
+curl -X POST https://api.formepdf.com/v1/redact \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdf\": \"$(base64 -w0 patient-record.pdf)\",
+    \"presets\": [\"ssn\", \"email\", \"phone\", \"date-of-birth\"]
+  }" \
+  --output redacted.pdf
+```
+
+---
+
+## Redaction Templates
+
+Reference a saved set of patterns and presets by slug. Create templates in the [dashboard](https://app.formepdf.com/dashboard/redaction-templates) or via the dashboard API.
+
+```json
+{
+  "pdf": "<base64>",
+  "template": "hipaa-patient-record"
+}
+```
+
+Combine a template with additional inline patterns — all sources are merged:
+
+```json
+{
+  "pdf": "<base64>",
+  "template": "hipaa-patient-record",
+  "patterns": [{"pattern": "Jane Doe", "pattern_type": "Literal"}],
+  "presets": ["credit-card"]
+}
+```
+
+<Note>Redaction templates require the hosted API. Self-hosted users should pass `patterns` and `presets` directly.</Note>
+
+---
+
+## Response
+
+`200 OK` with `Content-Type: application/pdf` — the redacted PDF.
+
+---
+
+## What Gets Removed
+
+- **Text operators** (`Tj`, `TJ`, `'`, `"`) within redacted regions are removed from the PDF content stream
+- **Metadata** is automatically scrubbed: author, creator, edit history, and comments are stripped. `/Producer` is replaced with "Forme" and `/ModDate` with the current timestamp.
+- **Visual overlay**: A black rectangle covers each redacted area
+
+<Tip>To verify redaction worked, open the PDF in Chrome and try to select text in the redacted area. If the text is truly removed, there will be nothing to select.</Tip>
+
+---
+
+## Known Limitations
+
+- **WinAnsi encoding only**: Text search works on standard Western-encoded text. CJK and other non-WinAnsi text is not searchable by patterns — use coordinate redaction instead.
+- **Maximum 50 patterns per request**: Combine multiple presets into a single request, but keep the total pattern count under 50.
+- **Images and vector graphics**: Visual black rectangles cover these elements, but the underlying image data is not removed from the content stream in v1.
+
+---
+
+## Related
+
+- [Redaction](/concepts/redaction) — how Forme redaction works, compliance use cases
+- [Redaction Templates](/concepts/redaction-templates) — creating and managing saved templates

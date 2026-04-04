@@ -90,7 +90,10 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Fillable forms**: AcroForm components — `<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>`. Fill and flatten for non-editable delivery.
 - **PDF/UA accessibility**: `<Document pdfUa>` generates PDF/UA-1 compliant documents with structure tree, tab order, role map, and artifact tagging.
 - **PDF/A archival**: `<Document pdfa="2b">` for long-term preservation. Supports PDF/A-2b and PDF/A-2a.
-- **Digital signatures**: PKCS#7 signatures with X.509 certificates via the `signature` prop or `/v1/sign` API endpoint.
+- **Digital certification**: PKCS#7 certification with X.509 certificates via the `certification` prop or `/v1/certify` API endpoint.
+- **PDF redaction**: True content removal with metadata scrubbing. Text-search, regex, presets, and saved templates.
+- **PDF merging**: Combine 2-20 PDFs into one via `/v1/merge`.
+- **PDF rasterization**: Convert pages to PNG images via `/v1/rasterize`, powered by PDFium.
 
 ## Browser Usage
 
@@ -221,7 +224,10 @@ Font sources can be file paths, data URIs, or `Uint8Array`. Fonts are automatica
 | Fillable forms | AcroForm (TextField, Checkbox, Dropdown, Radio) | No | HTML `<form>` (not PDF forms) |
 | PDF/UA accessibility | `<Document pdfUa>` | No | No |
 | PDF/A archival | `<Document pdfa="2b">` | No | No |
-| Digital signatures | PKCS#7 via `signature` prop or API | No | No |
+| Digital certification | PKCS#7 via `certification` prop or API | No | No |
+| Redaction | True content removal + metadata scrubbing | No | No |
+| PDF merging | Combine multiple PDFs | No | No |
+| Rasterization | PDF → PNG via PDFium | No | No |
 | Dependencies | None (WASM) | yoga-layout | Chrome/Chromium |
 | Runs in-process | Yes | Yes | No (subprocess) |
 
@@ -263,7 +269,7 @@ Full docs at [docs.formepdf.com](https://docs.formepdf.com):
 - [Forms](https://docs.formepdf.com/forms) — fillable AcroForm components
 - [Accessibility](https://docs.formepdf.com/accessibility) — PDF/UA-1 compliance
 - [Archival](https://docs.formepdf.com/archival) — PDF/A compliance
-- [Digital Signatures](https://docs.formepdf.com/digital-signatures) — PKCS#7 signing
+- [Digital Certification](https://docs.formepdf.com/concepts/digital-certification) — PKCS#7 certification
 
 ## Contributing
 

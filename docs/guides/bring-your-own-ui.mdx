@@ -1,0 +1,143 @@
+---
+title: Bring Your Own UI
+sidebarTitle: Bring Your Own UI
+description: Use Forme as a PDF operations engine behind your own frontend — redaction, merging, certification, and rasterization via API.
+---
+
+The Forme dashboard is a reference implementation. The same API endpoints that power it are available to your own applications. Build custom document workflows without adopting the Forme UI.
+
+---
+
+## Architecture
+
+Your frontend collects user intent (what to redact, which PDFs to merge, which certificate to use). Your backend sends the structured request to Forme's API and returns the result.
+
+```
+Your Frontend → Your Backend → Forme API → PDF result
+```
+
+All `/v1/*` endpoints accept JSON and return PDF bytes (or JSON for rasterize). No cookies, sessions, or UI dependencies.
+
+---
+
+## Custom Redaction UI
+
+Build a UI where users draw boxes on a PDF preview, then send the coordinates to Forme:
+
+```javascript
+// Your frontend collects redaction regions from user interaction
+const regions = [
+  { page: 0, x: 100, y: 200, width: 150, height: 20 },
+  { page: 0, x: 300, y: 400, width: 200, height: 15 },
+];
+
+// Your backend sends them to Forme
+const res = await fetch('https://api.formepdf.com/v1/redact', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.FORME_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    pdf: pdfBase64,
+    redactions: regions,
+  }),
+});
+
+const redactedPdf = Buffer.from(await res.arrayBuffer());
+```
+
+To show a PDF preview for drawing, use [POST /v1/rasterize](/api-reference/rasterize) to convert pages to images, then overlay a canvas for region selection.
+
+---
+
+## Custom Merge Workflow
+
+Let users select and reorder PDFs, then merge:
+
+```javascript
+// User selected these PDFs in your UI
+const selectedPdfs = [invoicePdfBase64, termsPdfBase64, appendixPdfBase64];
+
+const res = await fetch('https://api.formepdf.com/v1/merge', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.FORME_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ pdfs: selectedPdfs }),
+});
+
+const merged = Buffer.from(await res.arrayBuffer());
+```
+
+---
+
+## Programmatic Certification
+
+Certify documents as part of an approval workflow:
+
+```javascript
+// After user approves the document in your UI
+const res = await fetch('https://api.formepdf.com/v1/certify', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.FORME_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    pdf: documentPdfBase64,
+    certificateId: 'clxyz...', // saved certificate
+    reason: `Approved by ${user.name}`,
+    location: user.office,
+  }),
+});
+
+const certified = Buffer.from(await res.arrayBuffer());
+```
+
+---
+
+## Preview Generation
+
+Use rasterization to generate preview images for your own document viewer:
+
+```javascript
+const res = await fetch('https://api.formepdf.com/v1/rasterize', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${process.env.FORME_API_KEY}`,
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ pdf: pdfBase64, dpi: 150 }),
+});
+
+const { pages } = await res.json();
+// pages is an array of base64 PNG images — one per page
+```
+
+---
+
+## Resource Management
+
+List your templates, documents, and certificates programmatically:
+
+```bash
+# List templates
+curl https://api.formepdf.com/v1/templates \
+  -H "Authorization: Bearer forme_sk_abc123..."
+
+# Get a specific document with download URL
+curl https://api.formepdf.com/v1/documents/clxyz... \
+  -H "Authorization: Bearer forme_sk_abc123..."
+```
+
+See [Resources](/api-reference/render#resources) for the full listing API.
+
+---
+
+## Self-Hosted
+
+All operation endpoints (`/v1/render`, `/v1/certify`, `/v1/redact`, `/v1/merge`, `/v1/rasterize`) work on [self-hosted](/self-hosting) instances. Point your application at your own Forme container and avoid external API calls entirely.
+
+The only features that require the hosted API are: saved templates, saved certificates (`certificateId`), redaction templates (`template` slug), document storage, and resource listing.

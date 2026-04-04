@@ -1,0 +1,145 @@
+---
+title: Redaction
+description: How Forme performs true PDF redaction — content stream text removal, metadata scrubbing, and compliance-grade sensitive data removal.
+---
+
+Forme performs true PDF redaction: text is removed from the content stream, not just hidden behind a black box. This is the difference between compliance-grade redaction and a cosmetic overlay that can be trivially reversed.
+
+---
+
+## Why Black Boxes Aren't Enough
+
+A black rectangle drawn over text in a PDF does not remove the text — it only hides it visually. The text remains in the PDF content stream and can be extracted by:
+
+- Copying and pasting from the PDF
+- Using PDF text extraction tools
+- Inspecting the raw PDF file
+
+This is not a theoretical risk. Improperly redacted court documents, government filings, and legal briefs have leaked sensitive information because authors used annotation-based "redaction" tools that only add a visual overlay.
+
+---
+
+## How Forme Redacts
+
+When you call `POST /v1/redact`, Forme:
+
+1. **Decompresses content streams** — PDF content streams use FlateDecode compression. Forme decompresses them to access the raw page description operators.
+
+2. **Identifies text operators** — PDF draws text using operators like `Tj` (show text), `TJ` (show text with positioning), `'` (move to next line and show text), and `"` (set spacing and show text). Forme identifies which text operators fall within redaction regions.
+
+3. **Removes text operators** — Text operators within redacted regions are removed from the content stream entirely. The text data no longer exists in the PDF.
+
+4. **Draws visual overlay** — A black (or custom-colored) rectangle is drawn where the text was, providing a clear visual indicator that content has been redacted.
+
+5. **Recompresses content streams** — The modified content stream is recompressed with FlateDecode.
+
+6. **Scrubs metadata** — Document metadata is automatically cleaned (see below).
+
+---
+
+## Metadata Scrubbing
+
+Every redaction automatically scrubs document metadata. This is not optional — metadata often contains sensitive information that authors don't realize is embedded.
+
+**What gets removed:**
+- Author name
+- Creator application
+- Edit history
+- Comments and annotations
+
+**What gets replaced:**
+- `/Producer` → `"Forme"`
+- `/ModDate` → current timestamp
+
+---
+
+## Three Ways to Redact
+
+### 1. Coordinate Regions
+
+Draw precise rectangles over areas to redact. Best for known, fixed layouts where content position is predictable. This is what the dashboard's "Draw" mode uses.
+
+```json
+{
+  "pdf": "<base64>",
+  "redactions": [
+    {"page": 0, "x": 100, "y": 200, "width": 150, "height": 20}
+  ]
+}
+```
+
+### 2. Text Search
+
+Find text by literal string or regular expression. Best for dynamic content where you know what to redact but not exactly where it appears.
+
+```json
+{
+  "pdf": "<base64>",
+  "patterns": [
+    {"pattern": "Jane Doe", "pattern_type": "Literal"},
+    {"pattern": "\\d{3}-\\d{2}-\\d{4}", "pattern_type": "Regex"}
+  ]
+}
+```
+
+### 3. Presets and Templates
+
+Use built-in presets for common sensitive data types, or save reusable sets of patterns as [redaction templates](/concepts/redaction-templates).
+
+```json
+{
+  "pdf": "<base64>",
+  "presets": ["ssn", "email", "phone"],
+  "template": "hipaa-patient-record"
+}
+```
+
+**Available presets:**
+
+| Preset | Pattern |
+|--------|---------|
+| `ssn` | US Social Security Numbers (XXX-XX-XXXX) |
+| `email` | Email addresses |
+| `phone` | US phone numbers |
+| `date-of-birth` | Date patterns (MM/DD/YYYY, YYYY-MM-DD, etc.) |
+| `credit-card` | Credit card numbers |
+
+All three methods can be combined in a single request.
+
+---
+
+## Verifying Redaction
+
+After redacting a PDF:
+
+1. Open the redacted PDF in **Chrome** (not macOS Preview)
+2. Try to select text in the redacted areas
+3. If the redaction worked, there will be nothing to select — the text no longer exists
+
+<Note>macOS Preview may show a text cursor in redacted areas. This is a rendering artifact — the text is actually removed. Always verify in Chrome or Adobe Acrobat.</Note>
+
+---
+
+## Known Limitations
+
+- **WinAnsi encoding only**: Text search and pattern matching works on standard Western-encoded text (WinAnsi/Windows-1252). CJK, Arabic, and other non-WinAnsi encoded text cannot be found by text search — use coordinate redaction instead.
+- **Images and vector graphics**: In v1, images and vector graphics within redacted regions are covered by the visual overlay but not removed from the content stream. True image redaction is planned for a future release.
+- **Maximum 50 patterns per request**: Keep the total number of patterns (including those expanded from presets and templates) under 50.
+
+---
+
+## Compliance Use Cases
+
+- **HIPAA**: Redact patient names, SSNs, dates of birth, and medical record numbers before sharing
+- **GDPR**: Remove personally identifiable information from documents shared with third parties
+- **FOIA**: Redact exempted information from public records requests
+- **Legal Discovery**: Protect privileged information in document productions
+- **Internal Audit**: Remove sensitive details before sharing reports across departments
+
+---
+
+## Related
+
+- [Redact API](/api-reference/redact) — endpoint reference with code examples
+- [Redaction Templates](/concepts/redaction-templates) — saved pattern sets
+- [Bring Your Own UI](/guides/bring-your-own-ui) — building a custom redaction interface

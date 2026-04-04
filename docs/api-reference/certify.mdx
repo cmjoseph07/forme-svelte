@@ -1,0 +1,193 @@
+---
+title: Certify PDF
+sidebarTitle: Certify
+description: Apply a PKCS#7 digital signature to an existing PDF using X.509 certificates, with optional visible signature annotation.
+---
+
+`POST /v1/certify`
+
+Apply a PKCS#7 detached digital signature to a PDF. This cryptographically proves the document has not been tampered with since certification and identifies the certifier.
+
+```
+Authorization: Bearer forme_sk_...
+```
+
+---
+
+## Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pdf` | `string` | Yes | Base64-encoded PDF bytes |
+| `certificatePem` | `string` | Yes* | X.509 certificate in PEM format |
+| `privateKeyPem` | `string` | Yes* | RSA private key in PEM format (PKCS#8) |
+| `certificateId` | `string` | No | ID of a saved certificate (hosted API only). Use instead of inline PEM. |
+| `reason` | `string` | No | Certification reason (e.g., "Approved", "Reviewed") |
+| `location` | `string` | No | Certification location (e.g., "San Francisco, CA") |
+| `contact` | `string` | No | Certifier contact information |
+| `visible` | `boolean` | No | Show a visible signature annotation on the page (default: `false`) |
+| `x` | `number` | No | X coordinate in points from the left edge (for visible signatures) |
+| `y` | `number` | No | Y coordinate in points from the bottom edge (for visible signatures) |
+| `width` | `number` | No | Width of the visible signature in points (default: `200`) |
+| `height` | `number` | No | Height of the visible signature in points (default: `50`) |
+
+*Either `certificatePem` + `privateKeyPem` or `certificateId` is required.
+
+---
+
+## Using Inline Certificates
+
+Pass the certificate and private key directly in the request body:
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/certify \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdf\": \"$(base64 -w0 contract.pdf)\",
+    \"certificatePem\": \"$(cat cert.pem)\",
+    \"privateKeyPem\": \"$(cat key.pem)\",
+    \"reason\": \"Approved\",
+    \"location\": \"San Francisco, CA\",
+    \"contact\": \"legal@acme.com\"
+  }" \
+  --output certified-contract.pdf
+```
+
+```javascript Node.js
+import fs from 'fs';
+
+const pdf = fs.readFileSync('contract.pdf').toString('base64');
+const certificatePem = fs.readFileSync('cert.pem', 'utf-8');
+const privateKeyPem = fs.readFileSync('key.pem', 'utf-8');
+
+const res = await fetch('https://api.formepdf.com/v1/certify', {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer forme_sk_abc123...',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    pdf,
+    certificatePem,
+    privateKeyPem,
+    reason: 'Approved',
+    location: 'San Francisco, CA',
+    contact: 'legal@acme.com',
+  }),
+});
+
+const certifiedPdf = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync('certified-contract.pdf', certifiedPdf);
+```
+
+```python Python
+import requests
+import base64
+
+with open("contract.pdf", "rb") as f:
+    pdf_b64 = base64.b64encode(f.read()).decode()
+
+cert_pem = open("cert.pem").read()
+key_pem = open("key.pem").read()
+
+res = requests.post(
+    "https://api.formepdf.com/v1/certify",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/json",
+    },
+    json={
+        "pdf": pdf_b64,
+        "certificatePem": cert_pem,
+        "privateKeyPem": key_pem,
+        "reason": "Approved",
+        "location": "San Francisco, CA",
+        "contact": "legal@acme.com",
+    },
+)
+
+with open("certified-contract.pdf", "wb") as f:
+    f.write(res.content)
+```
+
+```go Go
+package main
+
+import (
+	"bytes"
+	"encoding/base64"
+	"encoding/json"
+	"io"
+	"net/http"
+	"os"
+)
+
+func main() {
+	pdf, _ := os.ReadFile("contract.pdf")
+	certPem, _ := os.ReadFile("cert.pem")
+	keyPem, _ := os.ReadFile("key.pem")
+
+	body, _ := json.Marshal(map[string]string{
+		"pdf":            base64.StdEncoding.EncodeToString(pdf),
+		"certificatePem": string(certPem),
+		"privateKeyPem":  string(keyPem),
+		"reason":         "Approved",
+		"location":       "San Francisco, CA",
+		"contact":        "legal@acme.com",
+	})
+
+	req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/certify", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+	req.Header.Set("Content-Type", "application/json")
+
+	res, _ := http.DefaultClient.Do(req)
+	defer res.Body.Close()
+
+	out, _ := os.Create("certified-contract.pdf")
+	io.Copy(out, res.Body)
+}
+```
+
+</CodeGroup>
+
+---
+
+## Using Saved Certificates
+
+On the hosted API, you can save certificates in [Credentials](/concepts/credentials) and reference them by ID. This avoids sending private keys in every request.
+
+```bash
+curl -X POST https://api.formepdf.com/v1/certify \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdf\": \"$(base64 -w0 contract.pdf)\",
+    \"certificateId\": \"clxyz...\",
+    \"reason\": \"Approved\"
+  }" \
+  --output certified-contract.pdf
+```
+
+<Note>Saved certificates are not available on self-hosted instances. Pass `certificatePem` and `privateKeyPem` directly.</Note>
+
+---
+
+## Response
+
+`200 OK` with `Content-Type: application/pdf` — the certified PDF.
+
+---
+
+## Deprecated Alias
+
+The `POST /v1/sign` endpoint still works and routes to the same handler. See [migration guide](/guides/migrating-to-0-9).
+
+---
+
+## Related
+
+- [Digital Certification](/concepts/digital-certification) — certifying at render time, visible signatures, known limitations
+- [Credentials & Certificates](/concepts/credentials) — managing saved certificates

@@ -4,7 +4,7 @@ sidebarTitle: Self-Hosting
 description: Run the Forme render engine as a self-hosted Docker container. Same API, no external dependencies, no database, no Chromium.
 ---
 
-A single Docker container that exposes the Forme render engine as an HTTP API. Same endpoints as the [hosted API](/api-reference), runs anywhere Docker runs. No Chromium, no LibreOffice, no database, no native dependencies.
+A single Docker container that exposes the Forme render engine as an HTTP API. Same endpoints as the [hosted API](/api-reference/render), runs anywhere Docker runs. No Chromium, no LibreOffice, no database, no native dependencies.
 
 ```bash
 docker run --rm -p 3000:3000 formepdf/forme:latest
@@ -48,7 +48,7 @@ docker compose up
 
 ```bash
 curl http://localhost:3000/health
-# {"status":"ok","version":"0.8.1"}
+# {"status":"ok","version":"0.9.0"}
 ```
 
 ---
@@ -61,7 +61,11 @@ The self-hosted API matches the hosted API, so switching between them is a base 
 |----------|-------------|
 | `POST /v1/render` | Inline render — compiled template JSON + data in request body |
 | `POST /v1/render/:slug` | Template render — loads pre-compiled JSON from mounted volume |
-| `POST /v1/sign` | Sign an existing PDF with an X.509 certificate |
+| `POST /v1/certify` | Certify an existing PDF with an X.509 certificate |
+| `POST /v1/sign` | *(deprecated alias for /v1/certify)* |
+| `POST /v1/redact` | Redact regions or text patterns from a PDF |
+| `POST /v1/merge` | Merge multiple PDFs into one |
+| `POST /v1/rasterize` | Convert PDF pages to PNG images |
 | `GET /health` | Health check |
 
 ### Inline render
@@ -151,10 +155,10 @@ res = requests.post(
 
 Templates are loaded from disk on each request — no restart needed when templates change.
 
-### Sign
+### Certify
 
 ```bash
-curl -X POST http://localhost:3000/v1/sign \
+curl -X POST http://localhost:3000/v1/certify \
   -H "Content-Type: application/json" \
   -d '{
     "pdf": "<base64-encoded PDF>",
@@ -162,8 +166,49 @@ curl -X POST http://localhost:3000/v1/sign \
     "privateKeyPem": "-----BEGIN PRIVATE KEY-----\n...",
     "reason": "Approved"
   }' \
-  --output signed.pdf
+  --output certified.pdf
 ```
+
+<Note>The deprecated `/v1/sign` endpoint still works and routes to the same handler.</Note>
+
+### Redact
+
+```bash
+curl -X POST http://localhost:3000/v1/redact \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdf": "<base64-encoded PDF>",
+    "patterns": [{"pattern": "Jane Doe", "pattern_type": "Literal"}],
+    "presets": ["ssn", "email"]
+  }' \
+  --output redacted.pdf
+```
+
+### Merge
+
+```bash
+curl -X POST http://localhost:3000/v1/merge \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdfs": ["<base64 PDF 1>", "<base64 PDF 2>"]
+  }' \
+  --output merged.pdf
+```
+
+### Rasterize
+
+```bash
+curl -X POST http://localhost:3000/v1/rasterize \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pdf": "<base64-encoded PDF>",
+    "dpi": 150
+  }'
+```
+
+Returns `{ "pages": ["<base64 PNG>", ...] }`.
+
+The rasterizer runs as a PDFium-based sidecar service on port 3001 inside the container. It starts automatically. Configure via `RASTERIZER_URL` if running separately.
 
 ---
 
@@ -231,6 +276,7 @@ All configuration is via environment variables. No config files.
 | `HTTP_PORT` | `3000` | Port the server listens on |
 | `FORME_API_KEY` | *(none)* | If set, enables Bearer token auth on all `/v1/*` endpoints |
 | `FORME_TEMPLATES_DIR` | *(none)* | Path to directory of pre-compiled `.json` templates |
+| `RASTERIZER_URL` | `http://localhost:3001` | URL of the PDFium rasterizer sidecar |
 
 ---
 
@@ -327,6 +373,10 @@ These features are available on the [hosted API](https://api.formepdf.com) only:
 - **Team management** — org-level API keys, seat management
 - **Usage analytics** — per-render logging and analytics
 - **Async rendering** — job queuing, webhooks, S3 upload
+- **Documents archive** — auto-save renders, metadata, download URLs
+- **Certificate storage** — save certificates, reference by `certificateId`
+- **Redaction templates** — saved pattern sets, reference by slug
+- **Resource listing** — `GET /v1/templates`, `/v1/documents`, etc.
 - **Priority support** — SLA-backed response times
 
 Self-hosters who need these features can upgrade to the hosted service at any time — it's a base URL change.
@@ -343,7 +393,10 @@ Self-hosters who need these features can upgrade to the hosted service at any ti
 | Input | HTML, Markdown, Office docs | JSX templates (compiled to JSON) |
 | Page breaks | Chromium-dependent | Engine-native |
 | AcroForms | No | Yes |
-| Digital signatures | No | Yes |
+| Digital certification | No | Yes |
+| Redaction | No | Yes |
+| PDF merging | No | Yes |
+| Rasterization | No | Yes |
 | PDF/UA | No | Yes |
 | PDF/A | No | Yes |
 

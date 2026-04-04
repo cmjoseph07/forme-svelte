@@ -28,20 +28,55 @@
       },
       {
         "group": "Reference",
-        "pages": ["components", "styles", "tailwind", "fonts", "page-breaks", "charts", "templates", "embedded-data", "api-reference", "self-hosting"]
+        "pages": ["components", "styles", "tailwind", "fonts", "page-breaks", "charts", "templates", "embedded-data", "self-hosting"]
+      },
+      {
+        "group": "API Reference",
+        "pages": [
+          "api-reference/render",
+          "api-reference/certify",
+          "api-reference/sign",
+          "api-reference/redact",
+          "api-reference/merge",
+          "api-reference/rasterize"
+        ]
+      },
+      {
+        "group": "Concepts",
+        "pages": [
+          "concepts/documents",
+          "concepts/credentials",
+          "concepts/redaction",
+          "concepts/redaction-templates",
+          "concepts/digital-certification",
+          "concepts/audit-trail"
+        ]
       },
       {
         "group": "Enterprise",
-        "pages": ["forms", "accessibility", "archival", "digital-signatures"]
+        "pages": ["forms", "accessibility", "archival"]
       },
       {
         "group": "SDKs",
         "pages": ["go-sdk", "rust-sdk"]
       },
       {
-        "group": "Migration",
-        "pages": ["migrating-from-react-pdf", "replacing-puppeteer"]
+        "group": "Guides",
+        "pages": [
+          "guides/migrating-to-0-9",
+          "guides/bring-your-own-ui",
+          "migrating-from-react-pdf",
+          "replacing-puppeteer"
+        ]
+      },
+      {
+        "group": "Changelog",
+        "pages": ["changelog/0-9-0", "changelog/0-8-3"]
       }
     ]
-  }
+  },
+  "redirects": [
+    { "source": "/api-reference", "destination": "/api-reference/render" },
+    { "source": "/digital-signatures", "destination": "/concepts/digital-certification" }
+  ]
 }

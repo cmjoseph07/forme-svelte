@@ -63,6 +63,9 @@ client := forme.New(apiKey,
 | `RenderAsync(slug, data, asyncOpts)` | Start async render job | `(*AsyncResult, error)` |
 | `GetJob(jobID)` | Poll async job status | `(*JobResult, error)` |
 | `Merge(pdfs)` | Merge multiple PDFs | `([]byte, error)` |
+| `Certify(pdf, opts)` | Certify a PDF with X.509 certificate | `([]byte, error)` |
+| `Redact(pdf, opts)` | Redact regions/patterns from a PDF | `([]byte, error)` |
+| `Rasterize(pdf, opts)` | Convert PDF pages to PNG images | `(*RasterizeResult, error)` |
 | `Extract(pdfBytes)` | Extract embedded data | `(map[string]any, error)` |
 
 ### Error handling

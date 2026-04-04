@@ -1,0 +1,22 @@
+---
+title: Sign PDF (Deprecated)
+sidebarTitle: Sign (deprecated)
+description: The POST /v1/sign endpoint has been renamed to POST /v1/certify. This page redirects to the new documentation.
+---
+
+<Warning>
+**Deprecated** — `POST /v1/sign` has been renamed to `POST /v1/certify`. The old endpoint still works but will be removed in a future version.
+</Warning>
+
+The `/v1/sign` endpoint routes to the same handler as `/v1/certify`. No code changes are required on your end — existing integrations will continue to work.
+
+When you're ready to migrate, update your API calls:
+
+```diff
+- POST /v1/sign
++ POST /v1/certify
+```
+
+See the full [Certify PDF documentation](/api-reference/certify) for the current API reference.
+
+See the [migration guide](/guides/migrating-to-0-9) for all 0.9.0 breaking changes.

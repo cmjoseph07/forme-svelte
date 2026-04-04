@@ -1,0 +1,130 @@
+---
+title: Merge PDFs
+sidebarTitle: Merge
+description: Combine multiple PDF files into a single document via the hosted API.
+---
+
+`POST /v1/merge`
+
+Merge multiple PDFs into a single document. PDFs are combined in array order.
+
+```
+Authorization: Bearer forme_sk_...
+```
+
+---
+
+## Request Body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pdfs` | `string[]` | Yes | Array of base64-encoded PDF bytes. Minimum 2, maximum 20. |
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```bash curl
+curl -X POST https://api.formepdf.com/v1/merge \
+  -H "Authorization: Bearer forme_sk_abc123..." \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"pdfs\": [
+      \"$(base64 -w0 invoice.pdf)\",
+      \"$(base64 -w0 terms.pdf)\"
+    ]
+  }" \
+  --output combined.pdf
+```
+
+```javascript Node.js
+import fs from 'fs';
+
+const invoice = fs.readFileSync('invoice.pdf').toString('base64');
+const terms = fs.readFileSync('terms.pdf').toString('base64');
+
+const res = await fetch('https://api.formepdf.com/v1/merge', {
+  method: 'POST',
+  headers: {
+    Authorization: 'Bearer forme_sk_abc123...',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ pdfs: [invoice, terms] }),
+});
+
+const merged = Buffer.from(await res.arrayBuffer());
+fs.writeFileSync('combined.pdf', merged);
+```
+
+```python Python
+import requests
+import base64
+
+invoice = base64.b64encode(open("invoice.pdf", "rb").read()).decode()
+terms = base64.b64encode(open("terms.pdf", "rb").read()).decode()
+
+res = requests.post(
+    "https://api.formepdf.com/v1/merge",
+    headers={
+        "Authorization": "Bearer forme_sk_abc123...",
+        "Content-Type": "application/json",
+    },
+    json={"pdfs": [invoice, terms]},
+)
+
+with open("combined.pdf", "wb") as f:
+    f.write(res.content)
+```
+
+```go Go
+invoice, _ := os.ReadFile("invoice.pdf")
+terms, _ := os.ReadFile("terms.pdf")
+
+body, _ := json.Marshal(map[string]any{
+	"pdfs": []string{
+		base64.StdEncoding.EncodeToString(invoice),
+		base64.StdEncoding.EncodeToString(terms),
+	},
+})
+
+req, _ := http.NewRequest("POST", "https://api.formepdf.com/v1/merge", bytes.NewReader(body))
+req.Header.Set("Authorization", "Bearer forme_sk_abc123...")
+req.Header.Set("Content-Type", "application/json")
+
+res, _ := http.DefaultClient.Do(req)
+defer res.Body.Close()
+
+out, _ := os.Create("combined.pdf")
+io.Copy(out, res.Body)
+```
+
+</CodeGroup>
+
+---
+
+## Response
+
+`200 OK` with `Content-Type: application/pdf` — the merged PDF.
+
+---
+
+## Limits
+
+- Minimum **2** PDFs per request
+- Maximum **20** PDFs per request
+- PDFs are merged in array order — the first PDF's pages appear first
+
+---
+
+## What Is Not Merged
+
+The following PDF features from source documents are not carried over in v1:
+
+- **AcroForms** — form fields are not merged (use flatten before merging if you need form data preserved visually)
+- **Bookmarks** — PDF outline entries are not combined
+- **Named destinations** — internal cross-references between source documents are not resolved
+- **Structure trees** — tagged PDF accessibility data is not merged
+
+Page content, fonts, images, and annotations are preserved.
