@@ -17,6 +17,8 @@ pub struct CertifyRequest {
     pub certificate_pem: String,
     /// PEM-encoded RSA private key (PKCS#8).
     pub private_key_pem: String,
+    /// Stored certificate ID (hosted-only, rejected here).
+    pub certificate_id: Option<String>,
     /// Reason for certification.
     pub reason: Option<String>,
     /// Location of certification.
@@ -38,6 +40,14 @@ pub struct CertifyRequest {
 
 /// POST /v1/certify — certify an existing PDF with an X.509 certificate.
 pub async fn certify(Json(payload): Json<CertifyRequest>) -> Result<Response, ApiError> {
+    if payload.certificate_id.is_some() {
+        return Err(ApiError::BadRequest(
+            "certificateId is not supported in self-hosted mode. \
+             Pass certificatePem and privateKeyPem directly."
+                .into(),
+        ));
+    }
+
     let b64 = base64::engine::general_purpose::STANDARD;
 
     let pdf_bytes = b64
