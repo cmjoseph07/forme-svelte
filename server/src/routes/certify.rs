@@ -14,9 +14,11 @@ pub struct CertifyRequest {
     /// Base64-encoded PDF bytes.
     pub pdf: String,
     /// PEM-encoded X.509 certificate.
-    pub certificate_pem: String,
-    /// PEM-encoded RSA private key (PKCS#8).
-    pub private_key_pem: String,
+    #[serde(alias = "certificatePem")]
+    pub certificate: String,
+    /// PEM-encoded RSA private key (PKCS#8 or PKCS#1).
+    #[serde(alias = "privateKeyPem")]
+    pub private_key: String,
     /// Stored certificate ID (hosted-only, rejected here).
     pub certificate_id: Option<String>,
     /// Reason for certification.
@@ -43,7 +45,7 @@ pub async fn certify(Json(payload): Json<CertifyRequest>) -> Result<Response, Ap
     if payload.certificate_id.is_some() {
         return Err(ApiError::BadRequest(
             "certificateId is not supported in self-hosted mode. \
-             Pass certificatePem and privateKeyPem directly."
+             Pass certificate and privateKey directly."
                 .into(),
         ));
     }
@@ -55,8 +57,8 @@ pub async fn certify(Json(payload): Json<CertifyRequest>) -> Result<Response, Ap
         .map_err(|e| ApiError::BadRequest(format!("Invalid base64 PDF: {e}")))?;
 
     let config = forme::CertificationConfig {
-        certificate_pem: payload.certificate_pem,
-        private_key_pem: payload.private_key_pem,
+        certificate_pem: payload.certificate,
+        private_key_pem: payload.private_key,
         reason: payload.reason,
         location: payload.location,
         contact: payload.contact,

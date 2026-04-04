@@ -18,12 +18,12 @@ pub struct MergeRequest {
 pub async fn merge(Json(payload): Json<MergeRequest>) -> Result<Response, ApiError> {
     if payload.pdfs.len() < 2 {
         return Err(ApiError::BadRequest(
-            "At least 2 PDFs are required".to_string(),
+            "pdfs array must contain at least 2 PDFs".to_string(),
         ));
     }
     if payload.pdfs.len() > 20 {
         return Err(ApiError::BadRequest(
-            "At most 20 PDFs are allowed".to_string(),
+            "pdfs array must contain at most 20 PDFs".to_string(),
         ));
     }
 

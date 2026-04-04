@@ -35,7 +35,6 @@
         "pages": [
           "api-reference/render",
           "api-reference/certify",
-          "api-reference/sign",
           "api-reference/redact",
           "api-reference/merge",
           "api-reference/rasterize"

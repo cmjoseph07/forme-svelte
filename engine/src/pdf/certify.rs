@@ -129,25 +129,42 @@ fn parse_pem_certificate(pem: &str) -> Result<Certificate, FormeError> {
         .map_err(|e| FormeError::RenderError(format!("Failed to parse PEM certificate: {e}")))
 }
 
-/// Parse a PEM-encoded RSA private key (PKCS#8 format).
+/// Parse a PEM-encoded RSA private key (PKCS#8 or PKCS#1 format).
 ///
-/// Only RSA keys are supported. ECDSA, Ed25519, and other key types will
-/// produce a clear error message.
+/// Tries PKCS#8 first (`-----BEGIN PRIVATE KEY-----`), then falls back to
+/// PKCS#1 (`-----BEGIN RSA PRIVATE KEY-----`). Only RSA keys are supported.
+/// ECDSA, Ed25519, and other key types will produce a clear error message.
 fn parse_pem_private_key(pem: &str) -> Result<RsaPrivateKey, FormeError> {
-    RsaPrivateKey::from_pkcs8_pem(pem).map_err(|e| {
-        let msg = e.to_string();
-        // Detect non-RSA key algorithms (ECDSA, Ed25519, etc.) which produce
-        // "unknown/unsupported algorithm OID" or similar errors
-        if msg.contains("algorithm") || msg.contains("OID") {
-            FormeError::RenderError(
-                "Only RSA private keys are supported for PDF signing. \
-                 ECDSA, Ed25519, and other key types are not supported."
-                    .to_string(),
-            )
-        } else {
-            FormeError::RenderError(format!("Failed to parse PEM private key: {e}"))
+    use rsa::pkcs1::DecodeRsaPrivateKey;
+
+    // Try PKCS#8 first (most common format)
+    match RsaPrivateKey::from_pkcs8_pem(pem) {
+        Ok(key) => Ok(key),
+        Err(pkcs8_err) => {
+            // If it looks like a PKCS#1 key, try that format
+            if pem.contains("BEGIN RSA PRIVATE KEY") {
+                return RsaPrivateKey::from_pkcs1_pem(pem).map_err(|e| {
+                    FormeError::RenderError(format!(
+                        "Failed to parse PKCS#1 (RSA) private key: {e}"
+                    ))
+                });
+            }
+
+            let msg = pkcs8_err.to_string();
+            // Detect non-RSA key algorithms (ECDSA, Ed25519, etc.)
+            if msg.contains("algorithm") || msg.contains("OID") {
+                return Err(FormeError::RenderError(
+                    "Only RSA private keys are supported for PDF signing. \
+                     ECDSA, Ed25519, and other key types are not supported."
+                        .to_string(),
+                ));
+            }
+
+            Err(FormeError::RenderError(format!(
+                "Failed to parse PEM private key: {pkcs8_err}"
+            )))
         }
-    })
+    }
 }
 
 /// Scan a PDF for structural metadata needed for incremental update.

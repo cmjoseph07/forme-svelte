@@ -18,6 +18,9 @@ pub enum ApiError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("{0}")]
+    NotImplemented(String),
 }
 
 impl ApiError {
@@ -28,6 +31,7 @@ impl ApiError {
             ApiError::NotFound(_) => StatusCode::NOT_FOUND,
             ApiError::RenderFailed(_) => StatusCode::BAD_REQUEST,
             ApiError::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            ApiError::NotImplemented(_) => StatusCode::NOT_IMPLEMENTED,
         }
     }
 
@@ -38,6 +42,7 @@ impl ApiError {
             ApiError::NotFound(_) => "NOT_FOUND",
             ApiError::RenderFailed(_) => "RENDER_FAILED",
             ApiError::Internal(_) => "INTERNAL_ERROR",
+            ApiError::NotImplemented(_) => "NOT_IMPLEMENTED",
         }
     }
 }

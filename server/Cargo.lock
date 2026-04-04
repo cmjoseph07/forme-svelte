@@ -553,6 +553,7 @@ dependencies = [
  "axum-test",
  "base64",
  "forme-pdf",
+ "regex",
  "reqwest",
  "serde",
  "serde_json",

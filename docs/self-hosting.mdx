@@ -62,7 +62,6 @@ The self-hosted API matches the hosted API, so switching between them is a base 
 | `POST /v1/render` | Inline render — compiled template JSON + data in request body |
 | `POST /v1/render/:slug` | Template render — loads pre-compiled JSON from mounted volume |
 | `POST /v1/certify` | Certify an existing PDF with an X.509 certificate |
-| `POST /v1/sign` | *(deprecated alias for /v1/certify)* |
 | `POST /v1/redact` | Redact regions or text patterns from a PDF |
 | `POST /v1/merge` | Merge multiple PDFs into one |
 | `POST /v1/rasterize` | Convert PDF pages to PNG images |
@@ -169,7 +168,6 @@ curl -X POST http://localhost:3000/v1/certify \
   --output certified.pdf
 ```
 
-<Note>The deprecated `/v1/sign` endpoint still works and routes to the same handler.</Note>
 
 ### Redact
 

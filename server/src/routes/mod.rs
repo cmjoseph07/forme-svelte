@@ -24,14 +24,15 @@ pub fn router(config: Arc<Config>) -> Router {
         .route("/v1/render", post(render::render_inline))
         .route("/v1/render/{slug}", post(render::render_slug))
         .route("/v1/certify", post(certify::certify))
-        // Deprecated alias — same handler, will add deprecation headers later
-        .route("/v1/sign", post(certify::certify))
         .route("/v1/rasterize", post(rasterize::rasterize))
         .route("/v1/merge", post(merge::merge))
         .route("/v1/redact", post(redact::redact))
         .route("/v1/templates", get(resources::list_templates))
         .route("/v1/documents", get(resources::list_documents))
-        .route("/v1/redaction-templates", get(resources::list_redaction_templates))
+        .route(
+            "/v1/redaction-templates",
+            get(resources::list_redaction_templates),
+        )
         .route("/v1/certificates", get(resources::list_certificates))
         .layer(middleware::from_fn_with_state(
             config.clone(),

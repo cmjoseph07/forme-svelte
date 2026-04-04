@@ -121,12 +121,25 @@ pub async fn redact(Json(payload): Json<RedactRequest>) -> Result<Response, ApiE
             "Maximum 50 patterns per request".to_string(),
         ));
     }
+    if payload.presets.len() > 20 {
+        return Err(ApiError::BadRequest(
+            "Maximum 20 presets per request".to_string(),
+        ));
+    }
     for p in &payload.patterns {
         if p.pattern_type != "Literal" && p.pattern_type != "Regex" {
             return Err(ApiError::BadRequest(format!(
                 "Invalid pattern_type: {}. Must be 'Literal' or 'Regex'",
                 p.pattern_type
             )));
+        }
+        if p.pattern_type == "Regex" {
+            if let Err(e) = regex::Regex::new(&p.pattern) {
+                return Err(ApiError::BadRequest(format!(
+                    "Invalid regex pattern '{}': {e}",
+                    p.pattern
+                )));
+            }
         }
     }
 
@@ -167,8 +180,13 @@ pub async fn redact(Json(payload): Json<RedactRequest>) -> Result<Response, ApiE
     if has_presets {
         let presets = builtin_presets();
         for name in &payload.presets {
-            if let Some(preset) = presets.get(name.as_str()) {
-                all_patterns.push(preset.clone());
+            match presets.get(name.as_str()) {
+                Some(preset) => all_patterns.push(preset.clone()),
+                None => {
+                    return Err(ApiError::BadRequest(format!(
+                        "Unknown preset: '{name}'. Valid presets: ssn, email, phone, date-of-birth, credit-card"
+                    )));
+                }
             }
         }
     }

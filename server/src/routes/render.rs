@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -26,9 +26,27 @@ pub struct SlugRenderRequest {
     pub data: Option<Value>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RenderOptions {
+    /// When true, form fields are flattened to static content.
+    pub flatten_forms: Option<bool>,
+}
+
 /// POST /v1/render — inline render with template + data in the request body.
-pub async fn render_inline(Json(payload): Json<InlineRenderRequest>) -> Result<Response, ApiError> {
-    let template_str = serde_json::to_string(&payload.template)
+pub async fn render_inline(
+    options: Query<RenderOptions>,
+    Json(payload): Json<InlineRenderRequest>,
+) -> Result<Response, ApiError> {
+    let mut template = payload.template;
+
+    if options.flatten_forms == Some(true) {
+        if let Value::Object(ref mut map) = template {
+            map.insert("flatten_forms".to_string(), Value::Bool(true));
+        }
+    }
+
+    let template_str = serde_json::to_string(&template)
         .map_err(|e| ApiError::BadRequest(format!("Invalid template JSON: {e}")))?;
 
     let pdf_bytes = if let Some(data) = payload.data {
@@ -50,6 +68,7 @@ pub async fn render_inline(Json(payload): Json<InlineRenderRequest>) -> Result<R
 pub async fn render_slug(
     State(config): State<Arc<Config>>,
     Path(slug): Path<String>,
+    options: Query<RenderOptions>,
     Json(payload): Json<SlugRenderRequest>,
 ) -> Result<Response, ApiError> {
     let templates_dir = config.templates_dir.as_ref().ok_or_else(|| {
@@ -84,6 +103,19 @@ pub async fn render_slug(
             }
         })?;
 
+    // Inject flattenForms into template JSON if requested via query param
+    let template_str = if options.flatten_forms == Some(true) {
+        match serde_json::from_str::<Value>(&template_str) {
+            Ok(Value::Object(mut map)) => {
+                map.insert("flatten_forms".to_string(), Value::Bool(true));
+                serde_json::to_string(&Value::Object(map)).unwrap_or(template_str)
+            }
+            _ => template_str,
+        }
+    } else {
+        template_str
+    };
+
     let pdf_bytes = if let Some(data) = payload.data {
         let data_str = serde_json::to_string(&data)
             .map_err(|e| ApiError::BadRequest(format!("Invalid data JSON: {e}")))?;
@@ -96,7 +128,18 @@ pub async fn render_slug(
             .map_err(|e| ApiError::Internal(format!("Render task failed: {e}")))?
     }?;
 
-    Ok(pdf_response(pdf_bytes))
+    Ok((
+        StatusCode::OK,
+        [
+            (header::CONTENT_TYPE, "application/pdf".to_string()),
+            (
+                header::CONTENT_DISPOSITION,
+                format!("attachment; filename=\"{slug}.pdf\""),
+            ),
+        ],
+        pdf_bytes,
+    )
+        .into_response())
 }
 
 fn pdf_response(pdf_bytes: Vec<u8>) -> Response {
