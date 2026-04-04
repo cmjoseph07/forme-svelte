@@ -1,9 +1,10 @@
 """Forme API client. Zero dependencies — uses stdlib urllib + json."""
 
+import base64
 import json
 import urllib.error
 import urllib.request
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, List, Optional, Sequence, Union
 
 
 class FormeError(Exception):
@@ -87,6 +88,119 @@ class Forme:
         """Poll the status of an async render job."""
         resp_body, _ = self._request("GET", "/v1/jobs/{}".format(job_id))
         return json.loads(resp_body)  # type: ignore[no-any-return]
+
+    def certify(
+        self,
+        pdf: bytes,
+        *,
+        certificate: Optional[str] = None,
+        private_key: Optional[str] = None,
+        certificate_pem: Optional[str] = None,
+        private_key_pem: Optional[str] = None,
+        certificate_id: Optional[str] = None,
+        reason: Optional[str] = None,
+        location: Optional[str] = None,
+        contact: Optional[str] = None,
+    ) -> bytes:
+        """Certify a PDF with a PKCS#7 digital signature.
+
+        Pass either ``certificate``/``private_key`` PEM strings, or
+        ``certificate_id`` for a saved certificate on the hosted API.
+        ``certificate_pem``/``private_key_pem`` are accepted as aliases.
+
+        Returns certified PDF bytes.
+        """
+        body: Dict[str, Any] = {
+            "pdf": base64.b64encode(pdf).decode("ascii"),
+        }
+        cert = certificate or certificate_pem
+        key = private_key or private_key_pem
+        if cert is not None:
+            body["certificate"] = cert
+        if key is not None:
+            body["privateKey"] = key
+        if certificate_id is not None:
+            body["certificateId"] = certificate_id
+        if reason is not None:
+            body["reason"] = reason
+        if location is not None:
+            body["location"] = location
+        if contact is not None:
+            body["contact"] = contact
+
+        resp_body, _ = self._request("POST", "/v1/certify", body=body)
+        return resp_body
+
+    def redact(
+        self,
+        pdf: bytes,
+        *,
+        redactions: Optional[List[Dict[str, Any]]] = None,
+        patterns: Optional[List[Dict[str, Any]]] = None,
+        presets: Optional[List[str]] = None,
+        template: Optional[str] = None,
+    ) -> bytes:
+        """Redact sensitive content from a PDF.
+
+        Provide at least one of ``redactions`` (coordinate regions),
+        ``patterns`` (text search), ``presets`` (built-in patterns like
+        ``"ssn"``, ``"email"``), or ``template`` (saved redaction template slug).
+
+        Returns redacted PDF bytes.
+        """
+        body: Dict[str, Any] = {
+            "pdf": base64.b64encode(pdf).decode("ascii"),
+        }
+        if redactions is not None:
+            body["redactions"] = redactions
+        if patterns is not None:
+            body["patterns"] = patterns
+        if presets is not None:
+            body["presets"] = presets
+        if template is not None:
+            body["template"] = template
+
+        resp_body, _ = self._request("POST", "/v1/redact", body=body)
+        return resp_body
+
+    def merge(self, pdfs: Sequence[bytes]) -> bytes:
+        """Merge multiple PDFs into one.
+
+        Args:
+            pdfs: 2-20 PDF byte strings to merge in order.
+
+        Returns merged PDF bytes.
+        """
+        body: Dict[str, Any] = {
+            "pdfs": [base64.b64encode(p).decode("ascii") for p in pdfs],
+        }
+
+        resp_body, _ = self._request("POST", "/v1/merge", body=body)
+        return resp_body
+
+    def rasterize(
+        self,
+        pdf: bytes,
+        *,
+        dpi: Optional[int] = None,
+    ) -> List[bytes]:
+        """Convert PDF pages to PNG images.
+
+        Args:
+            pdf: PDF bytes to rasterize.
+            dpi: Resolution (72-300, default 150).
+
+        Returns a list of PNG image bytes, one per page.
+        """
+        body: Dict[str, Any] = {
+            "pdf": base64.b64encode(pdf).decode("ascii"),
+        }
+        if dpi is not None:
+            body["dpi"] = dpi
+
+        resp_body, _ = self._request("POST", "/v1/rasterize", body=body)
+        result = json.loads(resp_body)
+        return [base64.b64decode(page) for page in result["pages"]]
 
     def extract(self, pdf_bytes: bytes) -> Any:
         """Extract embedded data from a PDF.

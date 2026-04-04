@@ -1,0 +1,196 @@
+---
+title: Python SDK
+sidebarTitle: Python
+description: Generate PDFs from Python with the hosted API or local WASM rendering. Zero-dependency API client, plus a component DSL for building documents in Python code.
+---
+
+## Installation
+
+```bash
+# API client only (zero dependencies)
+pip install formepdf
+
+# Local rendering with component DSL (adds wasmtime)
+pip install formepdf[local]
+```
+
+## Hosted API
+
+The API client uses only the Python standard library. Create templates in the [dashboard](https://app.formepdf.com), then render them with data:
+
+```python
+from formepdf import Forme
+
+client = Forme("forme_sk_...")
+
+pdf = client.render("invoice", {
+    "customer": "Acme Corp",
+    "items": [{"name": "Widget", "qty": 5, "price": 49}],
+    "total": 245,
+})
+
+with open("invoice.pdf", "wb") as f:
+    f.write(pdf)
+```
+
+### Client options
+
+```python
+client = Forme(
+    api_key="forme_sk_...",
+    base_url="https://custom-api.example.com",  # optional
+)
+```
+
+### Methods
+
+| Method | Description | Returns |
+|--------|-------------|---------|
+| `render(slug, data)` | Synchronous render | `bytes` |
+| `render(slug, data, s3=opts)` | Render and upload to S3 | `dict` |
+| `render_async(slug, data)` | Start async render job | `dict` |
+| `get_job(job_id)` | Poll async job status | `dict` |
+| `merge(pdfs)` | Merge multiple PDFs | `bytes` |
+| `certify(pdf, certificate=..., private_key=...)` | Certify a PDF with X.509 certificate | `bytes` |
+| `redact(pdf, patterns=..., presets=...)` | Redact content from a PDF | `bytes` |
+| `rasterize(pdf, dpi=150)` | Convert PDF pages to PNG images | `list[bytes]` |
+| `extract(pdf_bytes)` | Extract embedded data | `dict` or `None` |
+
+### Certify
+
+```python
+certified = client.certify(
+    pdf_bytes,
+    certificate=open("cert.pem").read(),
+    private_key=open("key.pem").read(),
+    reason="Approved",
+)
+```
+
+Or use a saved certificate on the hosted API:
+
+```python
+certified = client.certify(pdf_bytes, certificate_id="cert_abc123")
+```
+
+### Redact
+
+```python
+# By text pattern
+redacted = client.redact(pdf_bytes, patterns=[
+    {"pattern": "Jane Doe", "pattern_type": "Literal"},
+    {"pattern": r"\d{3}-\d{2}-\d{4}", "pattern_type": "Regex"},
+])
+
+# By built-in presets
+redacted = client.redact(pdf_bytes, presets=["ssn", "email", "phone"])
+
+# By saved redaction template
+redacted = client.redact(pdf_bytes, template="hipaa-patient-record")
+```
+
+### Merge
+
+```python
+merged = client.merge([pdf1, pdf2, pdf3])
+```
+
+### Rasterize
+
+```python
+pages = client.rasterize(pdf_bytes, dpi=200)
+for i, png in enumerate(pages):
+    with open(f"page-{i + 1}.png", "wb") as f:
+        f.write(png)
+```
+
+### Error handling
+
+```python
+from formepdf import Forme, FormeError
+
+try:
+    pdf = client.render("invoice", data)
+except FormeError as e:
+    print(f"Error {e.status}: {e.message}")
+```
+
+---
+
+## Native templates
+
+Build documents in Python code using a component DSL that mirrors the JSX API. Renders locally via the WASM engine — no network calls.
+
+```python
+from formepdf import Document, Page, View, Text, Image
+
+doc = Document(
+    Page(
+        View(
+            Text("Invoice #001", font_size=24, font_weight="bold"),
+            Text("Acme Corp", font_size=14, color="#666"),
+            flex_direction="column", gap=8,
+        ),
+        View(
+            Image("logo.png", width=80),
+            Text("Total: $245.00", font_size=18),
+            justify_content="space-between",
+            align_items="center",
+        ),
+    ),
+    title="Invoice #001",
+)
+
+pdf = doc.render()
+with open("invoice.pdf", "wb") as f:
+    f.write(pdf)
+```
+
+### Components
+
+| Constructor | Description | Key options |
+|-------------|-------------|-------------|
+| `Document(*children)` | Root container, `.render()` returns PDF bytes | `title`, `author`, `lang`, `tagged`, `pdf_ua`, `pdfa`, `flatten_forms` |
+| `Page(*children)` | Page container | `size` (e.g. `"A4"`), `margin` |
+| `View(*children)` | Flex/grid container | `flex_direction`, `gap`, `padding`, `justify_content`, `align_items` |
+| `Text(content)` | Text element | `font_size`, `font_weight`, `color`, `text_align` |
+| `Image(src)` | Image (file path, URL, or data URI) | `width`, `height`, `alt` |
+| `Table(*rows)` | Table with auto-repeating headers | `columns` |
+| `Row(*cells)` | Table row | `header=True` |
+| `Cell(*children)` | Table cell | `col_span`, `row_span` |
+| `QrCode(data)` | Vector QR code | `size`, `color` |
+| `Barcode(data)` | 1D barcode | `format`, `width`, `height` |
+| `BarChart(data)` | Bar chart | `width`, `height`, `title` |
+| `LineChart(series, labels)` | Line chart | `width`, `height`, `title` |
+| `PieChart(data)` | Pie/donut chart | `width`, `height`, `donut` |
+| `TextField(name)` | Fillable text field | `value`, `placeholder` |
+| `Checkbox(name)` | Fillable checkbox | `checked` |
+| `Dropdown(name, options)` | Fillable dropdown | `value` |
+| `Watermark(text)` | Rotated watermark | `font_size`, `color`, `angle` |
+| `PageBreak()` | Force a page break | -- |
+
+### Local certify
+
+```python
+from formepdf.wasm import certify_pdf
+import json
+
+config = json.dumps({
+    "certificate_pem": open("cert.pem").read(),
+    "private_key_pem": open("key.pem").read(),
+    "reason": "Approved",
+})
+
+certified = certify_pdf(pdf_bytes, config)
+```
+
+---
+
+## Hosted vs native
+
+| | Hosted API | Native templates |
+|---|---|---|
+| **Dependencies** | Zero (stdlib only) | wasmtime (~6MB WASM) |
+| **Templates** | Pre-uploaded via dashboard | Built in Python code |
+| **Network** | Requires API call | Fully offline |
+| **Use case** | Dynamic data + stored templates | Full control, CI/CD, testing |

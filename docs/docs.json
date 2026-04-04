@@ -57,7 +57,7 @@
       },
       {
         "group": "SDKs",
-        "pages": ["go-sdk", "rust-sdk"]
+        "pages": ["python-sdk", "go-sdk", "rust-sdk"]
       },
       {
         "group": "Guides",

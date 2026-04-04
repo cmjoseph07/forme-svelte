@@ -201,11 +201,3 @@ def certify_pdf(pdf_bytes: bytes, config_json: str) -> bytes:
     return _get_engine().certify_pdf(pdf_bytes, config_json)
 
 
-def sign_pdf(pdf_bytes: bytes, config_json: str) -> bytes:
-    """Sign PDF bytes with an X.509 certificate.
-
-    .. deprecated:: Use certify_pdf instead.
-    """
-    import warnings
-    warnings.warn("sign_pdf is deprecated, use certify_pdf", DeprecationWarning, stacklevel=2)
-    return certify_pdf(pdf_bytes, config_json)
