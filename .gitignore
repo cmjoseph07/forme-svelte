@@ -4,6 +4,9 @@ engine/target/
 # WASM build output
 packages/core/pkg/
 
+packages/go-sdk/templates/forme.wasm
+packages/python-sdk/formepdf/forme.wasm
+
 # VS Code extension build artifacts
 packages/vscode/pkg/
 *.vsix
