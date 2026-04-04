@@ -20,6 +20,26 @@ All notable changes to the Forme monorepo are documented in this file.
 ### Fixed
 - WASI timestamp: Python SDK and Go SDK WASM builds now use `std::time::SystemTime` instead of browser-only `js_sys::Date`
 
+## [0.8.3] - 2026-04-01
+
+### Added
+- SVG element opacity support: `opacity`, `fill-opacity`, and `stroke-opacity` attributes via PDF ExtGState with inheritance through `<g>` groups
+- `<Svg>` children API: JSX children as alternative to `content` string prop, with camelCase→kebab-case attribute mapping
+
+### Fixed
+- `<Page style={{ fontFamily }}>` now correctly inherits to child nodes (was being discarded during serialization)
+
+## [0.8.2] - 2026-03-30
+
+### Fixed
+- PDF serializer ignoring custom font weights — multiple weights for the same family (e.g. 200, 400, 700) now produce distinct font objects instead of collapsing to 400/700
+
+## [0.8.1] - 2026-03-30
+
+### Fixed
+- Latin Extended character widths in standard font tables (Å, Ä, Ö, etc. no longer stack)
+- Page number placeholder width mismatch during layout — two-pass rendering now measures actual digit count
+
 ## [0.8.0] - 2026-03-29
 
 ### Added
