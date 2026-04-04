@@ -50,12 +50,26 @@ fn main() -> Result<(), FormeError> {
 
 ## API
 
+### Rendering
+
 | Function | Description |
 |----------|-------------|
 | `render(&Document)` | Render a document struct to PDF bytes |
 | `render_json(&str)` | Parse JSON and render to PDF bytes |
-| `render_with_layout(&Document)` | Render and return layout metadata |
+| `render_with_layout(&Document)` | Render and return PDF bytes + layout metadata |
+| `render_json_with_layout(&str)` | Parse JSON, render, and return PDF bytes + layout metadata |
 | `render_template(&str, &str)` | Evaluate a template with data, then render |
+| `render_template_with_layout(&str, &str)` | Evaluate a template with data, render, and return PDF bytes + layout metadata |
+
+### PDF Operations
+
+| Function | Description |
+|----------|-------------|
+| `merge_pdfs(&[&[u8]])` | Combine multiple PDFs into one |
+| `certify_pdf(&[u8], &str, &str, ...)` | Apply a PKCS#7 digital signature to an existing PDF |
+| `redact_pdf(&[u8], &[RedactionRegion])` | Redact regions from a PDF (removes underlying text) |
+| `redact_text(&[u8], &[TextSearchRedaction])` | Find text by pattern and redact matching regions |
+| `find_text_regions(&[u8], &[TextSearchPattern])` | Find text regions in a PDF without redacting |
 
 All functions return `Result<Vec<u8>, FormeError>` (or a tuple with `LayoutInfo` for the `_with_layout` variants).
 
