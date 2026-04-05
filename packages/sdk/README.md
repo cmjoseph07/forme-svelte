@@ -41,12 +41,55 @@ new Forme(apiKey: string, options?: { baseUrl?: string })
 
 ## Methods
 
-### `render(slug, data?)`
+### `render(slug, data?, options?)`
 
 Render a template to PDF bytes.
 
 - **slug** — Template identifier
 - **data** — Template data (sent as JSON body, defaults to `{}`)
+- **options.s3** — Optional S3 upload config (`{ bucket, key, accessKeyId, secretAccessKey, region?, endpoint? }`)
+- **Returns** `Promise<Uint8Array>` (or `Promise<{ url: string }>` when `s3` is provided)
+
+### `renderAsync(slug, data?, options?)`
+
+Start an async render job.
+
+- **options.webhookUrl** — URL to receive a POST when the job completes
+- **Returns** `Promise<{ jobId: string; status: string }>`
+
+### `getJob(jobId)`
+
+Poll an async job's status.
+
+- **Returns** `Promise<JobResult>` — includes `pdfBase64` when complete
+
+### `merge(pdfs)`
+
+Merge multiple PDFs into one.
+
+- **pdfs** — Array of `Uint8Array` (2–20 PDFs)
+- **Returns** `Promise<Uint8Array>`
+
+### `certify(pdf, options)`
+
+Certify a PDF with an X.509 digital certificate.
+
+- **pdf** — PDF file bytes
+- **options.certificate** — PEM-encoded certificate string
+- **options.privateKey** — PEM-encoded private key string
+- **options.certificateId** — Or use a saved certificate ID (instead of raw PEM)
+- **options.reason** / **options.location** / **options.contact** — Optional metadata
+- **Returns** `Promise<Uint8Array>`
+
+### `redact(pdf, options)`
+
+Redact sensitive content from a PDF.
+
+- **pdf** — PDF file bytes
+- **options.patterns** — Array of `{ pattern, pattern_type: 'Literal' | 'Regex' }`
+- **options.presets** — Built-in presets like `['ssn', 'email', 'phone']`
+- **options.template** — Saved redaction template slug
+- **options.redactions** — Explicit regions `{ page, x, y, width, height }[]`
 - **Returns** `Promise<Uint8Array>`
 
 ### `extract(pdf)`

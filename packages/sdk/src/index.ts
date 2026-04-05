@@ -21,6 +21,35 @@ export interface AsyncRenderOptions {
   webhookUrl?: string;
 }
 
+export interface CertifyOptions {
+  certificate?: string;
+  privateKey?: string;
+  certificateId?: string;
+  reason?: string;
+  location?: string;
+  contact?: string;
+}
+
+export interface RedactionPattern {
+  pattern: string;
+  pattern_type: 'Literal' | 'Regex';
+}
+
+export interface RedactionRegion {
+  page: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface RedactOptions {
+  redactions?: RedactionRegion[];
+  patterns?: RedactionPattern[];
+  presets?: string[];
+  template?: string;
+}
+
 export interface JobResult {
   id: string;
   status: string;
@@ -112,6 +141,79 @@ export class Forme {
     return res.json();
   }
 
+  async merge(pdfs: Uint8Array[]): Promise<Uint8Array> {
+    const res = await fetch(`${this.baseUrl}/v1/merge`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pdfs: pdfs.map((p) => uint8ArrayToBase64(p)),
+      }),
+    });
+
+    if (!res.ok) {
+      const message = await parseErrorMessage(res);
+      throw new FormeError(res.status, message);
+    }
+
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  async certify(pdf: Uint8Array, options: CertifyOptions): Promise<Uint8Array> {
+    const body: Record<string, unknown> = {
+      pdf: uint8ArrayToBase64(pdf),
+    };
+
+    if (options.certificateId) {
+      body.certificateId = options.certificateId;
+    } else {
+      body.certificate = options.certificate;
+      body.privateKey = options.privateKey;
+    }
+    if (options.reason) body.reason = options.reason;
+    if (options.location) body.location = options.location;
+    if (options.contact) body.contact = options.contact;
+
+    const res = await fetch(`${this.baseUrl}/v1/certify`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const message = await parseErrorMessage(res);
+      throw new FormeError(res.status, message);
+    }
+
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
+  async redact(pdf: Uint8Array, options: RedactOptions): Promise<Uint8Array> {
+    const res = await fetch(`${this.baseUrl}/v1/redact`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        pdf: uint8ArrayToBase64(pdf),
+        ...options,
+      }),
+    });
+
+    if (!res.ok) {
+      const message = await parseErrorMessage(res);
+      throw new FormeError(res.status, message);
+    }
+
+    return new Uint8Array(await res.arrayBuffer());
+  }
+
   async extract(pdf: Uint8Array): Promise<unknown | null> {
     const res = await fetch(`${this.baseUrl}/v1/extract`, {
       method: 'POST',
@@ -138,6 +240,17 @@ export class Forme {
     const body = await res.json();
     return body.data;
   }
+}
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  if (typeof Buffer !== 'undefined') {
+    return Buffer.from(bytes).toString('base64');
+  }
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
 }
 
 async function parseErrorMessage(res: Response): Promise<string> {

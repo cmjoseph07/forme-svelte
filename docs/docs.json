@@ -56,7 +56,7 @@
       },
       {
         "group": "SDKs",
-        "pages": ["python-sdk", "go-sdk", "rust-sdk"]
+        "pages": ["typescript-sdk", "python-sdk", "go-sdk", "rust-sdk"]
       },
       {
         "group": "Guides",

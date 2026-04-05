@@ -1,0 +1,151 @@
+---
+title: TypeScript SDK
+sidebarTitle: TypeScript
+description: Generate, certify, redact, and merge PDFs from TypeScript with the hosted API. Zero-dependency client that works in Node.js, Deno, Bun, and edge runtimes.
+---
+
+## Installation
+
+```bash
+npm install @formepdf/sdk
+```
+
+## Usage
+
+Create templates in the [dashboard](https://app.formepdf.com), then render them with data:
+
+```typescript
+import { Forme } from "@formepdf/sdk";
+
+const forme = new Forme("forme_sk_...");
+
+const pdf = await forme.render("invoice", {
+  customer: "Acme Corp",
+  items: [{ name: "Widget", qty: 5, price: 49 }],
+  total: 245,
+});
+
+await fs.writeFile("invoice.pdf", pdf);
+```
+
+### Client options
+
+```typescript
+const forme = new Forme("forme_sk_...", {
+  baseUrl: "https://custom-api.example.com", // optional
+});
+```
+
+### Methods
+
+| Method | Description | Returns |
+|--------|-------------|---------|
+| `render(slug, data, options?)` | Synchronous render | `Promise<Uint8Array \| { url: string }>` |
+| `renderAsync(slug, data, options?)` | Start async render job | `Promise<{ jobId, status }>` |
+| `getJob(jobId)` | Poll async job status | `Promise<JobResult>` |
+| `merge(pdfs)` | Merge multiple PDFs | `Promise<Uint8Array>` |
+| `certify(pdf, options)` | Certify a PDF with X.509 certificate | `Promise<Uint8Array>` |
+| `redact(pdf, options)` | Redact content from a PDF | `Promise<Uint8Array>` |
+| `extract(pdf)` | Extract embedded data | `Promise<unknown \| null>` |
+
+---
+
+## Render to S3
+
+```typescript
+const result = await forme.render("invoice", data, {
+  s3: {
+    bucket: "my-bucket",
+    key: "invoices/001.pdf",
+    accessKeyId: "AKIA...",
+    secretAccessKey: "...",
+    region: "us-east-1",
+  },
+});
+// result = { url: "https://my-bucket.s3.amazonaws.com/invoices/001.pdf" }
+```
+
+## Async rendering
+
+```typescript
+const { jobId } = await forme.renderAsync("invoice", data, {
+  webhookUrl: "https://example.com/webhook",
+});
+
+// Poll for completion
+const job = await forme.getJob(jobId);
+if (job.status === "completed") {
+  const pdf = Buffer.from(job.pdfBase64!, "base64");
+}
+```
+
+## Certify
+
+```typescript
+import { readFileSync } from "fs";
+
+const certified = await forme.certify(pdfBytes, {
+  certificate: readFileSync("cert.pem", "utf-8"),
+  privateKey: readFileSync("key.pem", "utf-8"),
+  reason: "Approved",
+});
+```
+
+Or use a saved certificate on the hosted API:
+
+```typescript
+const certified = await forme.certify(pdfBytes, {
+  certificateId: "cert_abc123",
+});
+```
+
+## Redact
+
+```typescript
+// By text pattern
+const redacted = await forme.redact(pdfBytes, {
+  patterns: [
+    { pattern: "Jane Doe", pattern_type: "Literal" },
+    { pattern: "\\d{3}-\\d{2}-\\d{4}", pattern_type: "Regex" },
+  ],
+});
+
+// By built-in presets
+const redacted = await forme.redact(pdfBytes, {
+  presets: ["ssn", "email", "phone"],
+});
+
+// By saved redaction template
+const redacted = await forme.redact(pdfBytes, {
+  template: "hipaa-patient-record",
+});
+```
+
+## Merge
+
+```typescript
+const merged = await forme.merge([pdf1, pdf2, pdf3]);
+```
+
+## Extract embedded data
+
+```typescript
+const data = await forme.extract(pdfBytes);
+if (data) {
+  console.log(data); // the JSON that was embedded at render time
+}
+```
+
+## Error handling
+
+```typescript
+import { Forme, FormeError } from "@formepdf/sdk";
+
+try {
+  const pdf = await forme.render("invoice", data);
+} catch (err) {
+  if (err instanceof FormeError) {
+    console.error(`Error ${err.status}: ${err.message}`);
+  }
+}
+```

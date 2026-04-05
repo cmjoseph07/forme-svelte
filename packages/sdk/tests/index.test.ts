@@ -313,6 +313,132 @@ describe('Forme.getJob', () => {
   });
 });
 
+describe('Forme.merge', () => {
+  it('sends base64-encoded PDFs and returns Uint8Array', async () => {
+    const merged = new Uint8Array([37, 80, 68, 70]);
+    const fn = mockFetch({
+      arrayBuffer: () => Promise.resolve(merged.buffer),
+    });
+
+    const forme = new Forme('key');
+    const pdf1 = new Uint8Array([1, 2]);
+    const pdf2 = new Uint8Array([3, 4]);
+    const result = await forme.merge([pdf1, pdf2]);
+
+    expect(result).toBeInstanceOf(Uint8Array);
+    expect(Array.from(result)).toEqual([37, 80, 68, 70]);
+
+    const call = fn.mock.calls[0];
+    expect(call[0]).toBe('https://api.formepdf.com/v1/merge');
+    const body = JSON.parse(call[1].body);
+    expect(body.pdfs).toHaveLength(2);
+  });
+
+  it('throws FormeError on failure', async () => {
+    mockFetch({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ error: 'pdfs array with at least 2 base64-encoded PDFs is required' }),
+    });
+
+    const forme = new Forme('key');
+    await expect(forme.merge([])).rejects.toThrow(FormeError);
+  });
+});
+
+describe('Forme.certify', () => {
+  it('sends certificate and privateKey', async () => {
+    const certified = new Uint8Array([37, 80, 68, 70]);
+    const fn = mockFetch({
+      arrayBuffer: () => Promise.resolve(certified.buffer),
+    });
+
+    const forme = new Forme('key');
+    const result = await forme.certify(new Uint8Array([1, 2]), {
+      certificate: 'cert-pem',
+      privateKey: 'key-pem',
+      reason: 'Approved',
+    });
+
+    expect(result).toBeInstanceOf(Uint8Array);
+    const call = fn.mock.calls[0];
+    expect(call[0]).toBe('https://api.formepdf.com/v1/certify');
+    const body = JSON.parse(call[1].body);
+    expect(body.certificate).toBe('cert-pem');
+    expect(body.privateKey).toBe('key-pem');
+    expect(body.reason).toBe('Approved');
+    expect(body.pdf).toBeDefined();
+  });
+
+  it('sends certificateId when provided', async () => {
+    const fn = mockFetch({
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+
+    const forme = new Forme('key');
+    await forme.certify(new Uint8Array([1]), { certificateId: 'cert_abc123' });
+
+    const body = JSON.parse(fn.mock.calls[0][1].body);
+    expect(body.certificateId).toBe('cert_abc123');
+    expect(body.certificate).toBeUndefined();
+  });
+});
+
+describe('Forme.redact', () => {
+  it('sends patterns', async () => {
+    const fn = mockFetch({
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+
+    const forme = new Forme('key');
+    await forme.redact(new Uint8Array([1, 2]), {
+      patterns: [{ pattern: 'Jane Doe', pattern_type: 'Literal' }],
+    });
+
+    const call = fn.mock.calls[0];
+    expect(call[0]).toBe('https://api.formepdf.com/v1/redact');
+    const body = JSON.parse(call[1].body);
+    expect(body.patterns).toEqual([{ pattern: 'Jane Doe', pattern_type: 'Literal' }]);
+    expect(body.pdf).toBeDefined();
+  });
+
+  it('sends presets', async () => {
+    const fn = mockFetch({
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+
+    const forme = new Forme('key');
+    await forme.redact(new Uint8Array([1]), { presets: ['ssn', 'email'] });
+
+    const body = JSON.parse(fn.mock.calls[0][1].body);
+    expect(body.presets).toEqual(['ssn', 'email']);
+  });
+
+  it('sends template slug', async () => {
+    const fn = mockFetch({
+      arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)),
+    });
+
+    const forme = new Forme('key');
+    await forme.redact(new Uint8Array([1]), { template: 'hipaa-patient-record' });
+
+    const body = JSON.parse(fn.mock.calls[0][1].body);
+    expect(body.template).toBe('hipaa-patient-record');
+  });
+
+  it('throws FormeError on failure', async () => {
+    mockFetch({
+      ok: false,
+      status: 403,
+      json: () => Promise.resolve({ error: 'Redaction templates require a Pro plan or higher.' }),
+    });
+
+    const forme = new Forme('key');
+    await expect(forme.redact(new Uint8Array([1]), { template: 'test' })).rejects.toThrow(FormeError);
+    await expect(forme.redact(new Uint8Array([1]), { template: 'test' })).rejects.toMatchObject({ status: 403 });
+  });
+});
+
 describe('custom baseUrl', () => {
   it('uses custom baseUrl for render', async () => {
     const fn = mockFetch({
