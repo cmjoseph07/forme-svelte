@@ -106,18 +106,6 @@ with open("merged.pdf", "wb") as f:
     f.write(merged)
 ```
 
-### Rasterize
-
-Convert PDF pages to PNG images:
-
-```python
-pages = client.rasterize(pdf, dpi=200)
-
-for i, png in enumerate(pages):
-    with open(f"page-{i + 1}.png", "wb") as f:
-        f.write(png)
-```
-
 ### Extract embedded data
 
 ```python
