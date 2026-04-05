@@ -36,8 +36,7 @@
           "api-reference/render",
           "api-reference/certify",
           "api-reference/redact",
-          "api-reference/merge",
-          "api-reference/rasterize"
+          "api-reference/merge"
         ]
       },
       {

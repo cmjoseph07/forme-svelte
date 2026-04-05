@@ -53,7 +53,6 @@ client = Forme(
 | `merge(pdfs)` | Merge multiple PDFs | `bytes` |
 | `certify(pdf, certificate=..., private_key=...)` | Certify a PDF with X.509 certificate | `bytes` |
 | `redact(pdf, patterns=..., presets=...)` | Redact content from a PDF | `bytes` |
-| `rasterize(pdf, dpi=150)` | Convert PDF pages to PNG images | `list[bytes]` |
 | `extract(pdf_bytes)` | Extract embedded data | `dict` or `None` |
 
 ### Certify
@@ -93,15 +92,6 @@ redacted = client.redact(pdf_bytes, template="hipaa-patient-record")
 
 ```python
 merged = client.merge([pdf1, pdf2, pdf3])
-```
-
-### Rasterize
-
-```python
-pages = client.rasterize(pdf_bytes, dpi=200)
-for i, png in enumerate(pages):
-    with open(f"page-{i + 1}.png", "wb") as f:
-        f.write(png)
 ```
 
 ### Error handling

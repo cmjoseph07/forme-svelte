@@ -65,7 +65,6 @@ client := forme.New(apiKey,
 | `Merge(pdfs)` | Merge multiple PDFs | `([]byte, error)` |
 | `Certify(pdfBytes, certPem, keyPem, opts)` | Certify a PDF with X.509 certificate | `([]byte, error)` |
 | `Redact(pdfBytes, opts)` | Redact regions/patterns from a PDF | `([]byte, error)` |
-| `Rasterize(pdfBytes, opts)` | Convert PDF pages to PNG images | `([][]byte, error)` |
 | `Extract(pdfBytes)` | Extract embedded data | `(map[string]any, error)` |
 
 ### Error handling
