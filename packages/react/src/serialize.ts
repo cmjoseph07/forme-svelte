@@ -124,11 +124,43 @@ function isDocumentType(type: unknown): boolean {
 function resolveElement(element: ReactElement): ReactElement {
   let resolved = element;
   for (let i = 0; i < 10 && typeof resolved.type === 'function' && !isDocumentType(resolved.type); i++) {
-    const result = (resolved.type as (props: unknown) => ReactElement)(resolved.props);
+    const result = callComponent(resolved.type as (props: unknown) => ReactElement, resolved.props);
     if (!isValidElement(result)) break;
     resolved = result;
   }
   return resolved;
+}
+
+/**
+ * Call a function component directly (outside React's render cycle).
+ * React Compiler injects `useMemoCache` hooks into compiled components,
+ * which throws when called outside a render context. We catch that and
+ * give a clear error message pointing to the `'use no memo'` directive.
+ */
+function callComponent(fn: (props: unknown) => unknown, props: unknown): unknown {
+  try {
+    return fn(props);
+  } catch (err) {
+    if (err instanceof Error && /hook|useMemoCache|Invalid hook call/i.test(err.message)) {
+      const name = (fn as any).displayName || fn.name || 'Unknown';
+      throw new Error(
+        `Component "${name}" appears to be compiled by React Compiler, which injects hooks ` +
+        `that cannot run outside of React's render cycle. Forme's serialize() calls components ` +
+        `directly to walk the element tree.\n\n` +
+        `Fix: Add 'use no memo' at the top of the component to opt it out of React Compiler:\n\n` +
+        `  function ${name}(props) {\n` +
+        `    'use no memo';\n` +
+        `    return <Document>...</Document>;\n` +
+        `  }\n\n` +
+        `Alternatively, call the component yourself before passing to renderDocument():\n\n` +
+        `  const element = <${name} data={data} />;\n` +
+        `  // becomes:\n` +
+        `  const element = ${name}({ data });\n` +
+        `  await renderDocument(element);`
+      );
+    }
+    throw err;
+  }
 }
 
 // ─── Public API ──────────────────────────────────────────────────────
@@ -381,7 +413,7 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
 
   // Unknown component — try to call it as a function component
   if (typeof element.type === 'function') {
-    const result = (element.type as (props: Record<string, unknown>) => unknown)(element.props as Record<string, unknown>);
+    const result = callComponent(element.type as (props: unknown) => unknown, element.props);
     if (isValidElement(result)) {
       return serializeChild(result, parent);
     }
@@ -1710,7 +1742,7 @@ function serializeTemplateChild(child: unknown, parent: ParentContext = null): u
 
   // Unknown function component — call it
   if (typeof element.type === 'function') {
-    const result = (element.type as (props: Record<string, unknown>) => unknown)(element.props as Record<string, unknown>);
+    const result = callComponent(element.type as (props: unknown) => unknown, element.props);
     if (isValidElement(result)) {
       return serializeTemplateChild(result, parent);
     }
