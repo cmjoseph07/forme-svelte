@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] - 2026-04-06
+
+### Changed
+- Bump rasterizer base image to 0.9.1
+
 ## [0.9.0] - 2026-04-04
 
 ### Added

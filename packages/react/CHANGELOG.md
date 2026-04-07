@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] - 2026-04-06
+
+### Fixed
+- React Compiler compatibility: `serialize()` now detects when a wrapper component has been compiled by React Compiler (which injects `useMemoCache` hooks that can't run outside React's render cycle) and throws a clear, actionable error pointing users to add `'use no memo'` to the component. Previously these failures surfaced as a cryptic "Invalid hook call" error.
+
 ## [0.9.0] - 2026-04-04
 
 _Version bump only._

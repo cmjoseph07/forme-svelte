@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.1] - 2026-04-06
+
+### Fixed
+- React Compiler compatibility: `pdfResponse()` now detects compiled render callbacks and throws a clear error pointing users to add `'use no memo'`, instead of a cryptic "Invalid hook call".
+
 ## [0.9.0] - 2026-04-04
 
 _Dependency bump only._
