@@ -207,6 +207,8 @@ docker login
 
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
+  --provenance=true \
+  --sbom=true \
   -f server/Dockerfile \
   -t formepdf/forme:{version} \
   -t formepdf/forme:latest \
@@ -227,6 +229,8 @@ Build and push multi-platform rasterizer image from the monorepo root:
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
+  --provenance=true \
+  --sbom=true \
   -f rasterizer/Dockerfile \
   -t formepdf/rasterizer:{version} \
   -t formepdf/rasterizer:latest \
