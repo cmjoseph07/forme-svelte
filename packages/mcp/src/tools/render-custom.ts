@@ -37,12 +37,25 @@ export async function renderCustom(
   sanitized = sanitized.replace(/\bexport\s+/g, '');
   sanitized = sanitized.replace(/\brequire\s*\(/g, '(undefined)(');
 
-  // Build the function body: provide all Forme components + React in scope
+  // Build the function body: provide all Forme components + React in scope.
+  // This list is the source of truth — the tool description, the
+  // create-custom-pdf prompt, and the README must all stay in sync with it,
+  // because anything missing here becomes a ReferenceError at eval time.
   const componentNames = [
-    'Document', 'Page', 'View', 'Text', 'Image',
-    'Table', 'Row', 'Cell', 'Fixed', 'Svg', 'PageBreak',
-    'StyleSheet', 'Font', 'Watermark', 'QrCode',
-    'BarChart', 'LineChart', 'PieChart', 'Canvas',
+    // Layout
+    'Document', 'Page', 'View', 'Text', 'Image', 'PageBreak',
+    // Tables
+    'Table', 'Row', 'Cell',
+    // Fixed / decorative
+    'Fixed', 'Watermark',
+    // Graphics
+    'Svg', 'Canvas', 'QrCode', 'Barcode',
+    // Charts
+    'BarChart', 'LineChart', 'PieChart', 'AreaChart', 'DotPlot',
+    // Forms (AcroForms)
+    'TextField', 'Checkbox', 'Dropdown', 'RadioButton',
+    // Style / font helpers
+    'StyleSheet', 'Font',
   ];
 
   const preamble = componentNames

@@ -62,7 +62,17 @@ Input: { jsx: "<Document><Page>...</Page></Document>", output: "custom.pdf" }
 Output: PDF file at the specified path
 ```
 
-Available components: Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, PageBreak, StyleSheet, Font, Watermark, QrCode, BarChart, LineChart, PieChart, Canvas.
+Available components, grouped:
+
+- **Layout**: `Document`, `Page`, `View`, `Text`, `Image`, `PageBreak`
+- **Tables**: `Table`, `Row`, `Cell`
+- **Fixed / decorative**: `Fixed`, `Watermark`
+- **Graphics**: `Svg`, `Canvas`, `QrCode`, `Barcode`
+- **Charts**: `BarChart`, `LineChart`, `PieChart`, `AreaChart`, `DotPlot`
+- **Forms (AcroForms)**: `TextField`, `Checkbox`, `Dropdown`, `RadioButton`
+- **Style / font helpers**: `StyleSheet`, `Font`
+
+`<Document>` accepts `pdfUa` (PDF/UA-1 accessibility), `pdfa="2b"` (PDF/A archival), `signature={{ certificatePem, privateKeyPem }}` (digital signature), and `fonts={[...]}` (custom fonts; also registerable globally via `Font.register()`). The render tool also accepts an `embedData` option to attach a JSON payload as a file attachment inside the PDF.
 
 ## Built-in Templates
 

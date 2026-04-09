@@ -99,7 +99,7 @@ server.tool(
 
 server.tool(
   'render_custom_pdf',
-  'Render arbitrary JSX to PDF. Use Forme components: Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, PageBreak, StyleSheet, Font, Watermark, QrCode, BarChart, LineChart, PieChart, Canvas',
+  'Render arbitrary JSX to PDF. Components: Document, Page, View, Text, Image, PageBreak, Table/Row/Cell, Fixed, Watermark, Svg, Canvas, QrCode, Barcode, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton, StyleSheet, Font. Document supports pdfUa/pdfa/signature/fonts/embedData options.',
   {
     jsx: z.string().describe('JSX/TSX source code using Forme components (Document, Page, View, Text, etc.)'),
     output: z.string().optional().describe('Output file path (defaults to ./custom.pdf)'),
