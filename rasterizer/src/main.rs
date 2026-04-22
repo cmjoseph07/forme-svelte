@@ -1,6 +1,7 @@
 use std::io::Cursor;
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -144,6 +145,10 @@ async fn main() {
     let app = Router::new()
         .route("/health", get(health))
         .route("/rasterize", post(rasterize))
+        // PDFs (base64-encoded) can easily exceed axum's default 2 MB body
+        // limit. Disable it — the caller is the internal API proxy, so
+        // there's no DoS surface here.
+        .layer(DefaultBodyLimit::disable())
         .layer(cors);
 
     let port: u16 = std::env::var("RASTERIZER_PORT")
