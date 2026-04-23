@@ -1352,8 +1352,12 @@ fn build_font_map(pdf: &[u8], resources_text: &str) -> HashMap<String, FontInfo>
 
 /// Fetch a font object and parse its Subtype + ToUnicode CMap.
 fn parse_font_object(pdf: &[u8], obj_id: usize) -> Option<FontInfo> {
-    let text = std::str::from_utf8(pdf).ok()?;
-    let content = find_object_content(text, obj_id)?;
+    // Use from_utf8_lossy — PDFs contain binary font streams, so strict UTF-8
+    // decoding rejects the whole buffer. The lossy conversion replaces bad
+    // bytes with U+FFFD but the dictionary text around the binary data
+    // (which is ASCII) stays intact and findable.
+    let text = String::from_utf8_lossy(pdf);
+    let content = find_object_content(&text, obj_id)?;
 
     // Subtype check: Type0 is a CID font.
     let is_cid = content.contains("/Subtype /Type0") || content.contains("/Subtype/Type0");
