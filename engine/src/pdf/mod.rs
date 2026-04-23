@@ -2902,7 +2902,9 @@ impl PdfWriter {
                 && std::mem::discriminant(&glyph.font_style)
                     == std::mem::discriminant(&prev.font_style)
                 && (glyph.font_size - prev.font_size).abs() < 0.01
-                && Self::colors_equal(&glyph.color, &prev.color);
+                && Self::colors_equal(&glyph.color, &prev.color)
+                && std::mem::discriminant(&glyph.text_decoration)
+                    == std::mem::discriminant(&prev.text_decoration);
 
             if same_style {
                 current_group.push(glyph);
