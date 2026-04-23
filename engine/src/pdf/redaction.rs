@@ -21,6 +21,7 @@ use crate::error::FormeError;
 use crate::model::{PatternType, RedactionPattern, RedactionRegion};
 use miniz_oxide::deflate::compress_to_vec_zlib;
 use miniz_oxide::inflate::decompress_to_vec_zlib;
+use std::collections::HashMap;
 
 // ── Date formatting ─────────────────────────────────────────────────
 
@@ -1260,11 +1261,368 @@ struct CharPosition {
     font_size: f64,
 }
 
+/// Build a map from font resource name (e.g. "F1") to `FontInfo` for every
+/// font declared in the given `/Resources` dictionary text.
+///
+/// Walks `/Resources /Font << /F1 N 0 R ... >>`, fetches each font object from
+/// the PDF, identifies Type0 (CID) fonts by `/Subtype /Type0`, chases the
+/// `/ToUnicode` reference, decompresses and parses its CMap into a CID→Unicode
+/// table. Simple fonts (Type1 Helvetica etc.) get a default `FontInfo` with
+/// `is_cid: false`.
+fn build_font_map(pdf: &[u8], resources_text: &str) -> HashMap<String, FontInfo> {
+    let mut map = HashMap::new();
+
+    // Find the /Font subdictionary inside resources_text.
+    let Some(font_pos) = resources_text.find("/Font") else {
+        return map;
+    };
+    let after = resources_text[font_pos + 5..].trim_start();
+    let bytes = after.as_bytes();
+    if !after.starts_with("<<") {
+        return map;
+    }
+
+    // Collect the matching inner dict content.
+    let mut depth = 0;
+    let mut inner_end = 0;
+    let mut i = 0;
+    while i + 1 < bytes.len() {
+        if bytes[i] == b'<' && bytes[i + 1] == b'<' {
+            depth += 1;
+            i += 2;
+        } else if bytes[i] == b'>' && bytes[i + 1] == b'>' {
+            depth -= 1;
+            i += 2;
+            if depth == 0 {
+                inner_end = i;
+                break;
+            }
+        } else {
+            i += 1;
+        }
+    }
+    if inner_end == 0 {
+        return map;
+    }
+    let font_dict = &after[2..inner_end - 2];
+
+    // Parse "/Name N 0 R" entries (one font per entry).
+    let dict_bytes = font_dict.as_bytes();
+    let mut j = 0;
+    while j < dict_bytes.len() {
+        if dict_bytes[j] != b'/' {
+            j += 1;
+            continue;
+        }
+        // Read name until whitespace.
+        let name_start = j + 1;
+        let mut k = name_start;
+        while k < dict_bytes.len() && !dict_bytes[k].is_ascii_whitespace() && dict_bytes[k] != b'/'
+        {
+            k += 1;
+        }
+        let name: String = dict_bytes[name_start..k]
+            .iter()
+            .map(|&b| b as char)
+            .collect();
+        // Read value: expect "<num> <gen> R".
+        let after_name = &font_dict[k..];
+        let rest = after_name.trim_start();
+        if let Some(rel_r) = rest.find(" R") {
+            let ref_text = &rest[..rel_r];
+            let parts: Vec<&str> = ref_text.split_whitespace().collect();
+            if parts.len() >= 2 {
+                if let Ok(obj_id) = parts[0].parse::<usize>() {
+                    if let Some(info) = parse_font_object(pdf, obj_id) {
+                        map.insert(name.clone(), info);
+                    } else {
+                        map.insert(name.clone(), FontInfo::default());
+                    }
+                }
+            }
+            // Advance past the "R".
+            j = k + (rest.as_ptr() as usize - after_name.as_ptr() as usize) + rel_r + 2;
+        } else {
+            j = k;
+        }
+    }
+
+    map
+}
+
+/// Fetch a font object and parse its Subtype + ToUnicode CMap.
+fn parse_font_object(pdf: &[u8], obj_id: usize) -> Option<FontInfo> {
+    let text = std::str::from_utf8(pdf).ok()?;
+    let content = find_object_content(text, obj_id)?;
+
+    // Subtype check: Type0 is a CID font.
+    let is_cid = content.contains("/Subtype /Type0") || content.contains("/Subtype/Type0");
+
+    if !is_cid {
+        return Some(FontInfo {
+            is_cid: false,
+            cid_to_unicode: HashMap::new(),
+        });
+    }
+
+    // Find the /ToUnicode reference.
+    let Some(pos) = content.find("/ToUnicode") else {
+        return Some(FontInfo {
+            is_cid: true,
+            cid_to_unicode: HashMap::new(),
+        });
+    };
+    let rest = content[pos + "/ToUnicode".len()..].trim_start();
+    let Some(rel_r) = rest.find(" R") else {
+        return Some(FontInfo {
+            is_cid: true,
+            cid_to_unicode: HashMap::new(),
+        });
+    };
+    let ref_text = &rest[..rel_r];
+    let parts: Vec<&str> = ref_text.split_whitespace().collect();
+    if parts.len() < 2 {
+        return Some(FontInfo {
+            is_cid: true,
+            cid_to_unicode: HashMap::new(),
+        });
+    }
+    let cmap_obj_id = parts[0].parse::<usize>().ok()?;
+
+    let cmap_bytes = extract_and_decompress_stream(pdf, cmap_obj_id).ok()?;
+    let cmap_text = String::from_utf8_lossy(&cmap_bytes);
+    let table = parse_tounicode_cmap(&cmap_text);
+
+    Some(FontInfo {
+        is_cid: true,
+        cid_to_unicode: table,
+    })
+}
+
+/// Font metadata for decoding text in PDF content streams. Collected once
+/// per page from the page's `/Resources /Font` dictionary.
+#[derive(Debug, Clone, Default)]
+struct FontInfo {
+    /// When true, hex strings are 2-byte CIDs that need ToUnicode lookup.
+    /// Otherwise the font is a simple font with single-byte WinAnsi encoding.
+    is_cid: bool,
+    /// CID → Unicode string mapping parsed from the font's /ToUnicode CMap.
+    /// Populated only when `is_cid` is true. Values can be multi-character
+    /// strings (CMaps may map one glyph to e.g. a ligature like "fi").
+    cid_to_unicode: HashMap<u16, String>,
+}
+
+/// Parse a ToUnicode CMap text into a CID → Unicode string table.
+///
+/// Supports the common `bfchar` and `bfrange` sections. The engine only emits
+/// `bfchar` today but other PDF producers emit `bfrange` so we handle both so
+/// this works on imported/mixed PDFs too.
+fn parse_tounicode_cmap(text: &str) -> HashMap<u16, String> {
+    let mut map: HashMap<u16, String> = HashMap::new();
+
+    // bfchar: repeating "<CID_HEX> <UNICODE_HEX>" pairs.
+    let mut cursor = 0;
+    while let Some(start) = text[cursor..].find("beginbfchar") {
+        let abs_start = cursor + start + "beginbfchar".len();
+        let Some(end_rel) = text[abs_start..].find("endbfchar") else {
+            break;
+        };
+        let body = &text[abs_start..abs_start + end_rel];
+        for (cid, uni) in extract_angle_hex_pairs(body) {
+            let Some(key) = hex_to_u16(&cid) else {
+                continue;
+            };
+            let Some(value) = hex_to_string(&uni) else {
+                continue;
+            };
+            map.insert(key, value);
+        }
+        cursor = abs_start + end_rel + "endbfchar".len();
+    }
+
+    // bfrange: "<CID_START> <CID_END> <UNICODE_START>" or
+    //         "<CID_START> <CID_END> [ <UNICODE_1> <UNICODE_2> ... ]"
+    cursor = 0;
+    while let Some(start) = text[cursor..].find("beginbfrange") {
+        let abs_start = cursor + start + "beginbfrange".len();
+        let Some(end_rel) = text[abs_start..].find("endbfrange") else {
+            break;
+        };
+        let body = &text[abs_start..abs_start + end_rel];
+        parse_bfrange_body(body, &mut map);
+        cursor = abs_start + end_rel + "endbfrange".len();
+    }
+
+    map
+}
+
+/// Extract pairs of `<HEX>` tokens from a CMap bfchar body.
+fn extract_angle_hex_pairs(body: &str) -> Vec<(String, String)> {
+    let tokens = extract_angle_hex_tokens(body);
+    let mut pairs = Vec::new();
+    let mut i = 0;
+    while i + 1 < tokens.len() {
+        pairs.push((tokens[i].clone(), tokens[i + 1].clone()));
+        i += 2;
+    }
+    pairs
+}
+
+/// Extract every `<...>` token from a CMap section body, preserving order.
+fn extract_angle_hex_tokens(body: &str) -> Vec<String> {
+    let bytes = body.as_bytes();
+    let mut out = Vec::new();
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'<' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && bytes[j] != b'>' {
+                j += 1;
+            }
+            if j < bytes.len() {
+                let token: String = bytes[start..j]
+                    .iter()
+                    .filter(|b| !b.is_ascii_whitespace())
+                    .map(|&b| b as char)
+                    .collect();
+                out.push(token);
+                i = j + 1;
+                continue;
+            }
+        }
+        i += 1;
+    }
+    out
+}
+
+/// Parse the body of a `beginbfrange ... endbfrange` section into CID→Unicode
+/// entries. Each entry is three tokens; the third can be either a single
+/// `<HEX>` (incrementing range) or a `[<HEX> <HEX> ...]` array (explicit).
+fn parse_bfrange_body(body: &str, map: &mut HashMap<u16, String>) {
+    // Walk the body looking for triples. This is a tokenizer for:
+    //   <HEX> <HEX> <HEX>               (incrementing)
+    //   <HEX> <HEX> [ <HEX> ... ]       (explicit list)
+    let bytes = body.as_bytes();
+    let mut i = 0;
+    let mut group: Vec<String> = Vec::new();
+    let mut array_values: Option<Vec<String>> = None;
+
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b.is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        if b == b'<' {
+            let start = i + 1;
+            let mut j = start;
+            while j < bytes.len() && bytes[j] != b'>' {
+                j += 1;
+            }
+            if j >= bytes.len() {
+                break;
+            }
+            let token: String = bytes[start..j]
+                .iter()
+                .filter(|b| !b.is_ascii_whitespace())
+                .map(|&b| b as char)
+                .collect();
+            if let Some(arr) = array_values.as_mut() {
+                arr.push(token);
+            } else {
+                group.push(token);
+            }
+            i = j + 1;
+            continue;
+        }
+        if b == b'[' {
+            array_values = Some(Vec::new());
+            i += 1;
+            continue;
+        }
+        if b == b']' {
+            if let Some(values) = array_values.take() {
+                if group.len() == 2 {
+                    let start_cid = hex_to_u16(&group[0]);
+                    let end_cid = hex_to_u16(&group[1]);
+                    if let (Some(start_cid), Some(end_cid)) = (start_cid, end_cid) {
+                        let count = (end_cid as usize).saturating_sub(start_cid as usize) + 1;
+                        for (k, uni_hex) in values.iter().take(count).enumerate() {
+                            if let Some(s) = hex_to_string(uni_hex) {
+                                map.insert(start_cid + k as u16, s);
+                            }
+                        }
+                    }
+                }
+                group.clear();
+            }
+            i += 1;
+            continue;
+        }
+        i += 1;
+    }
+
+    // Flush any trailing incrementing triple: [start_cid, end_cid, first_unicode]
+    if group.len() == 3 {
+        if let (Some(start_cid), Some(end_cid), Some(start_uni)) = (
+            hex_to_u16(&group[0]),
+            hex_to_u16(&group[1]),
+            hex_to_u32(&group[2]),
+        ) {
+            let count = (end_cid as usize).saturating_sub(start_cid as usize) + 1;
+            for k in 0..count {
+                if let Some(ch) = char::from_u32(start_uni + k as u32) {
+                    map.insert(start_cid + k as u16, ch.to_string());
+                }
+            }
+        }
+    }
+}
+
+/// Parse a hex string into a u16 (truncates if longer, pads if shorter).
+fn hex_to_u16(hex: &str) -> Option<u16> {
+    if hex.is_empty() {
+        return None;
+    }
+    u32::from_str_radix(hex, 16).ok().map(|v| v as u16)
+}
+
+fn hex_to_u32(hex: &str) -> Option<u32> {
+    if hex.is_empty() {
+        return None;
+    }
+    u32::from_str_radix(hex, 16).ok()
+}
+
+/// Parse a hex string representing a sequence of UTF-16BE code units into a
+/// Unicode string. Each 4-hex-char pair is a 16-bit code unit; surrogate pairs
+/// combine to form characters above U+FFFF.
+fn hex_to_string(hex: &str) -> Option<String> {
+    if hex.is_empty() || !hex.len().is_multiple_of(4) {
+        // Short/odd hex: interpret as a single code point (best-effort).
+        let code = u32::from_str_radix(hex, 16).ok()?;
+        return char::from_u32(code).map(|c| c.to_string());
+    }
+    let mut units: Vec<u16> = Vec::new();
+    let chars: Vec<char> = hex.chars().collect();
+    let mut i = 0;
+    while i + 3 < chars.len() {
+        let chunk: String = chars[i..i + 4].iter().collect();
+        let unit = u16::from_str_radix(&chunk, 16).ok()?;
+        units.push(unit);
+        i += 4;
+    }
+    String::from_utf16(&units).ok()
+}
+
 /// Decode text content from a PDF string operand token.
 ///
-/// Handles `(literal strings)` with escape sequences and `<hex strings>`.
-/// Assumes WinAnsi (single-byte) encoding — CIDFont/CJK text won't decode correctly.
-fn decode_pdf_string(token_bytes: &[u8]) -> String {
+/// Handles `(literal strings)` with escape sequences and `<hex strings>`. For
+/// CID fonts (Type0), hex strings are 2-byte CIDs that get mapped through the
+/// font's ToUnicode CMap. For simple fonts (no font info or `is_cid: false`),
+/// hex strings are treated as single-byte WinAnsi text — the original path.
+fn decode_pdf_string(token_bytes: &[u8], font: Option<&FontInfo>) -> String {
     if token_bytes.is_empty() {
         return String::new();
     }
@@ -1315,8 +1673,30 @@ fn decode_pdf_string(token_bytes: &[u8]) -> String {
             .filter(|b| !b.is_ascii_whitespace())
             .map(|&b| b as char)
             .collect();
-        let mut out = Vec::new();
         let chars: Vec<char> = hex_str.chars().collect();
+
+        // CID font: decode as a sequence of 4-hex-char CIDs through the
+        // font's ToUnicode CMap. Emits the mapped Unicode string for each
+        // CID; unmapped CIDs are skipped (better than garbage bytes).
+        if let Some(info) = font {
+            if info.is_cid {
+                let mut out = String::new();
+                let mut i = 0;
+                while i + 3 < chars.len() {
+                    let chunk: String = chars[i..i + 4].iter().collect();
+                    if let Ok(cid) = u16::from_str_radix(&chunk, 16) {
+                        if let Some(uni) = info.cid_to_unicode.get(&cid) {
+                            out.push_str(uni);
+                        }
+                    }
+                    i += 4;
+                }
+                return out;
+            }
+        }
+
+        // Simple font: single-byte WinAnsi (original behavior).
+        let mut out = Vec::new();
         let mut i = 0;
         while i + 1 < chars.len() {
             let hi = chars[i].to_digit(16).unwrap_or(0) as u8;
@@ -1339,11 +1719,19 @@ fn decode_pdf_string(token_bytes: &[u8]) -> String {
 ///
 /// Returns a list of text blocks, each being a string and its per-character positions.
 /// Text within a BT/ET block is grouped; a new block starts on significant y-position changes.
-fn extract_text_with_positions(content: &[u8]) -> Vec<(String, Vec<CharPosition>)> {
+///
+/// `font_map` maps font resource names (e.g. `F1`) to `FontInfo` so hex-string
+/// text operands can be decoded against the current font's ToUnicode CMap.
+/// Passing an empty map falls back to WinAnsi single-byte decoding for all fonts.
+fn extract_text_with_positions(
+    content: &[u8],
+    font_map: &HashMap<String, FontInfo>,
+) -> Vec<(String, Vec<CharPosition>)> {
     let tokens = tokenize_content_stream(content);
     let mut state = TextState::new();
     let mut in_text = false;
     let mut operand_stack: Vec<&Token> = Vec::new();
+    let mut current_font: Option<&FontInfo> = None;
 
     let mut blocks: Vec<(String, Vec<CharPosition>)> = Vec::new();
     let mut current_text = String::new();
@@ -1427,13 +1815,23 @@ fn extract_text_with_positions(content: &[u8]) -> Vec<(String, Vec<CharPosition>
                             if size > 0.0 {
                                 state.font_size = size;
                             }
+                            // Font name: /F1 → "F1"
+                            if let Token::Operand(name_bytes) =
+                                operand_stack[operand_stack.len() - 2]
+                            {
+                                if !name_bytes.is_empty() && name_bytes[0] == b'/' {
+                                    let name: String =
+                                        name_bytes[1..].iter().map(|&b| b as char).collect();
+                                    current_font = font_map.get(&name);
+                                }
+                            }
                         }
                         operand_stack.clear();
                     }
                     "Tj" if in_text => {
                         // (string) Tj — show text
                         if let Some(Token::Operand(data)) = operand_stack.last() {
-                            let text = decode_pdf_string(data);
+                            let text = decode_pdf_string(data, current_font);
                             let char_width = state.font_size * 0.5;
                             for (ci, ch) in text.chars().enumerate() {
                                 current_chars.push(CharPosition {
@@ -1464,7 +1862,7 @@ fn extract_text_with_positions(content: &[u8]) -> Vec<(String, Vec<CharPosition>
                             for sub_tok in &sub_tokens {
                                 if let Token::Operand(sub_data) = sub_tok {
                                     if sub_data.starts_with(b"(") || sub_data.starts_with(b"<") {
-                                        let text = decode_pdf_string(sub_data);
+                                        let text = decode_pdf_string(sub_data, current_font);
                                         for (ci, ch) in text.chars().enumerate() {
                                             current_chars.push(CharPosition {
                                                 ch,
@@ -1494,7 +1892,7 @@ fn extract_text_with_positions(content: &[u8]) -> Vec<(String, Vec<CharPosition>
                         current_line_y = Some(state.ty());
                         // Show text (last operand for ', last for " after spacing args)
                         if let Some(Token::Operand(data)) = operand_stack.last() {
-                            let text = decode_pdf_string(data);
+                            let text = decode_pdf_string(data, current_font);
                             let char_width = state.font_size * 0.5;
                             for (ci, ch) in text.chars().enumerate() {
                                 current_chars.push(CharPosition {
@@ -1586,7 +1984,15 @@ pub fn find_text_regions(
             continue;
         }
 
-        let text_blocks = extract_text_with_positions(&combined_stream);
+        // Build the per-page font map so hex-string text can be decoded via
+        // CID→Unicode for Type0 fonts embedded in the PDF.
+        let font_map = page_info
+            .resources_ref
+            .as_deref()
+            .map(|res| build_font_map(pdf_bytes, res))
+            .unwrap_or_default();
+
+        let text_blocks = extract_text_with_positions(&combined_stream, &font_map);
 
         #[allow(unused_variables)]
         for (pat_idx, pattern) in patterns.iter().enumerate() {
@@ -2171,35 +2577,35 @@ mod tests {
 
     #[test]
     fn test_decode_pdf_string_literal() {
-        assert_eq!(decode_pdf_string(b"(Hello)"), "Hello");
-        assert_eq!(decode_pdf_string(b"(Hello World)"), "Hello World");
+        assert_eq!(decode_pdf_string(b"(Hello)", None), "Hello");
+        assert_eq!(decode_pdf_string(b"(Hello World)", None), "Hello World");
     }
 
     #[test]
     fn test_decode_pdf_string_escapes() {
-        assert_eq!(decode_pdf_string(b"(line1\\nline2)"), "line1\nline2");
-        assert_eq!(decode_pdf_string(b"(a\\\\b)"), "a\\b");
-        assert_eq!(decode_pdf_string(b"(open\\(paren)"), "open(paren");
-        assert_eq!(decode_pdf_string(b"(close\\)paren)"), "close)paren");
+        assert_eq!(decode_pdf_string(b"(line1\\nline2)", None), "line1\nline2");
+        assert_eq!(decode_pdf_string(b"(a\\\\b)", None), "a\\b");
+        assert_eq!(decode_pdf_string(b"(open\\(paren)", None), "open(paren");
+        assert_eq!(decode_pdf_string(b"(close\\)paren)", None), "close)paren");
     }
 
     #[test]
     fn test_decode_pdf_string_hex() {
-        assert_eq!(decode_pdf_string(b"<48656C6C6F>"), "Hello");
-        assert_eq!(decode_pdf_string(b"<48 65 6C 6C 6F>"), "Hello");
+        assert_eq!(decode_pdf_string(b"<48656C6C6F>", None), "Hello");
+        assert_eq!(decode_pdf_string(b"<48 65 6C 6C 6F>", None), "Hello");
     }
 
     #[test]
     fn test_decode_pdf_string_empty() {
-        assert_eq!(decode_pdf_string(b"()"), "");
-        assert_eq!(decode_pdf_string(b"<>"), "");
-        assert_eq!(decode_pdf_string(b""), "");
+        assert_eq!(decode_pdf_string(b"()", None), "");
+        assert_eq!(decode_pdf_string(b"<>", None), "");
+        assert_eq!(decode_pdf_string(b"", None), "");
     }
 
     #[test]
     fn test_extract_text_with_positions_basic() {
         let stream = b"BT /F1 12 Tf 72 720 Td (Hello World) Tj ET";
-        let blocks = extract_text_with_positions(stream);
+        let blocks = extract_text_with_positions(stream, &HashMap::new());
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].0, "Hello World");
         assert_eq!(blocks[0].1.len(), 11); // 11 chars
@@ -2212,7 +2618,7 @@ mod tests {
     fn test_extract_text_with_positions_tj_array() {
         // TJ array with kerning: [(H) -50 (ello)]
         let stream = b"BT /F1 10 Tf 0 700 Td [(H) -50 (ello)] TJ ET";
-        let blocks = extract_text_with_positions(stream);
+        let blocks = extract_text_with_positions(stream, &HashMap::new());
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].0, "Hello");
     }
@@ -2413,6 +2819,77 @@ mod tests {
             result, pdf_bytes,
             "No match → return original bytes unchanged"
         );
+    }
+
+    #[test]
+    fn test_parse_tounicode_cmap_bfchar() {
+        let cmap = r#"
+/CIDInit /ProcSet findresource begin
+12 dict begin
+begincmap
+/CIDSystemInfo
+<< /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> def
+/CMapName /Inter-UTF16 def
+/CMapType 2 def
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+3 beginbfchar
+<0042> <0048>
+<0043> <0065>
+<0044> <006C>
+endbfchar
+endcmap
+CMapName currentdict /CMap defineresource pop
+end
+end
+"#;
+        let map = parse_tounicode_cmap(cmap);
+        assert_eq!(map.get(&0x0042).map(String::as_str), Some("H"));
+        assert_eq!(map.get(&0x0043).map(String::as_str), Some("e"));
+        assert_eq!(map.get(&0x0044).map(String::as_str), Some("l"));
+    }
+
+    #[test]
+    fn test_parse_tounicode_cmap_bfrange() {
+        // Range form: <start> <end> <unicode_start> — CIDs 0001..=0003 → 'A'..='C'
+        let cmap = r#"
+begincmap
+1 begincodespacerange
+<0000> <FFFF>
+endcodespacerange
+1 beginbfrange
+<0001> <0003> <0041>
+endbfrange
+endcmap
+"#;
+        let map = parse_tounicode_cmap(cmap);
+        assert_eq!(map.get(&0x0001).map(String::as_str), Some("A"));
+        assert_eq!(map.get(&0x0002).map(String::as_str), Some("B"));
+        assert_eq!(map.get(&0x0003).map(String::as_str), Some("C"));
+    }
+
+    #[test]
+    fn test_decode_pdf_string_cid_hex() {
+        let mut table = HashMap::new();
+        table.insert(0x0042_u16, "H".to_string());
+        table.insert(0x0045_u16, "e".to_string());
+        table.insert(0x004C_u16, "l".to_string());
+        table.insert(0x004F_u16, "o".to_string());
+        let info = FontInfo {
+            is_cid: true,
+            cid_to_unicode: table,
+        };
+        // CID hex string for "Hello"
+        let decoded = decode_pdf_string(b"<00420045004C004C004F>", Some(&info));
+        assert_eq!(decoded, "Hello");
+    }
+
+    #[test]
+    fn test_decode_pdf_string_simple_unchanged() {
+        // Without a CID FontInfo, hex decoding should remain single-byte WinAnsi.
+        let decoded = decode_pdf_string(b"<48656C6C6F>", None);
+        assert_eq!(decoded, "Hello");
     }
 
     #[test]
