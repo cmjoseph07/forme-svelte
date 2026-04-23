@@ -1366,41 +1366,186 @@ fn parse_font_object(pdf: &[u8], obj_id: usize) -> Option<FontInfo> {
         return Some(FontInfo {
             is_cid: false,
             cid_to_unicode: HashMap::new(),
+            cid_widths: HashMap::new(),
+            default_width: 500.0,
         });
     }
 
-    // Find the /ToUnicode reference.
-    let Some(pos) = content.find("/ToUnicode") else {
-        return Some(FontInfo {
-            is_cid: true,
-            cid_to_unicode: HashMap::new(),
-        });
-    };
-    let rest = content[pos + "/ToUnicode".len()..].trim_start();
-    let Some(rel_r) = rest.find(" R") else {
-        return Some(FontInfo {
-            is_cid: true,
-            cid_to_unicode: HashMap::new(),
-        });
-    };
-    let ref_text = &rest[..rel_r];
-    let parts: Vec<&str> = ref_text.split_whitespace().collect();
-    if parts.len() < 2 {
-        return Some(FontInfo {
-            is_cid: true,
-            cid_to_unicode: HashMap::new(),
-        });
-    }
-    let cmap_obj_id = parts[0].parse::<usize>().ok()?;
+    // Parse ToUnicode CMap (optional — CIDs without a CMap just don't match).
+    let cid_to_unicode = content
+        .find("/ToUnicode")
+        .and_then(|pos| {
+            let rest = content[pos + "/ToUnicode".len()..].trim_start();
+            let rel_r = rest.find(" R")?;
+            let parts: Vec<&str> = rest[..rel_r].split_whitespace().collect();
+            if parts.len() < 2 {
+                return None;
+            }
+            let obj_id = parts[0].parse::<usize>().ok()?;
+            let bytes = extract_and_decompress_stream(pdf, obj_id).ok()?;
+            let cmap_text = String::from_utf8_lossy(&bytes);
+            Some(parse_tounicode_cmap(&cmap_text))
+        })
+        .unwrap_or_default();
 
-    let cmap_bytes = extract_and_decompress_stream(pdf, cmap_obj_id).ok()?;
-    let cmap_text = String::from_utf8_lossy(&cmap_bytes);
-    let table = parse_tounicode_cmap(&cmap_text);
+    // Parse descendant font's /W and /DW for per-glyph advances.
+    let (cid_widths, default_width) = content
+        .find("/DescendantFonts")
+        .and_then(|pos| {
+            // /DescendantFonts can be either "[N 0 R]" inline or a reference
+            // to an array object. Look for the first "N 0 R" after the key.
+            let rest = &content[pos + "/DescendantFonts".len()..];
+            let stripped = rest.trim_start();
+            let after = stripped.strip_prefix('[').unwrap_or(stripped).trim_start();
+            let rel_r = after.find(" R")?;
+            let parts: Vec<&str> = after[..rel_r].split_whitespace().collect();
+            if parts.len() < 2 {
+                return None;
+            }
+            let descendant_obj_id = parts[0].parse::<usize>().ok()?;
+            let descendant = find_object_content(&text, descendant_obj_id)?;
+            Some(parse_cid_widths(&descendant))
+        })
+        .unwrap_or_else(|| (HashMap::new(), 500.0));
 
     Some(FontInfo {
         is_cid: true,
-        cid_to_unicode: table,
+        cid_to_unicode,
+        cid_widths,
+        default_width,
     })
+}
+
+/// Parse a CIDFontType2's `/DW` default advance and `/W` per-CID advance
+/// table. Widths are in 1/1000 em units. `/W` supports two forms:
+///   `cid [w1 w2 w3 ...]`       — CIDs cid, cid+1, cid+2 have widths w1..w3
+///   `firstCid lastCid w`       — every CID in firstCid..=lastCid has width w
+fn parse_cid_widths(descendant: &str) -> (HashMap<u16, f64>, f64) {
+    let mut widths = HashMap::new();
+
+    let default_width = descendant
+        .find("/DW")
+        .and_then(|pos| {
+            let rest = descendant[pos + 3..].trim_start();
+            let end = rest
+                .find(|c: char| !c.is_ascii_digit() && c != '.' && c != '-')
+                .unwrap_or(rest.len());
+            rest[..end].parse::<f64>().ok()
+        })
+        .unwrap_or(500.0);
+
+    let Some(w_pos) = descendant.find("/W") else {
+        return (widths, default_width);
+    };
+    // Find the opening '[' of the /W array.
+    let after = &descendant[w_pos + 2..];
+    let Some(open) = after.find('[') else {
+        return (widths, default_width);
+    };
+    // Find the matching closing ']' at depth 0.
+    let body_bytes = &after.as_bytes()[open + 1..];
+    let mut depth: i32 = 0;
+    let mut close_rel: Option<usize> = None;
+    for (i, &b) in body_bytes.iter().enumerate() {
+        match b {
+            b'[' => depth += 1,
+            b']' => {
+                if depth == 0 {
+                    close_rel = Some(i);
+                    break;
+                }
+                depth -= 1;
+            }
+            _ => {}
+        }
+    }
+    let Some(close_rel) = close_rel else {
+        return (widths, default_width);
+    };
+    let body = &after[open + 1..open + 1 + close_rel];
+
+    // Walk the body collecting numbers and sub-arrays.
+    // Each entry is either "N [w w w ...]" or "firstN lastN w".
+    let bytes = body.as_bytes();
+    let mut i = 0;
+    let mut scratch: Vec<f64> = Vec::new();
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b.is_ascii_whitespace() {
+            i += 1;
+            continue;
+        }
+        if b == b'[' {
+            // Array of widths: apply to the most recent number in scratch.
+            let Some(start_cid) = scratch.last().copied() else {
+                // Malformed — skip past the array.
+                let mut j = i + 1;
+                while j < bytes.len() && bytes[j] != b']' {
+                    j += 1;
+                }
+                i = j + 1;
+                continue;
+            };
+            let mut j = i + 1;
+            let mut values: Vec<f64> = Vec::new();
+            while j < bytes.len() && bytes[j] != b']' {
+                if bytes[j].is_ascii_whitespace() {
+                    j += 1;
+                    continue;
+                }
+                let start = j;
+                while j < bytes.len()
+                    && (bytes[j].is_ascii_digit() || bytes[j] == b'.' || bytes[j] == b'-')
+                {
+                    j += 1;
+                }
+                if start == j {
+                    j += 1;
+                    continue;
+                }
+                if let Ok(n) = std::str::from_utf8(&bytes[start..j])
+                    .unwrap_or("")
+                    .parse::<f64>()
+                {
+                    values.push(n);
+                }
+            }
+            for (k, w) in values.iter().enumerate() {
+                widths.insert(start_cid as u16 + k as u16, *w);
+            }
+            scratch.pop();
+            i = j + 1;
+            continue;
+        }
+        if b.is_ascii_digit() || b == b'-' {
+            let start = i;
+            while i < bytes.len()
+                && (bytes[i].is_ascii_digit() || bytes[i] == b'.' || bytes[i] == b'-')
+            {
+                i += 1;
+            }
+            if let Ok(n) = std::str::from_utf8(&bytes[start..i])
+                .unwrap_or("")
+                .parse::<f64>()
+            {
+                scratch.push(n);
+                // Range form: three consecutive numbers
+                if scratch.len() == 3 {
+                    let first = scratch[0] as u16;
+                    let last = scratch[1] as u16;
+                    let w = scratch[2];
+                    for cid in first..=last {
+                        widths.insert(cid, w);
+                    }
+                    scratch.clear();
+                }
+            }
+            continue;
+        }
+        i += 1;
+    }
+
+    (widths, default_width)
 }
 
 /// Font metadata for decoding text in PDF content streams. Collected once
@@ -1414,6 +1559,14 @@ struct FontInfo {
     /// Populated only when `is_cid` is true. Values can be multi-character
     /// strings (CMaps may map one glyph to e.g. a ligature like "fi").
     cid_to_unicode: HashMap<u16, String>,
+    /// CID → advance width in 1/1000 em units, parsed from the descendant
+    /// font's `/W` array. Used to estimate per-glyph x offsets inside a
+    /// text-showing operator so redaction boxes land on the actual glyphs
+    /// instead of a uniform-width approximation.
+    cid_widths: HashMap<u16, f64>,
+    /// Default width (in 1/1000 em units) for CIDs not in `cid_widths`.
+    /// Parsed from the descendant font's `/DW`. Falls back to 500 if absent.
+    default_width: f64,
 }
 
 /// Parse a ToUnicode CMap text into a CID → Unicode string table.
@@ -1618,6 +1771,84 @@ fn hex_to_string(hex: &str) -> Option<String> {
         i += 4;
     }
     String::from_utf16(&units).ok()
+}
+
+/// Render a text-showing operand into per-glyph `CharPosition`s and return
+/// the decoded text + total advance width consumed (in PDF user space units).
+///
+/// Handles both `(literal)` and `<hex>` operands. For CID fonts, advances come
+/// from the font's `/W` per-CID table; otherwise a uniform `font_size * 0.5`
+/// approximation is used so simple fonts continue to work.
+fn render_text_operand(
+    token_bytes: &[u8],
+    font: Option<&FontInfo>,
+    font_size: f64,
+    start_x: f64,
+    start_y: f64,
+) -> (String, Vec<CharPosition>, f64) {
+    let text = decode_pdf_string(token_bytes, font);
+    let mut chars = Vec::with_capacity(text.chars().count());
+
+    // CID path: walk 2-byte CIDs and use real per-CID advances from /W.
+    if let Some(info) = font {
+        if info.is_cid && !token_bytes.is_empty() && token_bytes[0] == b'<' {
+            let hex_slice = &token_bytes[1..token_bytes.len().saturating_sub(1)];
+            let hex_str: String = hex_slice
+                .iter()
+                .filter(|b| !b.is_ascii_whitespace())
+                .map(|&b| b as char)
+                .collect();
+            let hex_chars: Vec<char> = hex_str.chars().collect();
+            let mut x_cursor = start_x;
+            let mut i = 0;
+            while i + 3 < hex_chars.len() {
+                let chunk: String = hex_chars[i..i + 4].iter().collect();
+                let cid = match u16::from_str_radix(&chunk, 16) {
+                    Ok(c) => c,
+                    Err(_) => {
+                        i += 4;
+                        continue;
+                    }
+                };
+                let uni = info.cid_to_unicode.get(&cid).cloned().unwrap_or_default();
+                let advance_em = info
+                    .cid_widths
+                    .get(&cid)
+                    .copied()
+                    .unwrap_or(info.default_width)
+                    / 1000.0;
+                let glyph_advance = advance_em * font_size;
+
+                // Emit one CharPosition per Unicode char in the mapped string;
+                // for ligatures like "fi" they all share this CID's x.
+                for ch in uni.chars() {
+                    chars.push(CharPosition {
+                        ch,
+                        x: x_cursor,
+                        y: start_y,
+                        font_size,
+                    });
+                }
+                x_cursor += glyph_advance;
+                i += 4;
+            }
+            let total_advance = x_cursor - start_x;
+            return (text, chars, total_advance);
+        }
+    }
+
+    // Simple font / literal-string fallback: uniform char-width estimate.
+    let char_width = font_size * 0.5;
+    for (ci, ch) in text.chars().enumerate() {
+        chars.push(CharPosition {
+            ch,
+            x: start_x + ci as f64 * char_width,
+            y: start_y,
+            font_size,
+        });
+    }
+    let total_advance = text.chars().count() as f64 * char_width;
+    (text, chars, total_advance)
 }
 
 /// Decode text content from a PDF string operand token.
@@ -1835,16 +2066,14 @@ fn extract_text_with_positions(
                     "Tj" if in_text => {
                         // (string) Tj — show text
                         if let Some(Token::Operand(data)) = operand_stack.last() {
-                            let text = decode_pdf_string(data, current_font);
-                            let char_width = state.font_size * 0.5;
-                            for (ci, ch) in text.chars().enumerate() {
-                                current_chars.push(CharPosition {
-                                    ch,
-                                    x: state.tx() + ci as f64 * char_width,
-                                    y: state.ty(),
-                                    font_size: state.font_size,
-                                });
-                            }
+                            let (text, chars, _advance) = render_text_operand(
+                                data,
+                                current_font,
+                                state.font_size,
+                                state.tx(),
+                                state.ty(),
+                            );
+                            current_chars.extend(chars);
                             current_text.push_str(&text);
                         }
                         operand_stack.clear();
@@ -1861,22 +2090,20 @@ fn extract_text_with_positions(
                                 data.as_slice()
                             };
                             let mut x_offset = state.tx();
-                            let char_width = state.font_size * 0.5;
                             let sub_tokens = tokenize_content_stream(array_inner);
                             for sub_tok in &sub_tokens {
                                 if let Token::Operand(sub_data) = sub_tok {
                                     if sub_data.starts_with(b"(") || sub_data.starts_with(b"<") {
-                                        let text = decode_pdf_string(sub_data, current_font);
-                                        for (ci, ch) in text.chars().enumerate() {
-                                            current_chars.push(CharPosition {
-                                                ch,
-                                                x: x_offset + ci as f64 * char_width,
-                                                y: state.ty(),
-                                                font_size: state.font_size,
-                                            });
-                                        }
+                                        let (text, chars, advance) = render_text_operand(
+                                            sub_data,
+                                            current_font,
+                                            state.font_size,
+                                            x_offset,
+                                            state.ty(),
+                                        );
+                                        current_chars.extend(chars);
                                         current_text.push_str(&text);
-                                        x_offset += text.chars().count() as f64 * char_width;
+                                        x_offset += advance;
                                     } else {
                                         // Numeric kerning value
                                         let kern: f64 = std::str::from_utf8(sub_data)
@@ -1896,16 +2123,14 @@ fn extract_text_with_positions(
                         current_line_y = Some(state.ty());
                         // Show text (last operand for ', last for " after spacing args)
                         if let Some(Token::Operand(data)) = operand_stack.last() {
-                            let text = decode_pdf_string(data, current_font);
-                            let char_width = state.font_size * 0.5;
-                            for (ci, ch) in text.chars().enumerate() {
-                                current_chars.push(CharPosition {
-                                    ch,
-                                    x: state.tx() + ci as f64 * char_width,
-                                    y: state.ty(),
-                                    font_size: state.font_size,
-                                });
-                            }
+                            let (text, chars, _advance) = render_text_operand(
+                                data,
+                                current_font,
+                                state.font_size,
+                                state.tx(),
+                                state.ty(),
+                            );
+                            current_chars.extend(chars);
                             current_text.push_str(&text);
                         }
                         operand_stack.clear();
@@ -2883,6 +3108,8 @@ endcmap
         let info = FontInfo {
             is_cid: true,
             cid_to_unicode: table,
+            cid_widths: HashMap::new(),
+            default_width: 500.0,
         };
         // CID hex string for "Hello"
         let decoded = decode_pdf_string(b"<00420045004C004C004F>", Some(&info));
