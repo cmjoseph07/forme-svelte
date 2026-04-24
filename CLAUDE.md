@@ -384,6 +384,9 @@ Would allow a single `.ttf` file to serve multiple weights/widths via `fvar` axi
 **CMYK color support** (Medium effort, print industry)
 PDF natively supports CMYK via `/DeviceCMYK` color space. Would need a `Color::Cmyk { c, m, y, k }` variant in `style/mod.rs`, plumbing through layout to PDF serialization. The PDF side is straightforward (`c m y k K` operators instead of `r g b rg`).
 
+**Finer-grained redaction splitting** (Medium effort, polish)
+`strip_redacted_text` in `pdf/redaction.rs` currently over-redacts: if any part of a Tj/TJ operand overlaps a redaction region, the entire text-showing operator is dropped. For a Tj drawing `Dear Daniel Molitor` where only `Molitor` matches, `Dear Daniel` also becomes unselectable (visible, since the overlay box only covers `Molitor`). Finer-grained splitting would rewrite the Tj into a TJ array where kept glyphs sit in `<hex>` chunks and redacted glyphs become negative kerning advances that skip past them. Per-CID advances from `/W` are already parsed in `FontInfo`, so the Type0 path is straightforward; simple (standard) fonts would need `/Widths` parsing too. Main risks: positioning math for kept glyphs (off-by-one on kerning cascades across the rest of the line) and merging with TJ arrays that already contain kerning values. Worth doing when users ask for partial-phrase redaction to preserve selectable surrounding text.
+
 ### Platform / Ecosystem
 
 **Serverless PDF API** — A hosted endpoint where users POST template JSON + data and get back PDF bytes. Would use the existing template expression system (`engine/src/template.rs`). No JS runtime needed server-side.
