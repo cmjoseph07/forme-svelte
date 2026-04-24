@@ -295,26 +295,38 @@ struct PdfRedactRegion {
     height: f64,
 }
 
-/// Check if text at the given position overlaps any redaction region.
+/// Check if a text operator spanning `[tx, tx + text_width]` horizontally and
+/// the given baseline y overlaps any redaction region. Used to decide whether
+/// to drop a text-showing operator from the content stream entirely.
 ///
-/// Intentionally aggressive: checks if the text baseline position falls within
-/// the redaction region's bounds with font_size as vertical tolerance.
-fn text_overlaps_region(tx: f64, ty: f64, font_size: f64, regions: &[PdfRedactRegion]) -> bool {
+/// Intentionally aggressive: even partial overlap of the text extent with the
+/// region triggers a drop, so redacting "Molitor" inside a longer Tj like
+/// "Daniel Molitor" removes the whole operator (over-redaction is safer than
+/// under-redaction — the visual overlay still only covers the target word).
+fn text_overlaps_region(
+    tx: f64,
+    ty: f64,
+    text_width: f64,
+    font_size: f64,
+    regions: &[PdfRedactRegion],
+) -> bool {
     for r in regions {
         // Text vertical extent: baseline (ty) to ty + font_size (approximate)
-        // We check a generous range to catch text with descenders
-        let text_bottom = ty - font_size * 0.3; // descender allowance
+        // with a small descender allowance.
+        let text_bottom = ty - font_size * 0.3;
         let text_top = ty + font_size;
 
         let region_bottom = r.y;
         let region_top = r.y + r.height;
 
-        // Vertical overlap
         let v_overlap = text_bottom < region_top && text_top > region_bottom;
 
-        // Horizontal: we're aggressive — any text whose x falls in the region's x-range.
-        // We don't know exact text width, so we check if tx is in [r.x - tolerance, r.x + r.width + tolerance]
-        let h_overlap = tx < r.x + r.width + font_size && tx + font_size > r.x - font_size * 0.5;
+        // Horizontal extent overlap: text [tx, tx+width] vs region [r.x, r.x+r.width]
+        let text_left = tx;
+        let text_right = tx + text_width.max(font_size * 0.5);
+        let region_left = r.x;
+        let region_right = r.x + r.width;
+        let h_overlap = text_left < region_right && text_right > region_left;
 
         if v_overlap && h_overlap {
             return true;
@@ -323,15 +335,50 @@ fn text_overlaps_region(tx: f64, ty: f64, font_size: f64, regions: &[PdfRedactRe
     false
 }
 
+/// Estimate the horizontal advance of a single text operand — for Tj this is
+/// the operand directly, for TJ each sub-operand contributes its advance
+/// minus kerning values (in thousandths of an em).
+fn measure_text_operand_width(data: &[u8], font: Option<&FontInfo>, font_size: f64) -> f64 {
+    // TJ array form
+    if data.len() >= 2 && data[0] == b'[' && data[data.len() - 1] == b']' {
+        let inner = &data[1..data.len() - 1];
+        let sub_tokens = tokenize_content_stream(inner);
+        let mut total = 0.0;
+        for sub in &sub_tokens {
+            if let Token::Operand(sub_data) = sub {
+                if sub_data.starts_with(b"(") || sub_data.starts_with(b"<") {
+                    let (_, _, advance) = render_text_operand(sub_data, font, font_size, 0.0, 0.0);
+                    total += advance;
+                } else {
+                    let kern: f64 = std::str::from_utf8(sub_data)
+                        .ok()
+                        .and_then(|s| s.trim().parse().ok())
+                        .unwrap_or(0.0);
+                    total -= kern / 1000.0 * font_size;
+                }
+            }
+        }
+        return total.max(0.0);
+    }
+    // Single string operand
+    let (_, _, advance) = render_text_operand(data, font, font_size, 0.0, 0.0);
+    advance
+}
+
 /// Remove text-showing operators that overlap redaction regions from a token stream.
 ///
 /// Preserves all non-text operators and text positioning operators so that
 /// text outside redaction regions stays correctly positioned.
-fn strip_redacted_text(tokens: &[Token], regions: &[PdfRedactRegion]) -> Vec<Token> {
+fn strip_redacted_text(
+    tokens: &[Token],
+    regions: &[PdfRedactRegion],
+    font_map: &HashMap<String, FontInfo>,
+) -> Vec<Token> {
     let mut out: Vec<Token> = Vec::new();
     let mut state = TextState::new();
     let mut in_text = false;
     let mut operand_stack: Vec<Token> = Vec::new();
+    let mut current_font: Option<&FontInfo> = None;
 
     for token in tokens {
         match token {
@@ -395,13 +442,34 @@ fn strip_redacted_text(tokens: &[Token], regions: &[PdfRedactRegion]) -> Vec<Tok
                             if size > 0.0 {
                                 state.font_size = size;
                             }
+                            // Resolve font name (/F1) → FontInfo for width lookup.
+                            if let Token::Operand(name_bytes) =
+                                &operand_stack[operand_stack.len() - 2]
+                            {
+                                if !name_bytes.is_empty() && name_bytes[0] == b'/' {
+                                    let name: String =
+                                        name_bytes[1..].iter().map(|&b| b as char).collect();
+                                    current_font = font_map.get(&name);
+                                }
+                            }
                         }
                         out.append(&mut operand_stack);
                         out.push(token.clone());
                     }
                     "Tj" if in_text => {
                         // Tj: (string) Tj — show text
-                        if text_overlaps_region(state.tx(), state.ty(), state.font_size, regions) {
+                        let text_width = if let Some(Token::Operand(data)) = operand_stack.last() {
+                            measure_text_operand_width(data, current_font, state.font_size)
+                        } else {
+                            0.0
+                        };
+                        if text_overlaps_region(
+                            state.tx(),
+                            state.ty(),
+                            text_width,
+                            state.font_size,
+                            regions,
+                        ) {
                             // Drop the string operand and Tj operator
                             operand_stack.clear();
                         } else {
@@ -411,7 +479,18 @@ fn strip_redacted_text(tokens: &[Token], regions: &[PdfRedactRegion]) -> Vec<Tok
                     }
                     "TJ" if in_text => {
                         // TJ: [(string) kern (string) kern ...] TJ — show text with kerning
-                        if text_overlaps_region(state.tx(), state.ty(), state.font_size, regions) {
+                        let text_width = if let Some(Token::Operand(data)) = operand_stack.last() {
+                            measure_text_operand_width(data, current_font, state.font_size)
+                        } else {
+                            0.0
+                        };
+                        if text_overlaps_region(
+                            state.tx(),
+                            state.ty(),
+                            text_width,
+                            state.font_size,
+                            regions,
+                        ) {
                             operand_stack.clear();
                         } else {
                             out.append(&mut operand_stack);
@@ -422,7 +501,18 @@ fn strip_redacted_text(tokens: &[Token], regions: &[PdfRedactRegion]) -> Vec<Tok
                     // " operator: set word/char spacing, move to next line, show text
                     op_s if in_text && op_s == "'" => {
                         state.apply_t_star();
-                        if text_overlaps_region(state.tx(), state.ty(), state.font_size, regions) {
+                        let text_width = if let Some(Token::Operand(data)) = operand_stack.last() {
+                            measure_text_operand_width(data, current_font, state.font_size)
+                        } else {
+                            0.0
+                        };
+                        if text_overlaps_region(
+                            state.tx(),
+                            state.ty(),
+                            text_width,
+                            state.font_size,
+                            regions,
+                        ) {
                             // Drop the string operand but keep the line move
                             // Emit T* instead to preserve position
                             operand_stack.clear();
@@ -435,7 +525,18 @@ fn strip_redacted_text(tokens: &[Token], regions: &[PdfRedactRegion]) -> Vec<Tok
                     op_s if in_text && op_s == "\"" => {
                         // " : aw ac string " — set word spacing, char spacing, show text
                         state.apply_t_star();
-                        if text_overlaps_region(state.tx(), state.ty(), state.font_size, regions) {
+                        let text_width = if let Some(Token::Operand(data)) = operand_stack.last() {
+                            measure_text_operand_width(data, current_font, state.font_size)
+                        } else {
+                            0.0
+                        };
+                        if text_overlaps_region(
+                            state.tx(),
+                            state.ty(),
+                            text_width,
+                            state.font_size,
+                            regions,
+                        ) {
                             operand_stack.clear();
                             out.push(Token::Operator(b"T*".to_vec()));
                         } else {
@@ -625,8 +726,17 @@ pub fn redact_pdf(pdf_bytes: &[u8], regions: &[RedactionRegion]) -> Result<Vec<u
             combined_stream.extend_from_slice(&decompressed);
         }
 
+        // Build the per-page font map so text-width estimates use real per-CID
+        // advances from the font's /W array (needed to detect when a text
+        // operator's extent crosses a redaction region).
+        let font_map = page_info
+            .resources_ref
+            .as_deref()
+            .map(|res| build_font_map(pdf_bytes, res))
+            .unwrap_or_default();
+
         let tokens = tokenize_content_stream(&combined_stream);
-        let filtered_tokens = strip_redacted_text(&tokens, &pdf_regions);
+        let filtered_tokens = strip_redacted_text(&tokens, &pdf_regions, &font_map);
         let new_stream_data = serialize_tokens(&filtered_tokens);
         let compressed_stream = compress_to_vec_zlib(&new_stream_data, 6);
 
@@ -2609,7 +2719,7 @@ mod tests {
             height: 30.0,
         }];
 
-        let filtered = strip_redacted_text(&tokens, &regions);
+        let filtered = strip_redacted_text(&tokens, &regions, &HashMap::new());
         let result = serialize_tokens(&filtered);
         let result_str = String::from_utf8_lossy(&result);
 
@@ -2637,7 +2747,7 @@ mod tests {
             height: 30.0,
         }];
 
-        let filtered = strip_redacted_text(&tokens, &regions);
+        let filtered = strip_redacted_text(&tokens, &regions, &HashMap::new());
         let result = serialize_tokens(&filtered);
         let result_str = String::from_utf8_lossy(&result);
 
