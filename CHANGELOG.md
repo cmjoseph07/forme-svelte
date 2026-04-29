@@ -2,6 +2,25 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.9.2] - 2026-04-28
+
+### Fixed
+- **Redaction precision**: Text-stripping now uses real per-CID glyph advances when locating regions, so partial-line redactions match the visible overlay precisely. Previously, redacting `Molitor` in `Dear Daniel Molitor` would also strip `Dear Daniel`
+- **CID font handling**: Decode CID/Type0 fonts in the redaction text extractor, with parsing that survives binary font streams
+- **Multi-style text grouping**: `text_decoration` is now part of the glyph style key, so a `line-through` span inside an otherwise plain text node is no longer merged with its neighbors during PDF emission
+
+### Changed
+- **Rasterizer body limit**: Default Axum 2 MB request body limit removed — large PDFs now flow through the rasterizer sidecar without 413 errors
+- **MCP tool surfaces**: Synced with the current `@formepdf/react` component set so generated prompts reflect shipping components
+
+## [0.9.1] - 2026-04-06
+
+### Fixed
+- **React Compiler compatibility**: `serialize()` now detects when a wrapper component has been compiled by React Compiler (which injects `useMemoCache` hooks that can't run outside React's render cycle) and throws a clear, actionable error pointing users to add `'use no memo'` to the component. Previously these failures surfaced as a cryptic "Invalid hook call" error
+
+### Changed
+- Bump rasterizer base image to 0.9.1
+
 ## [0.9.0] - 2026-04-04
 
 ### Added

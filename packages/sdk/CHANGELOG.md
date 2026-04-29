@@ -1,3 +1,7 @@
+## [0.9.2] - 2026-04-28
+
+_Version bump only._
+
 ## [0.9.1] - 2026-04-06
 
 _Dependency bump only._

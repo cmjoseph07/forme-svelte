@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.2] - 2026-04-28
+
+### Fixed
+- Redaction text-stripping now uses real per-CID glyph advances when locating regions, so partial-line redactions match the visible overlay precisely instead of dropping the surrounding text
+- CID font decoding in the redaction text extractor — handles Type0/CIDFontType2 streams correctly
+- PDF parsing in CID redaction is robust to binary font streams that previously confused the tokenizer
+- `text_decoration` is now part of the glyph style grouping key, so a `line-through` span inside an otherwise plain text node is no longer merged with its neighbors during PDF emission
+
 ## [0.9.1] - 2026-04-06
 
 _Version bump only._

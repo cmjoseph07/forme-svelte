@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.9.2] - 2026-04-28
+
+### Changed
+- Sync MCP tool surfaces with the current `@formepdf/react` component set — keeps generated render prompts in lockstep with shipping components
+
 ## [0.9.1] - 2026-04-06
 
 _Dependency bump only._
