@@ -3674,17 +3674,13 @@ fn test_breakable_view_continuation_page_has_top_padding() {
 
     // On continuation pages (page 2+), the wrapper Rect element should exist
     // and the first child inside it should be offset by padding.top from the Rect's top edge.
-    for page_idx in 1..pages.len() {
-        let page = &pages[page_idx];
+    for (page_idx, page) in pages.iter().enumerate().skip(1) {
         // Find the wrapper Rect element (the breakable view's background)
         let wrapper = page
             .elements
             .iter()
             .find(|el| matches!(el.draw, forme::layout::DrawCommand::Rect { .. }))
-            .expect(&format!(
-                "Page {} should have a wrapper Rect element",
-                page_idx + 1
-            ));
+            .unwrap_or_else(|| panic!("Page {} should have a wrapper Rect element", page_idx + 1));
 
         assert!(
             !wrapper.children.is_empty(),

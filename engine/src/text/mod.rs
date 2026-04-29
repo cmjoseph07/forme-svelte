@@ -2144,7 +2144,7 @@ mod tests {
             None,
         );
         // Multiple lines exist
-        assert!(lines.len() >= 1);
+        assert!(!lines.is_empty());
 
         let truncated = tl.truncate_with_ellipsis(
             &fc,

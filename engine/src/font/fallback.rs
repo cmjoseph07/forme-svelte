@@ -115,7 +115,7 @@ mod tests {
             .chars()
             .collect();
         let runs = segment_by_font(&chars, "Helvetica", 400, false, &registry);
-        assert!(runs.len() >= 1, "Should produce at least one run");
+        assert!(!runs.is_empty(), "Should produce at least one run");
         // All chars should be Noto Sans (since none are in Helvetica)
         assert_eq!(runs[0].family, "Noto Sans", "Cyrillic should use Noto Sans");
     }

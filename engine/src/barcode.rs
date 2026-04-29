@@ -104,6 +104,6 @@ mod tests {
     #[test]
     fn test_bars_contain_dark() {
         let bc = generate_barcode("Test", BarcodeFormat::Code128).unwrap();
-        assert!(bc.bars.iter().any(|&b| b == 1), "Should have dark bars");
+        assert!(bc.bars.contains(&1), "Should have dark bars");
     }
 }
