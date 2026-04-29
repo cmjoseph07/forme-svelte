@@ -531,7 +531,7 @@ fn patch_parent_refs(buf: &mut Vec<u8>, page_ids: &[usize], new_pages_id: usize)
     }
 
     // Apply patches in reverse order so byte offsets remain valid.
-    patches.sort_by(|a, b| b.0.cmp(&a.0));
+    patches.sort_by_key(|b| std::cmp::Reverse(b.0));
     for (start, end) in patches {
         let mut new_buf = Vec::with_capacity(buf.len());
         new_buf.extend_from_slice(&buf[..start]);

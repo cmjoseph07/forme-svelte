@@ -476,41 +476,33 @@ fn parse_path_d(d: &str) -> Vec<SvgCommand> {
 
     while i < tokens.len() {
         match tokens[i].as_str() {
-            "M" => {
-                if i + 2 < tokens.len() {
-                    cur_x = tokens[i + 1].parse().unwrap_or(0.0);
-                    cur_y = tokens[i + 2].parse().unwrap_or(0.0);
-                    start_x = cur_x;
-                    start_y = cur_y;
-                    commands.push(SvgCommand::MoveTo(cur_x, cur_y));
-                    i += 3;
-                    // Implicit LineTo for subsequent coordinate pairs
-                    while i + 1 < tokens.len() && is_number(&tokens[i]) {
-                        cur_x = tokens[i].parse().unwrap_or(0.0);
-                        cur_y = tokens[i + 1].parse().unwrap_or(0.0);
-                        commands.push(SvgCommand::LineTo(cur_x, cur_y));
-                        i += 2;
-                    }
-                } else {
-                    i += 1;
+            "M" if i + 2 < tokens.len() => {
+                cur_x = tokens[i + 1].parse().unwrap_or(0.0);
+                cur_y = tokens[i + 2].parse().unwrap_or(0.0);
+                start_x = cur_x;
+                start_y = cur_y;
+                commands.push(SvgCommand::MoveTo(cur_x, cur_y));
+                i += 3;
+                // Implicit LineTo for subsequent coordinate pairs
+                while i + 1 < tokens.len() && is_number(&tokens[i]) {
+                    cur_x = tokens[i].parse().unwrap_or(0.0);
+                    cur_y = tokens[i + 1].parse().unwrap_or(0.0);
+                    commands.push(SvgCommand::LineTo(cur_x, cur_y));
+                    i += 2;
                 }
             }
-            "m" => {
-                if i + 2 < tokens.len() {
-                    cur_x += tokens[i + 1].parse::<f64>().unwrap_or(0.0);
-                    cur_y += tokens[i + 2].parse::<f64>().unwrap_or(0.0);
-                    start_x = cur_x;
-                    start_y = cur_y;
-                    commands.push(SvgCommand::MoveTo(cur_x, cur_y));
-                    i += 3;
-                    while i + 1 < tokens.len() && is_number(&tokens[i]) {
-                        cur_x += tokens[i].parse::<f64>().unwrap_or(0.0);
-                        cur_y += tokens[i + 1].parse::<f64>().unwrap_or(0.0);
-                        commands.push(SvgCommand::LineTo(cur_x, cur_y));
-                        i += 2;
-                    }
-                } else {
-                    i += 1;
+            "m" if i + 2 < tokens.len() => {
+                cur_x += tokens[i + 1].parse::<f64>().unwrap_or(0.0);
+                cur_y += tokens[i + 2].parse::<f64>().unwrap_or(0.0);
+                start_x = cur_x;
+                start_y = cur_y;
+                commands.push(SvgCommand::MoveTo(cur_x, cur_y));
+                i += 3;
+                while i + 1 < tokens.len() && is_number(&tokens[i]) {
+                    cur_x += tokens[i].parse::<f64>().unwrap_or(0.0);
+                    cur_y += tokens[i + 1].parse::<f64>().unwrap_or(0.0);
+                    commands.push(SvgCommand::LineTo(cur_x, cur_y));
+                    i += 2;
                 }
             }
             "L" => {
