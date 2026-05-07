@@ -1,23 +1,27 @@
 /**
- * Browser entry point for @formepdf/core.
+ * Browser / edge entry point for @formepdf/core.
  *
  * Import as `@formepdf/core/browser` — no Node APIs, works in any
- * modern browser with WebAssembly support.
+ * modern browser, edge runtime, or worker with WebAssembly support.
  *
- * WASM is loaded via fetch() from the same origin as the importing
- * module (using import.meta.url resolution in the wasm-pack glue).
- * Bundlers like Vite, esbuild, and webpack handle this automatically.
- * For script-tag usage, call `initWasm()` with an explicit URL first.
+ * Backed by the wasm-pack `--target bundler` build of pkg/, so the
+ * WASM module is wired up implicitly by the consuming bundler at
+ * module-load time (via `import * as wasm from './forme_bg.wasm'`
+ * inside pkg/forme.js). Vite, esbuild, Webpack, Turbopack, and
+ * Wrangler all handle this — there is no explicit init step.
  */
 
-import initWasm, {
+import {
+  certify_pdf as wasmCertifyPdf,
+  find_text_regions as wasmFindTextRegions,
+  merge_pdfs as wasmMergePdfs,
+  redact_pdf as wasmRedactPdf,
+  redact_text as wasmRedactText,
   render_pdf as wasmRenderPdf,
   render_pdf_with_layout as wasmRenderPdfWithLayout,
   render_template_pdf as wasmRenderTemplatePdf,
   render_template_pdf_with_layout as wasmRenderTemplatePdfWithLayout,
 } from '../pkg/forme.js';
-
-import type { InitInput } from '../pkg/forme.js';
 
 // ── Re-export types from the main entry ────────────────────────────
 
@@ -38,30 +42,17 @@ export type {
 import type { LayoutInfo, RenderWithLayoutResult, RenderDocumentOptions, RedactionRegion, RedactionPattern } from './index.js';
 
 // ── WASM initialization ────────────────────────────────────────────
-
-let initialized = false;
-
-/**
- * Initialize the WASM module. Called automatically on first render,
- * but you can call it early to control timing or provide a custom
- * WASM URL/bytes.
- *
- * @example
- * // Auto-resolve (works with bundlers)
- * await initWasm();
- *
- * // Explicit URL (CDN, custom path, etc.)
- * await initWasm('/wasm/forme_bg.wasm');
- * await initWasm(new URL('./forme_bg.wasm', import.meta.url));
- */
-export async function init(module?: InitInput | Promise<InitInput>): Promise<void> {
-  if (initialized) return;
-  if (module !== undefined) {
-    await initWasm({ module_or_path: module });
-  } else {
-    await initWasm();
-  }
-  initialized = true;
+//
+// Kept as a no-op for backward compatibility with callers that did
+// `await init()` against the old --target web build. The bundler-
+// target build instantiates the WASM at module-load time, so by the
+// time anyone could invoke any of the exports below, the engine is
+// already live.
+//
+/** @deprecated The bundler now wires up WASM automatically; calling
+ *  this is a no-op. Safe to delete from your code. */
+export async function init(_module?: unknown): Promise<void> {
+  return;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
@@ -125,17 +116,11 @@ async function resolveImagesInNode(node: Record<string, unknown>): Promise<void>
 
 // ── Render functions ───────────────────────────────────────────────
 
-async function ensureInit(): Promise<void> {
-  if (!initialized) await init();
-}
-
 export async function renderPdf(json: string): Promise<Uint8Array> {
-  await ensureInit();
   return wasmRenderPdf(json);
 }
 
 export async function renderPdfWithLayout(json: string): Promise<RenderWithLayoutResult> {
-  await ensureInit();
   const result = wasmRenderPdfWithLayout(json) as { pdf: Uint8Array; layout: LayoutInfo };
   return result;
 }
@@ -219,7 +204,6 @@ export async function renderTemplate(
   templateJson: string,
   dataJson: string,
 ): Promise<Uint8Array> {
-  await ensureInit();
   return wasmRenderTemplatePdf(templateJson, dataJson);
 }
 
@@ -227,7 +211,6 @@ export async function renderTemplateWithLayout(
   templateJson: string,
   dataJson: string,
 ): Promise<RenderWithLayoutResult> {
-  await ensureInit();
   const result = wasmRenderTemplatePdfWithLayout(templateJson, dataJson) as {
     pdf: Uint8Array;
     layout: LayoutInfo;
@@ -241,9 +224,7 @@ export async function certifyPdf(
   pdfBytes: Uint8Array,
   config: { certificatePem: string; privateKeyPem: string; reason?: string; location?: string; contact?: string; visible?: boolean; page?: number; x?: number; y?: number; width?: number; height?: number },
 ): Promise<Uint8Array> {
-  await ensureInit();
-  const { certify_pdf } = await import('../pkg/forme.js');
-  return certify_pdf(pdfBytes, JSON.stringify(config));
+  return wasmCertifyPdf(pdfBytes, JSON.stringify(config));
 }
 
 /** @deprecated Use certifyPdf */
@@ -255,9 +236,7 @@ export async function redactPdf(
   pdfBytes: Uint8Array,
   regions: RedactionRegion[],
 ): Promise<Uint8Array> {
-  await ensureInit();
-  const { redact_pdf } = await import('../pkg/forme.js');
-  return redact_pdf(pdfBytes, JSON.stringify(regions));
+  return wasmRedactPdf(pdfBytes, JSON.stringify(regions));
 }
 
 // ── Text-search redaction ─────────────────────────────────────────────
@@ -272,9 +251,7 @@ export async function findTextRegions(
   pdfBytes: Uint8Array,
   patterns: RedactionPattern[],
 ): Promise<RedactionRegion[]> {
-  await ensureInit();
-  const { find_text_regions } = await import('../pkg/forme.js');
-  const json = find_text_regions(pdfBytes, JSON.stringify(patterns));
+  const json = wasmFindTextRegions(pdfBytes, JSON.stringify(patterns));
   return JSON.parse(json) as RedactionRegion[];
 }
 
@@ -288,9 +265,7 @@ export async function redactText(
   pdfBytes: Uint8Array,
   patterns: RedactionPattern[],
 ): Promise<Uint8Array> {
-  await ensureInit();
-  const { redact_text } = await import('../pkg/forme.js');
-  return redact_text(pdfBytes, JSON.stringify(patterns));
+  return wasmRedactText(pdfBytes, JSON.stringify(patterns));
 }
 
 // ── PDF merging ──────────────────────────────────────────────────────
@@ -302,12 +277,10 @@ export async function redactText(
  * @returns The merged PDF as a Uint8Array.
  */
 export async function mergePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
-  await ensureInit();
-  const { merge_pdfs } = await import('../pkg/forme.js');
   const base64Pdfs = pdfs.map((pdf) =>
     btoa(Array.from(pdf, (b) => String.fromCharCode(b)).join('')),
   );
-  return merge_pdfs(JSON.stringify(base64Pdfs));
+  return wasmMergePdfs(JSON.stringify(base64Pdfs));
 }
 
 // ── Data extraction (browser-native decompression) ──────────────────

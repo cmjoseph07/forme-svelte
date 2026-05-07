@@ -1,7 +1,9 @@
-import initWasm, { render_pdf as wasmRenderPdf } from '../pkg/forme.js';
+// Node entry uses the wasm-pack `--target nodejs` build, which is a
+// self-initializing CJS module: it `require('fs').readFileSync`s its
+// own .wasm at import time, so callers don't need to await any init.
+import { render_pdf as wasmRenderPdf } from '../pkg-node/forme.js';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import { dirname, join, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { ReactElement } from 'react';
 
 // ── Layout metadata types ──────────────────────────────────────────
@@ -81,19 +83,6 @@ export interface RenderWithLayoutResult {
   layout: LayoutInfo;
 }
 
-// ── WASM initialization ────────────────────────────────────────────
-
-let initialized = false;
-
-async function ensureInit(): Promise<void> {
-  if (initialized) return;
-  const __dirname = dirname(fileURLToPath(import.meta.url));
-  const wasmPath = join(__dirname, '..', 'pkg', 'forme_bg.wasm');
-  const wasmBytes = await readFile(wasmPath);
-  await initWasm({ module_or_path: wasmBytes });
-  initialized = true;
-}
-
 // ── Font resolution ──────────────────────────────────────────────
 
 function uint8ArrayToBase64(bytes: Uint8Array): string {
@@ -148,14 +137,11 @@ async function resolveImagesInNode(node: Record<string, unknown>): Promise<void>
 // ── Render functions ───────────────────────────────────────────────
 
 export async function renderPdf(json: string): Promise<Uint8Array> {
-  await ensureInit();
   return wasmRenderPdf(json);
 }
 
 export async function renderPdfWithLayout(json: string): Promise<RenderWithLayoutResult> {
-  await ensureInit();
-  // Dynamic import to access the WASM binding that returns { pdf, layout }
-  const { render_pdf_with_layout } = await import('../pkg/forme.js');
+  const { render_pdf_with_layout } = await import('../pkg-node/forme.js');
   const result = render_pdf_with_layout(json) as { pdf: Uint8Array; layout: LayoutInfo };
   return result;
 }
@@ -213,14 +199,12 @@ export async function renderDocumentWithLayout(element: ReactElement, options?: 
 // ── Template rendering ──────────────────────────────────────────────
 
 export async function renderTemplate(templateJson: string, dataJson: string): Promise<Uint8Array> {
-  await ensureInit();
-  const { render_template_pdf } = await import('../pkg/forme.js');
+  const { render_template_pdf } = await import('../pkg-node/forme.js');
   return render_template_pdf(templateJson, dataJson);
 }
 
 export async function renderTemplateWithLayout(templateJson: string, dataJson: string): Promise<RenderWithLayoutResult> {
-  await ensureInit();
-  const { render_template_pdf_with_layout } = await import('../pkg/forme.js');
+  const { render_template_pdf_with_layout } = await import('../pkg-node/forme.js');
   const result = render_template_pdf_with_layout(templateJson, dataJson) as { pdf: Uint8Array; layout: LayoutInfo };
   return result;
 }
@@ -228,8 +212,7 @@ export async function renderTemplateWithLayout(templateJson: string, dataJson: s
 // ── PDF certification ────────────────────────────────────────────────
 
 export async function certifyPdf(pdfBytes: Uint8Array, config: CertificationConfig): Promise<Uint8Array> {
-  await ensureInit();
-  const { certify_pdf } = await import('../pkg/forme.js');
+  const { certify_pdf } = await import('../pkg-node/forme.js');
   return certify_pdf(pdfBytes, JSON.stringify(config));
 }
 
@@ -254,8 +237,7 @@ export interface RedactionRegion {
 }
 
 export async function redactPdf(pdfBytes: Uint8Array, regions: RedactionRegion[]): Promise<Uint8Array> {
-  await ensureInit();
-  const { redact_pdf } = await import('../pkg/forme.js');
+  const { redact_pdf } = await import('../pkg-node/forme.js');
   return redact_pdf(pdfBytes, JSON.stringify(regions));
 }
 
@@ -279,8 +261,7 @@ export interface RedactionPattern {
  * redaction regions (in web top-origin coordinates) for each match.
  */
 export async function findTextRegions(pdfBytes: Uint8Array, patterns: RedactionPattern[]): Promise<RedactionRegion[]> {
-  await ensureInit();
-  const { find_text_regions } = await import('../pkg/forme.js');
+  const { find_text_regions } = await import('../pkg-node/forme.js');
   const json = find_text_regions(pdfBytes, JSON.stringify(patterns));
   return JSON.parse(json) as RedactionRegion[];
 }
@@ -292,8 +273,7 @@ export async function findTextRegions(pdfBytes: Uint8Array, patterns: RedactionP
  * applies coordinate-based redaction to each match.
  */
 export async function redactText(pdfBytes: Uint8Array, patterns: RedactionPattern[]): Promise<Uint8Array> {
-  await ensureInit();
-  const { redact_text } = await import('../pkg/forme.js');
+  const { redact_text } = await import('../pkg-node/forme.js');
   return redact_text(pdfBytes, JSON.stringify(patterns));
 }
 
@@ -306,8 +286,7 @@ export async function redactText(pdfBytes: Uint8Array, patterns: RedactionPatter
  * @returns The merged PDF as a Uint8Array.
  */
 export async function mergePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
-  await ensureInit();
-  const { merge_pdfs } = await import('../pkg/forme.js');
+  const { merge_pdfs } = await import('../pkg-node/forme.js');
   const base64Pdfs = pdfs.map((pdf) => Buffer.from(pdf).toString('base64'));
   return merge_pdfs(JSON.stringify(base64Pdfs));
 }

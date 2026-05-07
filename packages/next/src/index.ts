@@ -15,18 +15,15 @@ let _renderDocument: RenderDocumentFn | null = null;
 async function getRenderDocument(): Promise<RenderDocumentFn> {
   if (_renderDocument) return _renderDocument;
 
-  // Check if we can resolve file paths — Workers with nodejs_compat provide
-  // process.versions.node but import.meta.url is undefined, so the Node
-  // entry's fileURLToPath() call crashes. This detects the actual capability.
+  // Workers with nodejs_compat expose process.versions.node, but their
+  // import.meta.url isn't a file:// URL — the Node entry's fileURLToPath()
+  // would crash. Branch on the actual capability we need.
   const isEdge = typeof import.meta.url !== 'string' || !import.meta.url.startsWith('file://');
   if (isEdge) {
+    // The browser entry is backed by wasm-pack --target bundler, so the
+    // bundler (Next.js/webpack, Turbopack, wrangler/esbuild) wires the
+    // .wasm in implicitly at module load. No manual init needed.
     const browser = await import('@formepdf/core/browser');
-    // In edge runtimes, import.meta.url doesn't resolve to a valid URL so
-    // the default WASM loader fails. Import the .wasm file directly —
-    // bundlers (Next.js/webpack, wrangler/esbuild) resolve this to a
-    // WebAssembly.Module.
-    const wasm = await import('@formepdf/core/pkg/forme_bg.wasm');
-    await browser.init(wasm.default ?? wasm);
     _renderDocument = browser.renderDocument as RenderDocumentFn;
   } else {
     const core = await import('@formepdf/core');

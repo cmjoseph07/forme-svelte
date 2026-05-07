@@ -3,6 +3,7 @@ engine/target/
 
 # WASM build output
 packages/core/pkg/
+packages/core/pkg-node/
 
 packages/go-sdk/templates/forme.wasm
 packages/python-sdk/formepdf/forme.wasm

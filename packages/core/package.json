@@ -62,7 +62,8 @@
   },
   "files": [
     "dist/",
-    "pkg/"
+    "pkg/",
+    "pkg-node/"
   ],
   "license": "MIT",
   "repository": {
