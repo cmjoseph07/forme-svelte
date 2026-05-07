@@ -446,6 +446,11 @@ pub struct LayoutElement {
     pub is_header_row: bool,
     /// Overflow behavior (Visible or Hidden). When Hidden, PDF clips children.
     pub overflow: Overflow,
+    /// Opacity for the entire element including its children (0.0–1.0). The
+    /// PDF serializer wraps `write_element` in a `q\n/GS{n} gs ... Q` block
+    /// when this is < 1.0, so descendants render at the cumulative alpha.
+    /// Default is 1.0 (no extra wrap).
+    pub opacity: f64,
 }
 
 /// Return a human-readable name for a NodeKind variant.
@@ -523,6 +528,13 @@ pub enum DrawCommand {
         border_color: EdgeValues<Color>,
         border_radius: CornerValues,
         opacity: f64,
+        /// Optional drop shadow rendered before the background. Boxed
+        /// to keep the `DrawCommand` enum's largest variant size down.
+        box_shadow: Option<Box<crate::style::BoxShadow>>,
+        /// Optional gradient paint. When `Some`, takes precedence over
+        /// `background` (solid color). Boxed for the same enum-size
+        /// reason as `box_shadow`.
+        background_gradient: Option<Box<crate::style::Background>>,
     },
     /// Draw text.
     Text {
@@ -1476,7 +1488,9 @@ impl LayoutEngine {
                     border_width: style.border_width,
                     border_color: style.border_color,
                     border_radius: style.border_radius,
-                    opacity: style.opacity,
+                    opacity: 1.0,
+                    box_shadow: style.box_shadow.map(Box::new),
+                    background_gradient: style.background.clone().map(Box::new),
                 },
                 children: child_elements,
                 node_type: Some(node_kind_name(&node.kind).to_string()),
@@ -1487,6 +1501,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: style.overflow,
+                opacity: style.opacity,
             };
             cursor.elements.push(rect_element);
 
@@ -1547,6 +1562,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             });
         }
 
@@ -1598,7 +1614,9 @@ impl LayoutEngine {
             border_width: style.border_width,
             border_color: style.border_color,
             border_radius: style.border_radius,
-            opacity: style.opacity,
+            opacity: 1.0,
+            box_shadow: style.box_shadow.map(Box::new),
+            background_gradient: style.background.clone().map(Box::new),
         };
 
         if pages.len() == initial_page_count {
@@ -1621,6 +1639,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: style.overflow,
+                opacity: style.opacity,
             });
         } else {
             // Page breaks occurred: wrap elements on each page with clone semantics
@@ -1648,6 +1667,7 @@ impl LayoutEngine {
                     alt: None,
                     is_header_row: false,
                     overflow: Overflow::default(),
+                    opacity: 1.0,
                 });
             }
 
@@ -1676,6 +1696,7 @@ impl LayoutEngine {
                         alt: None,
                         is_header_row: false,
                         overflow: Overflow::default(),
+                        opacity: 1.0,
                     });
                 }
             }
@@ -1702,6 +1723,7 @@ impl LayoutEngine {
                     alt: None,
                     is_header_row: false,
                     overflow: Overflow::default(),
+                    opacity: 1.0,
                 });
             }
         }
@@ -2514,7 +2536,9 @@ impl LayoutEngine {
                         border_width: cell_style.border_width,
                         border_color: cell_style.border_color,
                         border_radius: cell_style.border_radius,
-                        opacity: cell_style.opacity,
+                        opacity: 1.0,
+                        box_shadow: cell_style.box_shadow.map(Box::new),
+                        background_gradient: cell_style.background.clone().map(Box::new),
                     }
                 } else {
                     DrawCommand::None
@@ -2528,6 +2552,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: is_header,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             });
 
             cell_x += col_width;
@@ -2546,7 +2571,9 @@ impl LayoutEngine {
                     border_width: Edges::default(),
                     border_color: EdgeValues::uniform(Color::BLACK),
                     border_radius: CornerValues::uniform(0.0),
-                    opacity: row_style.opacity,
+                    opacity: 1.0,
+                    box_shadow: row_style.box_shadow.map(Box::new),
+                    background_gradient: row_style.background.clone().map(Box::new),
                 }
             } else {
                 DrawCommand::None
@@ -2560,6 +2587,7 @@ impl LayoutEngine {
             alt: None,
             is_header_row: is_header,
             overflow: row_style.overflow,
+            opacity: row_style.opacity,
         });
 
         // Append any overflow pages from cells that exceeded page height
@@ -2734,6 +2762,7 @@ impl LayoutEngine {
                         alt: None,
                         is_header_row: false,
                         overflow: Overflow::default(),
+                        opacity: 1.0,
                     });
                     is_first_element = false;
                 }
@@ -2769,7 +2798,11 @@ impl LayoutEngine {
             // Use the sum of natural glyph advances (what PDF Tj actually renders)
             // rather than KP-adjusted positions, which bake justification into
             // char_positions and make slack ≈ 0.
+            //
+            // User-set `word_spacing` is the base; when text is justified, the
+            // computed slack-per-space is added on top.
             let is_last_line = line_idx == lines.len() - 1;
+            let user_ws = style.word_spacing;
             let (justified_width, word_spacing) =
                 if matches!(style.text_align, TextAlign::Justify) && !is_last_line {
                     let last_non_space = glyphs.iter().rposition(|g| g.char_value != ' ');
@@ -2789,9 +2822,9 @@ impl LayoutEngine {
                     } else {
                         0.0
                     };
-                    (text_width, ws)
+                    (text_width, user_ws + ws)
                 } else {
-                    (rendered_width, 0.0)
+                    (rendered_width, user_ws)
                 };
 
             let text_line = TextLine {
@@ -2812,7 +2845,7 @@ impl LayoutEngine {
                     lines: vec![text_line],
                     color: style.color,
                     text_decoration: style.text_decoration,
-                    opacity: style.opacity,
+                    opacity: 1.0,
                 },
                 children: vec![],
                 node_type: Some("TextLine".to_string()),
@@ -2823,6 +2856,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             });
 
             cursor.y += line_height;
@@ -2851,6 +2885,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             });
         }
 
@@ -2996,6 +3031,7 @@ impl LayoutEngine {
                         alt: None,
                         is_header_row: false,
                         overflow: Overflow::default(),
+                        opacity: 1.0,
                     });
                     is_first_element = false;
                 }
@@ -3019,7 +3055,11 @@ impl LayoutEngine {
             // Justify: compute extra word spacing so the line fills the column width.
             // Use the sum of natural glyph advances (what PDF Tj actually renders)
             // rather than KP-adjusted line width.
+            //
+            // User-set `word_spacing` is the base; when text is justified, the
+            // computed slack-per-space is added on top.
             let is_last_line = line_idx == broken_lines.len() - 1;
+            let user_ws = style.word_spacing;
             let (justified_width, word_spacing) =
                 if matches!(style.text_align, TextAlign::Justify) && !is_last_line {
                     let last_non_space = glyphs.iter().rposition(|g| g.char_value != ' ');
@@ -3039,9 +3079,9 @@ impl LayoutEngine {
                     } else {
                         0.0
                     };
-                    (text_width, ws)
+                    (text_width, user_ws + ws)
                 } else {
-                    (run_line.width, 0.0)
+                    (run_line.width, user_ws)
                 };
 
             let text_line = TextLine {
@@ -3070,7 +3110,7 @@ impl LayoutEngine {
                     lines: vec![text_line],
                     color: style.color,
                     text_decoration: text_dec,
-                    opacity: style.opacity,
+                    opacity: 1.0,
                 },
                 children: vec![],
                 node_type: Some("TextLine".to_string()),
@@ -3081,6 +3121,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             });
 
             cursor.y += line_height;
@@ -3108,6 +3149,7 @@ impl LayoutEngine {
                 alt: None,
                 is_header_row: false,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             });
         }
     }
@@ -3820,6 +3862,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += img_height + margin.bottom;
@@ -3881,6 +3924,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += svg_height + margin.bottom;
@@ -4055,6 +4099,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += canvas_height + margin.bottom;
@@ -4103,6 +4148,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += chart_height + margin.bottom;
@@ -4147,6 +4193,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += field_height + margin.bottom;
@@ -4209,6 +4256,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += bar_height + margin.bottom;
@@ -4265,6 +4313,7 @@ impl LayoutEngine {
             alt: node.alt.clone(),
             is_header_row: false,
             overflow: style.overflow,
+            opacity: style.opacity,
         });
 
         cursor.y += display_size + margin.bottom;
@@ -4982,6 +5031,7 @@ impl LayoutEngine {
                             alt: None,
                             is_header_row: false,
                             overflow: Overflow::default(),
+                            opacity: 1.0,
                         });
                     }
                 }

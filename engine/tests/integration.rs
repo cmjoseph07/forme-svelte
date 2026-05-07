@@ -3175,6 +3175,7 @@ fn test_breakable_view_with_background_splits_across_pages() {
             },
             margin: Edges::uniform(20.0),
             wrap: true,
+            ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -3254,6 +3255,7 @@ fn test_breakable_view_background_does_not_overlap_footer() {
             },
             margin: Edges::uniform(margin),
             wrap: true,
+            ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -3324,6 +3326,7 @@ fn test_breakable_view_without_visual_stays_unwrapped() {
             },
             margin: Edges::uniform(20.0),
             wrap: true,
+            ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -3622,6 +3625,7 @@ fn test_breakable_view_continuation_page_has_top_padding() {
         },
         margin: Edges::uniform(20.0),
         wrap: true,
+        ..Default::default()
     };
     let padding = 15.0;
 
@@ -4214,6 +4218,7 @@ fn test_justified_text_produces_valid_pdf() {
                     size: PageSize::Letter,
                     margin: Edges { top: 36.0, right: 36.0, bottom: 36.0, left: 36.0 },
                     wrap: true,
+                ..Default::default()
                 },
             },
             style: Style::default(),
@@ -4246,6 +4251,7 @@ fn test_justified_text_produces_valid_pdf() {
             size: PageSize::Letter,
             margin: Edges { top: 72.0, right: 72.0, bottom: 72.0, left: 72.0 },
             wrap: true,
+        ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -4279,6 +4285,7 @@ fn test_lang_inherits_to_text_nodes() {
                         left: 36.0,
                     },
                     wrap: true,
+                    ..Default::default()
                 },
             },
             style: Style::default(),
@@ -4302,6 +4309,7 @@ fn test_lang_inherits_to_text_nodes() {
                 left: 72.0,
             },
             wrap: true,
+            ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -4333,6 +4341,7 @@ fn test_per_node_lang_override() {
                         left: 36.0,
                     },
                     wrap: true,
+                    ..Default::default()
                 },
             },
             style: Style::default(),
@@ -4373,6 +4382,7 @@ fn test_per_node_lang_override() {
                 left: 72.0,
             },
             wrap: true,
+            ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -5159,6 +5169,7 @@ fn test_text_overflow_ellipsis_single_line() {
             },
             margin: Edges::uniform(10.0),
             wrap: true,
+            ..Default::default()
         },
         fonts: vec![],
         tagged: false,
@@ -7915,6 +7926,7 @@ fn test_page_placeholder_survives_line_breaking() {
                 },
                 margin: Edges::uniform(5.0),
                 wrap: true,
+                ..Default::default()
             },
         },
         style: Style::default(),
@@ -7998,6 +8010,7 @@ fn test_two_pass_multi_page_common_case() {
                 size: PageSize::A4,
                 margin: Edges::uniform(40.0),
                 wrap: true,
+                ..Default::default()
             },
         },
         style: Style::default(),
@@ -8048,6 +8061,7 @@ fn test_render_performance() {
                 size: PageSize::A4,
                 margin: Edges::uniform(50.0),
                 wrap: true,
+                ..Default::default()
             },
         },
         style: Style::default(),
@@ -8297,5 +8311,698 @@ fn test_svg_inherited_group_opacity() {
     assert!(
         pdf_str.contains("/ca 0.5000"),
         "PDF should contain ExtGState with inherited group opacity 0.5"
+    );
+}
+
+// ─── Feature 1: opacity propagates to children ────────────────
+
+/// A View with opacity:0.5 and a Text child must wrap BOTH the rect's own
+/// paint and the text's BT…ET in a single q/GS gs … Q block. Without the
+/// fix, the rect fades but the child text renders at 100% alpha.
+#[test]
+fn test_opacity_wraps_children() {
+    let doc = default_doc(vec![make_styled_view(
+        Style {
+            opacity: Some(0.5),
+            background_color: Some(Color::rgb(1.0, 0.0, 0.0)),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![make_text("Faded text", 12.0)],
+    )]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf_bytes);
+
+    // Find the index of the first /GS gs reference.
+    let gs_idx = stream
+        .find(" gs")
+        .expect("expected at least one /GS{n} gs reference");
+    // The text BT…ET block must appear AFTER the gs (so it's inside the
+    // opacity wrap) and BEFORE the matching Q.
+    let bt_idx = stream
+        .find("BT")
+        .expect("expected a BT text block in the content stream");
+    assert!(
+        bt_idx > gs_idx,
+        "BT must come after /GS gs so the text is inside the opacity wrap (gs at {}, BT at {})",
+        gs_idx,
+        bt_idx,
+    );
+    // The matching Q must come after the BT/ET pair (Q closes the
+    // opacity-wrap q from the start).
+    let et_idx = stream
+        .rfind("ET")
+        .expect("expected an ET in the content stream");
+    let last_q_idx = stream
+        .rfind("\nQ\n")
+        .or_else(|| stream.rfind("\nQ"))
+        .expect("expected a Q closing the opacity wrap");
+    assert!(
+        last_q_idx > et_idx,
+        "Q closing opacity must come after ET (ET at {}, Q at {})",
+        et_idx,
+        last_q_idx,
+    );
+}
+
+/// Nested opacities must produce two ExtGState references in nested q/Q
+/// blocks. PDF's graphics state stack multiplies them at render time, so a
+/// 0.5 child of a 0.5 parent renders at effective 0.25 alpha — but in the
+/// emitted bytes both ExtGState dicts hold /ca 0.5 (the multiplication is
+/// the viewer's job).
+#[test]
+fn test_nested_opacity_emits_two_gs_refs() {
+    let inner = make_styled_view(
+        Style {
+            opacity: Some(0.5),
+            background_color: Some(Color::rgb(0.0, 1.0, 0.0)),
+            width: Some(Dimension::Pt(50.0)),
+            height: Some(Dimension::Pt(25.0)),
+            ..Default::default()
+        },
+        vec![make_text("inner", 12.0)],
+    );
+    let outer = make_styled_view(
+        Style {
+            opacity: Some(0.5),
+            background_color: Some(Color::rgb(1.0, 0.0, 0.0)),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![inner],
+    );
+    let doc = default_doc(vec![outer]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf_bytes);
+
+    // Count /GSx gs references — should be at least 2 (one per opacity
+    // level). The unique-opacity collector dedupes 0.5 to a single
+    // ExtGState dict, so both references point to the same /GS0.
+    let gs_count = stream.matches(" gs").count();
+    assert!(
+        gs_count >= 2,
+        "expected at least 2 /GS{{n}} gs references for nested opacities, got {} (stream: {})",
+        gs_count,
+        stream,
+    );
+
+    // ExtGState dict carries 0.5 (the multiplication to 0.25 happens
+    // at render time via the q/Q stack — not in the PDF bytes).
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+    assert!(
+        pdf_str.contains("/ca 0.5000"),
+        "PDF should contain /ca 0.5000 ExtGState"
+    );
+}
+
+// ─── Feature 4: boxShadow ──────────────────────────────────────
+
+/// `boxShadow` paints a filled rect offset by (offsetX, offsetY) BEFORE
+/// the element's background, so the shadow sits visually behind. Verify
+/// the order in the page content stream.
+#[test]
+fn test_box_shadow_renders_before_background() {
+    let view = make_styled_view(
+        Style {
+            box_shadow: Some(forme::style::BoxShadow {
+                offset_x: 2.0,
+                offset_y: 4.0,
+                blur: 0.0,
+                color: Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.2,
+                },
+            }),
+            background_color: Some(Color::rgb(1.0, 1.0, 1.0)),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_last_flate_stream(&pdf_bytes).expect("expected page content stream");
+
+    // The shadow's fill (`0.000 0.000 0.000 rg`) must come before the
+    // background's white fill (`1.000 1.000 1.000 rg`).
+    let shadow_fill_idx = stream
+        .find("0.000 0.000 0.000 rg")
+        .expect("expected shadow fill in content stream");
+    let bg_idx = stream
+        .find("1.000 1.000 1.000 rg")
+        .expect("expected background fill in content stream");
+    assert!(
+        shadow_fill_idx < bg_idx,
+        "shadow fill (at {}) must precede background fill (at {})",
+        shadow_fill_idx,
+        bg_idx,
+    );
+}
+
+/// Shadow color with alpha < 1.0 produces an ExtGState entry so the
+/// shadow renders semi-transparently.
+#[test]
+fn test_box_shadow_alpha_creates_extgstate() {
+    let view = make_styled_view(
+        Style {
+            box_shadow: Some(forme::style::BoxShadow {
+                offset_x: 4.0,
+                offset_y: 4.0,
+                blur: 0.0,
+                color: Color {
+                    r: 0.0,
+                    g: 0.0,
+                    b: 0.0,
+                    a: 0.25,
+                },
+            }),
+            background_color: Some(Color::rgb(1.0, 1.0, 1.0)),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+    assert!(
+        pdf_str.contains("/ca 0.2500"),
+        "expected /ca 0.2500 ExtGState for shadow alpha 0.25"
+    );
+}
+
+// ─── Feature 5: Page backgroundImage ──────────────────────────
+
+/// `backgroundImage` on a Page is registered as a PDF XObject and
+/// referenced from the page's resource dictionary. Verifies the XObject
+/// is embedded (`/Subtype /Image`), the page's resource dict contains
+/// `/XObject << /Im{n} ... >>`, and the visual ordering check happens via
+/// `decompress_page_content_stream` below.
+#[test]
+fn test_page_background_image_registers_xobject() {
+    let one_px_png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    let mut doc = default_doc(vec![make_text("Foreground", 12.0)]);
+    doc.default_page.background_image = Some(one_px_png.to_string());
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+
+    // The image XObject is embedded in the PDF.
+    assert!(
+        pdf_str.contains("/Subtype /Image"),
+        "expected image XObject (/Subtype /Image) in PDF",
+    );
+    // The page's resource dictionary references the XObject as /Im0.
+    assert!(
+        pdf_str.contains("/XObject << /Im0"),
+        "expected page resources to include /XObject << /Im0 ...",
+    );
+
+    // Locate and decompress the page content stream specifically (not
+    // arbitrary streams — fonts and images emit binary streams that
+    // confuse the global helper). Find the LAST `<< /Length ... /Filter
+    // /FlateDecode >>\nstream\n` block — page content is the final
+    // FlateDecode stream in the typical object emission order.
+    let content = decompress_last_flate_stream(&pdf_bytes)
+        .expect("expected at least one FlateDecode page content stream");
+    let do_idx = content
+        .find(" Do")
+        .expect("expected /Im{n} Do for page background in the content stream");
+    let bt_idx = content
+        .find("BT")
+        .expect("expected BT for foreground text in the content stream");
+    assert!(
+        do_idx < bt_idx,
+        "background Do (at {}) must precede text BT (at {}) so it renders behind",
+        do_idx,
+        bt_idx,
+    );
+}
+
+/// Find the last `<< /Length N /Filter /FlateDecode >>\nstream\n` block
+/// in the PDF and decompress it. The page content stream is emitted last
+/// in the typical object order, so this isolates the operators we want
+/// without colliding with `endstream\n` inside binary image/font streams.
+fn decompress_last_flate_stream(pdf: &[u8]) -> Option<String> {
+    use miniz_oxide::inflate::decompress_to_vec_zlib;
+    let header_prefix = b"<< /Length ";
+    let header_suffix = b" /Filter /FlateDecode >>\nstream\n";
+    // Walk through the bytes finding header_prefix occurrences; for each,
+    // parse the length integer and check that header_suffix follows.
+    let mut last: Option<(usize, usize)> = None;
+    let mut search_from = 0usize;
+    while let Some(rel) = pdf[search_from..]
+        .windows(header_prefix.len())
+        .position(|w| w == header_prefix)
+    {
+        let prefix_end = search_from + rel + header_prefix.len();
+        // Read digits.
+        let mut digit_end = prefix_end;
+        while digit_end < pdf.len() && pdf[digit_end].is_ascii_digit() {
+            digit_end += 1;
+        }
+        if digit_end == prefix_end {
+            search_from = prefix_end;
+            continue;
+        }
+        // Suffix must follow immediately.
+        if digit_end + header_suffix.len() > pdf.len()
+            || &pdf[digit_end..digit_end + header_suffix.len()] != header_suffix
+        {
+            search_from = prefix_end;
+            continue;
+        }
+        let length: usize = std::str::from_utf8(&pdf[prefix_end..digit_end])
+            .ok()?
+            .parse()
+            .ok()?;
+        let stream_start = digit_end + header_suffix.len();
+        last = Some((stream_start, length));
+        search_from = stream_start + length;
+    }
+    let (abs, len) = last?;
+    let bytes = &pdf[abs..abs + len];
+    let decompressed = decompress_to_vec_zlib(bytes).ok()?;
+    String::from_utf8(decompressed).ok()
+}
+
+/// `backgroundOpacity: 0.08` produces a `/ca 0.0800` ExtGState entry so
+/// the background paint renders at 8% alpha. Useful for watermark-style
+/// overlays.
+#[test]
+fn test_page_background_opacity_creates_extgstate() {
+    let one_px_png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==";
+    let config = PageConfig {
+        background_image: Some(one_px_png.to_string()),
+        background_opacity: Some(0.08),
+        ..Default::default()
+    };
+    let doc = Document {
+        children: vec![make_text("on top", 12.0)],
+        metadata: Metadata::default(),
+        default_page: config,
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        pdf_ua: false,
+        flatten_forms: false,
+        certification: None,
+    };
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+    assert!(
+        pdf_str.contains("/ca 0.0800"),
+        "expected /ca 0.0800 ExtGState for backgroundOpacity 0.08"
+    );
+}
+
+// ─── Feature 3: rounded clipping when overflow:hidden + borderRadius ──
+
+/// `overflow: hidden` with a non-zero `borderRadius` must clip children
+/// to the rounded path (m/l/c/h then W n), not a rectangular `re W n`.
+/// Otherwise, descendants visually escape the rounded corners.
+#[test]
+fn test_overflow_hidden_with_border_radius_uses_rounded_clip() {
+    let inner = make_text("clipped content", 12.0);
+    let outer = make_styled_view(
+        Style {
+            overflow: Some(forme::style::Overflow::Hidden),
+            border_radius: Some(forme::style::CornerValues::uniform(12.0)),
+            background_color: Some(Color::rgb(0.9, 0.9, 0.9)),
+            width: Some(Dimension::Pt(120.0)),
+            height: Some(Dimension::Pt(60.0)),
+            ..Default::default()
+        },
+        vec![inner],
+    );
+    let doc = default_doc(vec![outer]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf_bytes);
+
+    // The clip must use a rounded path (m/c/h W n), not a rectangle re W n.
+    // Look for the unique signature `h\nW n` — the rounded path closes with
+    // `h` before applying the clip.
+    let has_rounded_clip = stream.contains("h\nW n") || stream.contains("h\nW n\n");
+    assert!(
+        has_rounded_clip,
+        "expected rounded clip path (h\\nW n) in content stream; got: {}",
+        stream,
+    );
+}
+
+/// `overflow: hidden` with NO borderRadius keeps the rectangular `re W n`
+/// clip. Regression check: rounding shouldn't kick in when borderRadius is
+/// 0.
+#[test]
+fn test_overflow_hidden_without_border_radius_uses_rect_clip() {
+    let inner = make_text("clipped content", 12.0);
+    let outer = make_styled_view(
+        Style {
+            overflow: Some(forme::style::Overflow::Hidden),
+            background_color: Some(Color::rgb(0.9, 0.9, 0.9)),
+            width: Some(Dimension::Pt(120.0)),
+            height: Some(Dimension::Pt(60.0)),
+            ..Default::default()
+        },
+        vec![inner],
+    );
+    let doc = default_doc(vec![outer]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf_bytes);
+    assert!(
+        stream.contains(" re W n"),
+        "expected rectangular clip `re W n` in content stream; got: {}",
+        stream,
+    );
+}
+
+// ─── Feature 2: user-facing wordSpacing ───────────────────────
+
+/// `wordSpacing: 4` on a Text emits a `Tw 4` operator in the content
+/// stream so each ASCII space gets +4pt of width (PDF Tw operator).
+#[test]
+fn test_word_spacing_emits_tw_operator() {
+    let doc = default_doc(vec![Node {
+        kind: NodeKind::Text {
+            content: "hello world wide".to_string(),
+            href: None,
+            runs: vec![],
+        },
+        style: Style {
+            font_size: Some(12.0),
+            word_spacing: Some(4.0),
+            ..Default::default()
+        },
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf_bytes);
+    assert!(
+        stream.contains("4.0000 Tw"),
+        "expected `4.0000 Tw` in content stream, got: {}",
+        stream,
+    );
+}
+
+/// Default text (no wordSpacing, no justification) should not emit a Tw
+/// operator — preserves current output exactly.
+#[test]
+fn test_default_text_no_tw_operator() {
+    let doc = default_doc(vec![make_text("hello world", 12.0)]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf_bytes);
+    assert!(
+        !stream.contains(" Tw"),
+        "expected no Tw in default text content stream, got: {}",
+        stream,
+    );
+}
+
+/// Element with opacity exactly 1.0 should not emit any /GS gs reference
+/// or ExtGState dict (perf and cleaner output).
+#[test]
+fn test_opacity_one_emits_no_extgstate_wrap() {
+    let doc = default_doc(vec![make_styled_view(
+        Style {
+            opacity: Some(1.0),
+            background_color: Some(Color::rgb(1.0, 0.0, 0.0)),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![make_text("Full alpha", 12.0)],
+    )]);
+
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+    assert!(
+        !pdf_str.contains("/ExtGState"),
+        "no /ExtGState resource should be emitted when all opacities are 1.0"
+    );
+}
+
+// ─── Feature 6 (v1): 2-stop linear / radial gradients ─────────
+
+/// `background: linear-gradient(...)` emits a Type 2 (axial) Shading
+/// dictionary with a Type 2 (exponential) Function for color
+/// interpolation, and a `/Sh{n} sh` operator inside a clipped path in
+/// the content stream.
+#[test]
+fn test_linear_gradient_emits_shading_type_2() {
+    let view = make_styled_view(
+        Style {
+            background: Some(forme::style::Background::Linear(
+                forme::style::LinearGradient {
+                    angle_deg: 90.0,
+                    stops: vec![
+                        forme::style::GradientStop {
+                            position: 0.0,
+                            color: Color::rgb(1.0, 0.0, 0.0),
+                        },
+                        forme::style::GradientStop {
+                            position: 1.0,
+                            color: Color::rgb(0.0, 0.0, 1.0),
+                        },
+                    ],
+                },
+            )),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+
+    assert!(
+        pdf_str.contains("/ShadingType 2"),
+        "expected /ShadingType 2 (axial) for linear gradient",
+    );
+    assert!(
+        pdf_str.contains("/FunctionType 2"),
+        "expected /FunctionType 2 (exponential) for color interpolation",
+    );
+    assert!(
+        pdf_str.contains("/Shading << /Sh0"),
+        "expected page resource dict to reference /Sh0 shading",
+    );
+
+    let stream = decompress_last_flate_stream(&pdf_bytes).expect("expected page content stream");
+    assert!(
+        stream.contains("/Sh0 sh"),
+        "expected `/Sh0 sh` operator in content stream, got: {}",
+        stream,
+    );
+}
+
+/// `background: radial-gradient(...)` emits a Type 3 (radial) Shading
+/// dictionary with inner radius 0 and outer radius equal to half the
+/// element's longest side.
+#[test]
+fn test_radial_gradient_emits_shading_type_3() {
+    let view = make_styled_view(
+        Style {
+            background: Some(forme::style::Background::Radial(
+                forme::style::RadialGradient {
+                    stops: vec![
+                        forme::style::GradientStop {
+                            position: 0.0,
+                            color: Color::rgb(1.0, 1.0, 1.0),
+                        },
+                        forme::style::GradientStop {
+                            position: 1.0,
+                            color: Color::rgb(0.0, 0.0, 0.0),
+                        },
+                    ],
+                },
+            )),
+            width: Some(Dimension::Pt(80.0)),
+            height: Some(Dimension::Pt(80.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+
+    assert!(
+        pdf_str.contains("/ShadingType 3"),
+        "expected /ShadingType 3 (radial) for radial gradient",
+    );
+    // Center is (w/2, h/2) = (40, 40), inner r = 0, outer r = max(w,h)/2 = 40.
+    assert!(
+        pdf_str.contains("/Coords [40.000 40.000 0 40.000 40.000 40.000]"),
+        "expected radial Coords [cx cy 0 cx cy r] = [40 40 0 40 40 40], got PDF: {}",
+        &pdf_str[..pdf_str.len().min(2000)],
+    );
+}
+
+/// CSS 180deg = top-to-bottom. On a w×h rect, the gradient axis must run
+/// from (w/2, h) at the top in PDF coords (CSS-spec start) to (w/2, 0) at
+/// the bottom (CSS-spec end). This locks down the angle math against
+/// regressions — the Y-flip and CSS clockwise-from-up convention are
+/// fiddly to get right.
+#[test]
+fn test_linear_gradient_180deg_axis_goes_top_to_bottom() {
+    // Use a w=200, h=100 rect so the expected coords have nice numbers.
+    let view = make_styled_view(
+        Style {
+            background: Some(forme::style::Background::Linear(
+                forme::style::LinearGradient {
+                    angle_deg: 180.0,
+                    stops: vec![
+                        forme::style::GradientStop {
+                            position: 0.0,
+                            color: Color::rgb(1.0, 1.0, 1.0),
+                        },
+                        forme::style::GradientStop {
+                            position: 1.0,
+                            color: Color::rgb(0.0, 0.0, 0.0),
+                        },
+                    ],
+                },
+            )),
+            width: Some(Dimension::Pt(200.0)),
+            height: Some(Dimension::Pt(100.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+
+    // 180deg means dx=sin(180°)=0, dy=cos(180°)=-1. Axis length = h = 100.
+    // Center of rect (relative) = (100, 50). half = 50.
+    // x0 = 100 - 0 = 100, y0 = 50 - (-1)*50 = 100  (top in PDF coords).
+    // x1 = 100 + 0 = 100, y1 = 50 + (-1)*50 = 0    (bottom in PDF coords).
+    // First stop (white) at top → last stop (black) at bottom = top-to-bottom.
+    // Note: cos(180°) is -1, so y1 = 50 + (-1)*50 = 0, but f64 arithmetic
+    // produces -0.0 which {:.3} formats as "-0.000". Accept either signed
+    // form of zero — the rendered position is the same.
+    let has_top_to_bottom = pdf_str.contains("/Coords [100.000 100.000 100.000 0.000]")
+        || pdf_str.contains("/Coords [100.000 100.000 100.000 -0.000]");
+    assert!(
+        has_top_to_bottom,
+        "expected 180deg Coords [w/2 h w/2 0] = [100 100 100 0], got snippet: {}",
+        &pdf_str[..pdf_str.len().min(2000)],
+    );
+}
+
+/// Multi-stop (3+) gradient emits a Type 3 (stitching) function combining
+/// N-1 Type 2 sub-functions, with /Bounds at each interior stop position.
+#[test]
+fn test_multi_stop_gradient_emits_stitching_function() {
+    let view = make_styled_view(
+        Style {
+            background: Some(forme::style::Background::Linear(
+                forme::style::LinearGradient {
+                    angle_deg: 90.0,
+                    stops: vec![
+                        forme::style::GradientStop {
+                            position: 0.0,
+                            color: Color::rgb(1.0, 0.0, 0.0),
+                        },
+                        forme::style::GradientStop {
+                            position: 0.5,
+                            color: Color::rgb(0.0, 1.0, 0.0),
+                        },
+                        forme::style::GradientStop {
+                            position: 1.0,
+                            color: Color::rgb(0.0, 0.0, 1.0),
+                        },
+                    ],
+                },
+            )),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+
+    assert!(
+        pdf_str.contains("/FunctionType 3"),
+        "expected /FunctionType 3 (stitching) for multi-stop gradient",
+    );
+    let type2_count = pdf_str.matches("/FunctionType 2").count();
+    assert_eq!(
+        type2_count, 2,
+        "expected 2 Type 2 sub-functions for a 3-stop gradient, got {}",
+        type2_count,
+    );
+    assert!(
+        pdf_str.contains("/Bounds [0.5000]"),
+        "expected /Bounds [0.5000] for the interior stop, got: {}",
+        &pdf_str[..pdf_str.len().min(2000)],
+    );
+    assert!(
+        pdf_str.contains("/Encode [0 1 0 1]"),
+        "expected /Encode [0 1 0 1] for 2 sub-functions, got: {}",
+        &pdf_str[..pdf_str.len().min(2000)],
+    );
+}
+
+/// Stops with positions outside [0,1] or in non-monotonic order are
+/// normalized: clamped to [0,1], sorted ascending. Defensive in case JSON
+/// callers (not just the React parser) pass dirty input.
+#[test]
+fn test_gradient_stops_normalized_when_out_of_order() {
+    let view = make_styled_view(
+        Style {
+            background: Some(forme::style::Background::Linear(
+                forme::style::LinearGradient {
+                    angle_deg: 90.0,
+                    stops: vec![
+                        forme::style::GradientStop {
+                            position: 1.0,
+                            color: Color::rgb(0.0, 0.0, 1.0),
+                        },
+                        forme::style::GradientStop {
+                            position: 0.0,
+                            color: Color::rgb(1.0, 0.0, 0.0),
+                        },
+                    ],
+                },
+            )),
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(50.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![view]);
+    let pdf_bytes = render_to_pdf(&doc);
+    let pdf_str = String::from_utf8_lossy(&pdf_bytes);
+
+    assert!(
+        pdf_str.contains("/C0 [1.0000 0.0000 0.0000] /C1 [0.0000 0.0000 1.0000]"),
+        "expected normalized order red→blue in C0/C1, got: {}",
+        &pdf_str[..pdf_str.len().min(2000)],
     );
 }

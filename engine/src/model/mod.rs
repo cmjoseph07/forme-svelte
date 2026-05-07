@@ -189,6 +189,7 @@ pub struct Metadata {
 
 /// Configuration for a page: size, margins, orientation.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PageConfig {
     /// Page size. Defaults to A4.
     #[serde(default = "PageSize::default")]
@@ -201,6 +202,49 @@ pub struct PageConfig {
     /// Whether this page auto-wraps content that overflows.
     #[serde(default = "default_true")]
     pub wrap: bool,
+
+    /// Optional background image painted behind the page's content.
+    /// URL, file path, or `data:image/...;base64,` URI.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_image: Option<String>,
+
+    /// Opacity for the background image (0.0–1.0). Defaults to 1.0.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_opacity: Option<f64>,
+
+    /// How the background image is sized within the page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_size: Option<BackgroundSize>,
+
+    /// Where the background image is positioned within the page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub background_position: Option<BackgroundPosition>,
+}
+
+/// How a background image is scaled to fit a page.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum BackgroundSize {
+    /// Stretch the image to the page's exact dimensions (default).
+    #[default]
+    Fill,
+    /// Scale to fully cover the page; crops if aspect ratio differs.
+    Cover,
+    /// Scale to fit within the page; letterboxes if aspect ratio differs.
+    Contain,
+}
+
+/// Where a background image is positioned on a page (relevant for
+/// `cover` / `contain` when the image doesn't fill the page exactly).
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum BackgroundPosition {
+    Center,
+    #[default]
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
 }
 
 impl Default for PageConfig {
@@ -209,6 +253,10 @@ impl Default for PageConfig {
             size: PageSize::A4,
             margin: Edges::uniform(54.0), // ~0.75 inch
             wrap: true,
+            background_image: None,
+            background_opacity: None,
+            background_size: None,
+            background_position: None,
         }
     }
 }

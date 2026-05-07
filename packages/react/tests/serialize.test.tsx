@@ -1372,6 +1372,91 @@ describe('QrCode serialization', () => {
   });
 });
 
+describe('background gradient parsing', () => {
+  it('parses linear-gradient with explicit angle and 2 stops', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: 'linear-gradient(90deg, #ff0000 0%, #0000ff 100%)' }} />
+      </Document>
+    );
+    const bg = (doc.children[0].style as { background?: { type: string; angleDeg: number; stops: { position: number; color: { r: number; g: number; b: number; a: number } }[] } }).background;
+    expect(bg).toBeDefined();
+    expect(bg!.type).toBe('linear');
+    expect(bg!.angleDeg).toBe(90);
+    expect(bg!.stops).toHaveLength(2);
+    expect(bg!.stops[0]).toEqual({ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } });
+    expect(bg!.stops[1]).toEqual({ position: 1, color: { r: 0, g: 0, b: 1, a: 1 } });
+  });
+
+  it('defaults to 180deg when angle omitted', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: 'linear-gradient(#fff, #000)' }} />
+      </Document>
+    );
+    const bg = (doc.children[0].style as { background?: { angleDeg: number } }).background;
+    expect(bg!.angleDeg).toBe(180);
+  });
+
+  it('translates "to right" side keyword to 90deg', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: 'linear-gradient(to right, #fff, #000)' }} />
+      </Document>
+    );
+    const bg = (doc.children[0].style as { background?: { angleDeg: number } }).background;
+    expect(bg!.angleDeg).toBe(90);
+  });
+
+  it('parses radial-gradient with circle keyword', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: 'radial-gradient(circle, #10b981 0%, #059669 100%)' }} />
+      </Document>
+    );
+    const bg = (doc.children[0].style as { background?: { type: string; stops: { position: number }[] } }).background;
+    expect(bg).toBeDefined();
+    expect(bg!.type).toBe('radial');
+    expect(bg!.stops).toHaveLength(2);
+    expect(bg!.stops[0].position).toBe(0);
+    expect(bg!.stops[1].position).toBe(1);
+  });
+
+  it('preserves 3+ stops (multi-stop gradients via Type 3 stitching)', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: 'linear-gradient(180deg, #ff0000 0%, #00ff00 50%, #0000ff 100%)' }} />
+      </Document>
+    );
+    const bg = (doc.children[0].style as { background?: { stops: { position: number; color: { r: number; g: number; b: number; a: number } }[] } }).background;
+    expect(bg!.stops).toHaveLength(3);
+    expect(bg!.stops[0]).toEqual({ position: 0, color: { r: 1, g: 0, b: 0, a: 1 } });
+    expect(bg!.stops[1]).toEqual({ position: 0.5, color: { r: 0, g: 1, b: 0, a: 1 } });
+    expect(bg!.stops[2]).toEqual({ position: 1, color: { r: 0, g: 0, b: 1, a: 1 } });
+  });
+
+  it('routes solid color to backgroundColor', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: '#1e293b' }} />
+      </Document>
+    );
+    const style = doc.children[0].style as { backgroundColor?: { r: number; g: number; b: number; a: number }; background?: unknown };
+    expect(style.background).toBeUndefined();
+    expect(style.backgroundColor).toEqual({ r: 30 / 255, g: 41 / 255, b: 59 / 255, a: 1 });
+  });
+
+  it('rgba() solid color in background routes to backgroundColor', () => {
+    const doc = serialize(
+      <Document>
+        <View style={{ background: 'rgba(255, 0, 0, 0.5)' }} />
+      </Document>
+    );
+    const style = doc.children[0].style as { backgroundColor?: { r: number; g: number; b: number; a: number } };
+    expect(style.backgroundColor).toEqual({ r: 1, g: 0, b: 0, a: 0.5 });
+  });
+});
+
 // ─── .map() children flattening ─────────────────────────────────────
 
 describe('.map() children in serialize()', () => {

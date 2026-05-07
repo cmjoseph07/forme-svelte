@@ -112,9 +112,22 @@ struct PdfBuilder {
     /// Maps (page_index, element_position_in_page) to image index in image_objects.
     /// Used during content stream writing to find the right /ImN reference.
     image_index_map: HashMap<(usize, usize), usize>,
+    /// Maps page_index to (image_index, intrinsic_width_px, intrinsic_height_px)
+    /// for the page's optional `background_image`. Identical URLs across
+    /// pages share a single XObject; the dims are needed for
+    /// `cover` / `contain` sizing math at content-stream time.
+    page_background_image_map: HashMap<usize, (usize, u32, u32)>,
+    /// Caches `backgroundImage URL → (image index, w_px, h_px)` so
+    /// identical background images across different pages collapse to a
+    /// single XObject.
+    page_background_url_cache: HashMap<String, (usize, u32, u32)>,
     /// ExtGState objects for opacity. Maps opacity value (as ordered bits) to
     /// (object_id, gs_name) e.g. (42, "GS0").
     ext_gstate_map: HashMap<u64, (usize, String)>,
+    /// Shading dictionaries for gradients. One entry per (page, element)
+    /// gradient instance. Resolves to (object_id, sh_name e.g. "Sh0").
+    /// Maps `(page_idx, elem_idx) -> (obj_id, name)`.
+    shading_map: HashMap<(usize, usize), (usize, String)>,
 }
 
 pub(crate) struct PdfObject {
@@ -153,7 +166,10 @@ impl PdfWriter {
             custom_font_data: HashMap::new(),
             image_objects: Vec::new(),
             image_index_map: HashMap::new(),
+            page_background_image_map: HashMap::new(),
+            page_background_url_cache: HashMap::new(),
             ext_gstate_map: HashMap::new(),
+            shading_map: HashMap::new(),
         };
 
         // Reserve object IDs:
@@ -193,8 +209,16 @@ impl PdfWriter {
         // Register images as XObject PDF objects
         self.register_images(&mut builder, pages);
 
+        // Register page background images (if any) — distinct from
+        // element-level Image XObjects since they're addressed per-page
+        // and can be shared across pages with the same source URL.
+        self.register_page_background_images(&mut builder, pages);
+
         // Register ExtGState objects for opacity
         self.register_ext_gstates(&mut builder, pages);
+
+        // Register Shading dictionaries for gradient backgrounds.
+        self.register_shadings(&mut builder, pages);
 
         // Create tag builder for accessibility if requested
         let mut tag_builder = if tagged {
@@ -260,12 +284,16 @@ impl PdfWriter {
             let font_resources = self.build_font_resource_dict(&builder.font_objects);
             let xobject_resources = self.build_xobject_resource_dict(page_idx, &builder);
             let ext_gstate_resources = self.build_ext_gstate_resource_dict(&builder);
+            let shading_resources = self.build_shading_resource_dict(page_idx, &builder);
             let mut resources = format!("/Font << {} >>", font_resources);
             if !xobject_resources.is_empty() {
                 let _ = write!(resources, " /XObject << {} >>", xobject_resources);
             }
             if !ext_gstate_resources.is_empty() {
                 let _ = write!(resources, " /ExtGState << {} >>", ext_gstate_resources);
+            }
+            if !shading_resources.is_empty() {
+                let _ = write!(resources, " /Shading << {} >>", shading_resources);
             }
             per_page_resources.push(resources);
 
@@ -1086,6 +1114,16 @@ impl PdfWriter {
         let mut stream = String::new();
         let page_height = page.height;
         let mut element_counter = 0usize;
+        let mut gradient_counter = 0usize;
+
+        // Page background image: paint it before any element content so
+        // it sits behind everything. Wrapped in q/Q + ExtGState for
+        // backgroundOpacity, with the cm matrix sized & positioned via
+        // backgroundSize / backgroundPosition. Same XObject can be reused
+        // across multiple pages with the same source URL.
+        if let Some(&img_idx) = builder.page_background_image_map.get(&page_idx) {
+            self.write_page_background(&mut stream, page, img_idx, builder);
+        }
 
         for element in &page.elements {
             self.write_element(
@@ -1095,6 +1133,7 @@ impl PdfWriter {
                 builder,
                 page_idx,
                 &mut element_counter,
+                &mut gradient_counter,
                 page_number,
                 total_pages,
                 tag_builder.as_deref_mut(),
@@ -1107,6 +1146,7 @@ impl PdfWriter {
 
     /// Write a single layout element as PDF operators.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     fn write_element(
         &self,
         stream: &mut String,
@@ -1115,6 +1155,7 @@ impl PdfWriter {
         builder: &PdfBuilder,
         page_idx: usize,
         element_counter: &mut usize,
+        gradient_counter: &mut usize,
         page_number: usize,
         total_pages: usize,
         mut tag_builder: Option<&mut tagged::TagBuilder>,
@@ -1149,6 +1190,20 @@ impl PdfWriter {
             None
         };
 
+        // Element-level opacity wrap. Open `q\n/GS{n} gs` AFTER the BMC/BDC
+        // marker block (so opacity affects content, not the marker), and
+        // close the matching `Q` BEFORE the EMC. The wrap encompasses both
+        // the element's own DrawCommand emission AND the recursion into
+        // `element.children`, so descendants render at the cumulative
+        // alpha (PDF graphics state stack multiplies naturally — a 0.5
+        // child of a 0.5 parent renders at effective 0.25).
+        let needs_element_opacity = element.opacity < 1.0;
+        if needs_element_opacity {
+            if let Some((_, gs_name)) = builder.ext_gstate_map.get(&element.opacity.to_bits()) {
+                let _ = writeln!(stream, "q\n/{} gs", gs_name);
+            }
+        }
+
         match &element.draw {
             DrawCommand::None => {}
 
@@ -1158,6 +1213,8 @@ impl PdfWriter {
                 border_color,
                 border_radius,
                 opacity,
+                box_shadow,
+                background_gradient,
             } => {
                 let x = element.x;
                 let y = page_height - element.y - element.height;
@@ -1172,7 +1229,76 @@ impl PdfWriter {
                     }
                 }
 
-                if let Some(bg) = background {
+                // Box shadow: paint a filled rect offset by (offsetX, offsetY)
+                // BEFORE the background so the shadow sits behind. Shadow
+                // color alpha goes through the per-shadow ExtGState. Shadow
+                // path uses the same border_radius as the element so rounded
+                // boxes get rounded shadows.
+                if let Some(shadow) = box_shadow {
+                    if shadow.color.a > 0.0 {
+                        // PDF y-axis is flipped vs CSS, so a positive
+                        // offsetY (CSS: shadow goes down) → subtract from
+                        // pdf_y to move the shadow rect downward in
+                        // visual terms.
+                        let sx = x + shadow.offset_x;
+                        let sy = y - shadow.offset_y;
+                        let needs_shadow_alpha = shadow.color.a < 1.0;
+                        if needs_shadow_alpha {
+                            if let Some((_, gs_name)) =
+                                builder.ext_gstate_map.get(&shadow.color.a.to_bits())
+                            {
+                                let _ = writeln!(stream, "q\n/{} gs", gs_name);
+                            } else {
+                                let _ = writeln!(stream, "q");
+                            }
+                        } else {
+                            let _ = writeln!(stream, "q");
+                        }
+                        let _ = writeln!(
+                            stream,
+                            "{:.3} {:.3} {:.3} rg",
+                            shadow.color.r, shadow.color.g, shadow.color.b
+                        );
+                        if border_radius.top_left > 0.0
+                            || border_radius.top_right > 0.0
+                            || border_radius.bottom_right > 0.0
+                            || border_radius.bottom_left > 0.0
+                        {
+                            self.write_rounded_rect(stream, sx, sy, w, h, border_radius);
+                        } else {
+                            let _ = writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re", sx, sy, w, h);
+                        }
+                        let _ = writeln!(stream, "f\nQ");
+                    }
+                }
+
+                // Background paint: gradient takes precedence over the
+                // solid color when both are set. Gradient emission uses
+                // `q + clip path + cm + sh + Q`; the cm translate moves
+                // the shading's local 0,0 to the rect's bottom-left so
+                // the Coords (computed during register_shadings) line up.
+                if background_gradient.is_some() {
+                    let key = (page_idx, *gradient_counter);
+                    *gradient_counter += 1;
+                    if let Some((_, sh_name)) = builder.shading_map.get(&key) {
+                        let _ = writeln!(stream, "q");
+                        // Clip to the rect (rounded if borderRadius set).
+                        if border_radius.top_left > 0.0
+                            || border_radius.top_right > 0.0
+                            || border_radius.bottom_right > 0.0
+                            || border_radius.bottom_left > 0.0
+                        {
+                            self.write_rounded_rect(stream, x, y, w, h, border_radius);
+                            let _ = writeln!(stream, "W n");
+                        } else {
+                            let _ = writeln!(stream, "{:.2} {:.2} {:.2} {:.2} re W n", x, y, w, h);
+                        }
+                        // Translate so the shading's local 0,0 sits at
+                        // the rect's bottom-left.
+                        let _ =
+                            writeln!(stream, "1 0 0 1 {:.3} {:.3} cm\n/{} sh\nQ", x, y, sh_name);
+                    }
+                } else if let Some(bg) = background {
                     if bg.a > 0.0 {
                         let _ = writeln!(stream, "q\n{:.3} {:.3} {:.3} rg", bg.r, bg.g, bg.b);
 
@@ -1978,18 +2104,38 @@ impl PdfWriter {
             }
         }
 
-        // Overflow clipping: wrap children in q/clip/Q when overflow is Hidden
+        // Overflow clipping: wrap children in q/clip/Q when overflow is Hidden.
+        // When the element's Rect has a non-zero border_radius, clip to the
+        // rounded path so descendants don't visually overflow the rounded
+        // corners. Plain rectangular clip otherwise.
         let clip_overflow = matches!(element.overflow, Overflow::Hidden);
         if clip_overflow {
             let clip_x = element.x;
             let clip_y = page_height - element.y - element.height;
             let clip_w = element.width;
             let clip_h = element.height;
-            let _ = writeln!(
-                stream,
-                "q\n{:.2} {:.2} {:.2} {:.2} re W n",
-                clip_x, clip_y, clip_w, clip_h
-            );
+            // Pull border_radius from the Rect DrawCommand if present.
+            // Other element kinds (Text, Image, Svg, ...) don't carry a
+            // border_radius — they fall back to a rectangular clip.
+            let radius = if let DrawCommand::Rect { border_radius, .. } = &element.draw {
+                Some(border_radius)
+            } else {
+                None
+            };
+            let has_rounded_corners = radius.is_some_and(|r| {
+                r.top_left > 0.0 || r.top_right > 0.0 || r.bottom_right > 0.0 || r.bottom_left > 0.0
+            });
+            let _ = writeln!(stream, "q");
+            if has_rounded_corners {
+                self.write_rounded_rect(stream, clip_x, clip_y, clip_w, clip_h, radius.unwrap());
+                let _ = writeln!(stream, "W n");
+            } else {
+                let _ = writeln!(
+                    stream,
+                    "{:.2} {:.2} {:.2} {:.2} re W n",
+                    clip_x, clip_y, clip_w, clip_h
+                );
+            }
         }
 
         for child in &element.children {
@@ -2000,6 +2146,7 @@ impl PdfWriter {
                 builder,
                 page_idx,
                 element_counter,
+                gradient_counter,
                 page_number,
                 total_pages,
                 tag_builder.as_deref_mut(),
@@ -2008,6 +2155,12 @@ impl PdfWriter {
         }
 
         if clip_overflow {
+            let _ = writeln!(stream, "Q");
+        }
+
+        // Close the element-level opacity wrap (paired with the q above).
+        // Goes before EMC so the marker boundary is preserved.
+        if needs_element_opacity {
             let _ = writeln!(stream, "Q");
         }
 
@@ -2303,6 +2456,300 @@ impl PdfWriter {
     }
 
     /// Walk all pages, create XObject PDF objects for each image,
+    /// Register PDF Shading dictionaries for every Rect with a
+    /// `background_gradient`. Walks the element tree once per page in
+    /// pre-order (same order `write_element` recurses) so the counter-
+    /// indexed `shading_map` lookups during emission match.
+    fn register_shadings(&self, builder: &mut PdfBuilder, pages: &[LayoutPage]) {
+        for (page_idx, page) in pages.iter().enumerate() {
+            let mut counter = 0usize;
+            Self::collect_shadings_recursive(&page.elements, page_idx, &mut counter, builder);
+        }
+    }
+
+    fn collect_shadings_recursive(
+        elements: &[LayoutElement],
+        page_idx: usize,
+        counter: &mut usize,
+        builder: &mut PdfBuilder,
+    ) {
+        for element in elements {
+            if let DrawCommand::Rect {
+                background_gradient: Some(gradient),
+                ..
+            } = &element.draw
+            {
+                let ordinal = *counter;
+                *counter += 1;
+                let (obj_id, name) =
+                    Self::write_shading_objects(builder, gradient, element, ordinal);
+                builder
+                    .shading_map
+                    .insert((page_idx, ordinal), (obj_id, name));
+            }
+            Self::collect_shadings_recursive(&element.children, page_idx, counter, builder);
+        }
+    }
+
+    /// Build the Function + Shading PDF objects for one gradient. Returns
+    /// (shading_obj_id, "Sh{n}"). 2-stop gradients use a single Type 2
+    /// (exponential) function. 3+ stop gradients use a Type 3 (stitching)
+    /// function combining N-1 Type 2 sub-functions, with /Bounds at each
+    /// interior stop position.
+    fn write_shading_objects(
+        builder: &mut PdfBuilder,
+        gradient: &crate::style::Background,
+        element: &LayoutElement,
+        ordinal: usize,
+    ) -> (usize, String) {
+        use crate::style::Background;
+        use crate::style::GradientStop;
+
+        // Materialize the gradient as a normalized stop list (positions
+        // sorted ascending, clamped to [0,1]). Solid-color backgrounds
+        // collapse to two identical stops at 0 and 1.
+        let black = Color {
+            r: 0.0,
+            g: 0.0,
+            b: 0.0,
+            a: 1.0,
+        };
+        let stops: Vec<GradientStop> = match gradient {
+            Background::Color(c) => vec![
+                GradientStop {
+                    position: 0.0,
+                    color: *c,
+                },
+                GradientStop {
+                    position: 1.0,
+                    color: *c,
+                },
+            ],
+            Background::Linear(g) => normalize_gradient_stops(&g.stops, black),
+            Background::Radial(g) => normalize_gradient_stops(&g.stops, black),
+        };
+
+        // Build the color-interpolation function. With <=2 stops we emit
+        // a single Type 2 (exponential) function; with 3+ stops we emit a
+        // Type 3 (stitching) function combining N-1 Type 2 sub-functions.
+        let function_id = if stops.len() <= 2 {
+            let c0 = stops.first().map(|s| s.color).unwrap_or(black);
+            let c1 = stops.last().map(|s| s.color).unwrap_or(c0);
+            let id = builder.objects.len();
+            let data = format!(
+                "<< /FunctionType 2 /Domain [0 1] /C0 [{:.4} {:.4} {:.4}] /C1 [{:.4} {:.4} {:.4}] /N 1 >>",
+                c0.r, c0.g, c0.b, c1.r, c1.g, c1.b,
+            );
+            builder.objects.push(PdfObject {
+                id,
+                data: data.into_bytes(),
+            });
+            id
+        } else {
+            // Reserve N-1 Type 2 sub-function objects.
+            let mut sub_ids: Vec<usize> = Vec::with_capacity(stops.len() - 1);
+            for window in stops.windows(2) {
+                let c0 = window[0].color;
+                let c1 = window[1].color;
+                let id = builder.objects.len();
+                let data = format!(
+                    "<< /FunctionType 2 /Domain [0 1] /C0 [{:.4} {:.4} {:.4}] /C1 [{:.4} {:.4} {:.4}] /N 1 >>",
+                    c0.r, c0.g, c0.b, c1.r, c1.g, c1.b,
+                );
+                builder.objects.push(PdfObject {
+                    id,
+                    data: data.into_bytes(),
+                });
+                sub_ids.push(id);
+            }
+            // Bounds = interior stop positions (exclude first and last).
+            // Encode = [0 1] per sub-function — each sub-function uses its
+            // full domain regardless of the bound interval width.
+            let bounds: Vec<String> = stops[1..stops.len() - 1]
+                .iter()
+                .map(|s| format!("{:.4}", s.position))
+                .collect();
+            let encode: Vec<&str> = (0..sub_ids.len()).map(|_| "0 1").collect();
+            let functions: Vec<String> = sub_ids.iter().map(|i| format!("{} 0 R", i)).collect();
+            let id = builder.objects.len();
+            let data = format!(
+                "<< /FunctionType 3 /Domain [0 1] /Functions [{}] /Bounds [{}] /Encode [{}] >>",
+                functions.join(" "),
+                bounds.join(" "),
+                encode.join(" "),
+            );
+            builder.objects.push(PdfObject {
+                id,
+                data: data.into_bytes(),
+            });
+            id
+        };
+
+        // Element dimensions. The shading's coord space is local to the
+        // rect (we cm-translate to the rect's bottom-left at draw time),
+        // so x/y aren't needed here — only w/h.
+        let _ = element.x;
+        let _ = element.y;
+        let w = element.width;
+        let h = element.height;
+
+        let shading_id = builder.objects.len();
+        let shading_data = match gradient {
+            Background::Linear(g) => {
+                // CSS angle convention: 0deg = bottom→top, 90deg = left→right,
+                // 180deg = top→bottom (clockwise from up).
+                // Our layout uses Y-down; PDF uses Y-up. Compute the axis
+                // in PDF coords directly: dx = sin(θ), dy = cos(θ) where
+                // CSS 0deg points "up" (positive PDF y).
+                // CSS angle convention: 0deg = bottom→top, 180deg =
+                // top→bottom. PDF y-axis is flipped vs CSS-on-screen, so
+                // dy comes from cos(θ) directly (CSS 0deg points "up"
+                // which is +y in PDF coords).
+                let theta = g.angle_deg.to_radians();
+                let dx = theta.sin();
+                let dy = theta.cos();
+                // Axis length spans the rect along the gradient direction
+                // (CSS spec covering box).
+                let axis_len = w * dx.abs() + h * dy.abs();
+                // Coords are RELATIVE to the rect's bottom-left corner
+                // (the cm-translate at draw time positions absolutely).
+                let cx_rel = w / 2.0;
+                let cy_rel = h / 2.0;
+                let half = axis_len / 2.0;
+                let x0 = cx_rel - dx * half;
+                let y0 = cy_rel - dy * half;
+                let x1 = cx_rel + dx * half;
+                let y1 = cy_rel + dy * half;
+                format!(
+                    "<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [{:.3} {:.3} {:.3} {:.3}] /Function {} 0 R /Extend [true true] >>",
+                    x0, y0, x1, y1, function_id,
+                )
+            }
+            Background::Radial(_) => {
+                // Circle from center, inner r=0, outer r=max(w/2, h/2),
+                // expressed relative to rect bottom-left.
+                let cx_rel = w / 2.0;
+                let cy_rel = h / 2.0;
+                let r_outer = (w / 2.0).max(h / 2.0);
+                format!(
+                    "<< /ShadingType 3 /ColorSpace /DeviceRGB /Coords [{:.3} {:.3} 0 {:.3} {:.3} {:.3}] /Function {} 0 R /Extend [true true] >>",
+                    cx_rel, cy_rel, cx_rel, cy_rel, r_outer, function_id,
+                )
+            }
+            Background::Color(_) => {
+                // Solid: emit a constant 1.0-stop function via the Coords
+                // collapsed to a point. (Shouldn't normally hit this path —
+                // background_gradient should only be set for true gradients.)
+                format!(
+                    "<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [0 0 0 0] /Function {} 0 R /Extend [true true] >>",
+                    function_id,
+                )
+            }
+        };
+        builder.objects.push(PdfObject {
+            id: shading_id,
+            data: shading_data.into_bytes(),
+        });
+        (shading_id, format!("Sh{}", ordinal))
+    }
+
+    /// Decode and embed each page's optional `background_image` as a PDF
+    /// XObject. Identical URLs across pages share a single XObject (the
+    /// `page_background_url_cache` does the deduplication).
+    fn register_page_background_images(&self, builder: &mut PdfBuilder, pages: &[LayoutPage]) {
+        for (page_idx, page) in pages.iter().enumerate() {
+            let Some(src) = &page.config.background_image else {
+                continue;
+            };
+            // Reuse the XObject if a previous page used the same source.
+            if let Some(&entry) = builder.page_background_url_cache.get(src) {
+                builder.page_background_image_map.insert(page_idx, entry);
+                continue;
+            }
+            // Decode + embed; on failure, log a warning and skip the
+            // background for that page (don't fail the whole render).
+            match crate::image_loader::load_image(src) {
+                Ok(image_data) => {
+                    let img_idx = builder.image_objects.len();
+                    let dims = (img_idx, image_data.width_px, image_data.height_px);
+                    let xobj_id = Self::write_image_xobject(builder, &image_data);
+                    builder.image_objects.push(xobj_id);
+                    builder.page_background_image_map.insert(page_idx, dims);
+                    builder.page_background_url_cache.insert(src.clone(), dims);
+                }
+                Err(e) => {
+                    eprintln!("[forme] page background image failed to load: {}", e);
+                }
+            }
+        }
+    }
+
+    /// Emit the page background paint (q + optional ExtGState + cm + Do + Q)
+    /// at the start of a page's content stream. Sizing follows CSS
+    /// `background-size` semantics (fill/cover/contain) with positioning
+    /// per `background-position`.
+    fn write_page_background(
+        &self,
+        stream: &mut String,
+        page: &LayoutPage,
+        page_bg: (usize, u32, u32),
+        builder: &PdfBuilder,
+    ) {
+        use crate::model::{BackgroundPosition, BackgroundSize};
+        let (img_idx, iw_px, ih_px) = page_bg;
+        let page_w = page.width;
+        let page_h = page.height;
+        let iw = iw_px as f64;
+        let ih = ih_px as f64;
+
+        let size = page.config.background_size.unwrap_or_default();
+        let (dest_w, dest_h) = match size {
+            BackgroundSize::Fill => (page_w, page_h),
+            BackgroundSize::Cover => {
+                let s = (page_w / iw).max(page_h / ih);
+                (iw * s, ih * s)
+            }
+            BackgroundSize::Contain => {
+                let s = (page_w / iw).min(page_h / ih);
+                (iw * s, ih * s)
+            }
+        };
+
+        // Position: for `fill`, dest matches page exactly so position is
+        // moot; otherwise place per `background-position` against the
+        // page's bounding box.
+        let position = page.config.background_position.unwrap_or_default();
+        // PDF Y origin is bottom-left, so "top" means pdf_y = page_h - dest_h
+        // and "bottom" means pdf_y = 0.
+        let (dest_x, dest_y) = match position {
+            BackgroundPosition::TopLeft => (0.0, page_h - dest_h),
+            BackgroundPosition::TopRight => (page_w - dest_w, page_h - dest_h),
+            BackgroundPosition::BottomLeft => (0.0, 0.0),
+            BackgroundPosition::BottomRight => (page_w - dest_w, 0.0),
+            BackgroundPosition::Center => ((page_w - dest_w) / 2.0, (page_h - dest_h) / 2.0),
+        };
+
+        // Optional ExtGState wrap for backgroundOpacity < 1.0.
+        let opacity = page.config.background_opacity.unwrap_or(1.0);
+        let needs_opacity = opacity < 1.0;
+        if needs_opacity {
+            if let Some((_, gs_name)) = builder.ext_gstate_map.get(&opacity.to_bits()) {
+                let _ = writeln!(stream, "q\n/{} gs", gs_name);
+            } else {
+                let _ = writeln!(stream, "q");
+            }
+        } else {
+            let _ = writeln!(stream, "q");
+        }
+        // PDF cm: a b c d e f → matrix [[a c e][b d f][0 0 1]]; for a
+        // simple scale + translate, that's: w 0 0 h x y cm.
+        let _ = writeln!(
+            stream,
+            "{:.2} 0 0 {:.2} {:.2} {:.2} cm\n/Im{} Do\nQ",
+            dest_w, dest_h, dest_x, dest_y, img_idx,
+        );
+    }
+
     /// and populate the image_index_map for content stream reference.
     fn register_images(&self, builder: &mut PdfBuilder, pages: &[LayoutPage]) {
         for (page_idx, page) in pages.iter().enumerate() {
@@ -2350,6 +2797,12 @@ impl PdfWriter {
         let mut unique_opacities: Vec<f64> = Vec::new();
         for page in pages {
             Self::collect_opacities_recursive(&page.elements, &mut unique_opacities);
+            // Page background opacity (independent of element-level alphas).
+            if let Some(o) = page.config.background_opacity {
+                if o < 1.0 {
+                    unique_opacities.push(o);
+                }
+            }
         }
         unique_opacities.sort_by(|a, b| a.partial_cmp(b).unwrap());
         unique_opacities.dedup();
@@ -2372,6 +2825,27 @@ impl PdfWriter {
 
     fn collect_opacities_recursive(elements: &[LayoutElement], opacities: &mut Vec<f64>) {
         for element in elements {
+            // Element-level opacity wraps the whole subtree (including
+            // children) in `q\n/GS{n} gs ... Q` so descendants render at
+            // the cumulative alpha. Collect it independently of the
+            // per-DrawCommand opacities below — they coexist for now,
+            // and the per-Rect/Text/Watermark opacities are gradually
+            // being deprecated in favor of the element-level one.
+            if element.opacity < 1.0 {
+                opacities.push(element.opacity);
+            }
+            // Shadow color alpha — needs its own ExtGState entry so the
+            // shadow renders semi-transparently independent of the
+            // element's opacity.
+            if let DrawCommand::Rect {
+                box_shadow: Some(shadow),
+                ..
+            } = &element.draw
+            {
+                if shadow.color.a < 1.0 {
+                    opacities.push(shadow.color.a);
+                }
+            }
             match &element.draw {
                 DrawCommand::Rect { opacity, .. }
                 | DrawCommand::Text { opacity, .. }
@@ -2522,6 +2996,26 @@ impl PdfWriter {
     }
 
     /// Build the /XObject resource dict entries for a specific page.
+    /// Build the page's `/Shading << ... >>` resource dict from the
+    /// shading_map entries that match `page_idx`.
+    fn build_shading_resource_dict(&self, page_idx: usize, builder: &PdfBuilder) -> String {
+        let mut entries: Vec<(String, usize)> = builder
+            .shading_map
+            .iter()
+            .filter(|(&(p, _), _)| p == page_idx)
+            .map(|(_, (obj_id, name))| (name.clone(), *obj_id))
+            .collect();
+        if entries.is_empty() {
+            return String::new();
+        }
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
+            .iter()
+            .map(|(name, obj_id)| format!("/{} {} 0 R", name, obj_id))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
     fn build_xobject_resource_dict(&self, page_idx: usize, builder: &PdfBuilder) -> String {
         let mut entries: Vec<(usize, usize)> = Vec::new();
         for (&(pidx, _), &img_idx) in &builder.image_index_map {
@@ -2529,6 +3023,12 @@ impl PdfWriter {
                 let obj_id = builder.image_objects[img_idx];
                 entries.push((img_idx, obj_id));
             }
+        }
+        // Include the page's background image (if any) so the `/Im{n} Do`
+        // operator at the start of the content stream resolves.
+        if let Some(&(img_idx, _, _)) = builder.page_background_image_map.get(&page_idx) {
+            let obj_id = builder.image_objects[img_idx];
+            entries.push((img_idx, obj_id));
         }
         if entries.is_empty() {
             return String::new();
@@ -3422,7 +3922,60 @@ fn write_chart_primitive(
     }
 }
 
-/// Escape a string for use in a PDF text string (parentheses and backslash).
+/// Normalize a list of gradient stops for PDF Shading emission. Clamps
+/// positions to [0, 1], sorts ascending by position, and pads with
+/// implicit stops at 0 and 1 (using the closest defined stop's color)
+/// when the input doesn't cover the full range. Empty input collapses to
+/// two `fallback`-colored stops at 0 and 1 so the caller never has to
+/// special-case zero stops.
+fn normalize_gradient_stops(
+    stops: &[crate::style::GradientStop],
+    fallback: Color,
+) -> Vec<crate::style::GradientStop> {
+    use crate::style::GradientStop;
+    if stops.is_empty() {
+        return vec![
+            GradientStop {
+                position: 0.0,
+                color: fallback,
+            },
+            GradientStop {
+                position: 1.0,
+                color: fallback,
+            },
+        ];
+    }
+    let mut sorted: Vec<GradientStop> = stops
+        .iter()
+        .map(|s| GradientStop {
+            position: s.position.clamp(0.0, 1.0),
+            color: s.color,
+        })
+        .collect();
+    sorted.sort_by(|a, b| {
+        a.position
+            .partial_cmp(&b.position)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
+    if sorted[0].position > 0.0 {
+        sorted.insert(
+            0,
+            GradientStop {
+                position: 0.0,
+                color: sorted[0].color,
+            },
+        );
+    }
+    if sorted[sorted.len() - 1].position < 1.0 {
+        let last = sorted[sorted.len() - 1].color;
+        sorted.push(GradientStop {
+            position: 1.0,
+            color: last,
+        });
+    }
+    sorted
+}
+
 fn pdf_escape_string(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for ch in s.chars() {
@@ -3573,6 +4126,7 @@ mod tests {
                     alt: None,
                     is_header_row: false,
                     overflow: Overflow::default(),
+                    opacity: 1.0,
                 },
                 LayoutElement {
                     x: 54.0,
@@ -3616,6 +4170,7 @@ mod tests {
                     alt: None,
                     is_header_row: false,
                     overflow: Overflow::default(),
+                    opacity: 1.0,
                 },
             ],
             fixed_header: vec![],
@@ -3783,6 +4338,7 @@ mod tests {
                 alt: None,
                 is_header_row: false,
                 overflow: Overflow::default(),
+                opacity: 1.0,
             }],
             fixed_header: vec![],
             fixed_footer: vec![],

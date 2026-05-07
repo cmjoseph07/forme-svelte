@@ -104,6 +104,17 @@ export interface Style {
   lineHeight?: number;
   textAlign?: 'left' | 'center' | 'right' | 'justify';
   letterSpacing?: number;
+  /** Extra width (points) added to each ASCII space — PDF Tw operator.
+   *  Negative values tighten word gaps. When `textAlign: 'justify'` is
+   *  set, the layout engine adds the computed slack-per-space on top. */
+  wordSpacing?: number;
+  /** Drop shadow painted behind the element. Object form is preferred;
+   *  CSS-like string form `"offsetX offsetY blur color"` is also
+   *  accepted. v1 paints a solid offset shadow only — `blur` is parsed
+   *  for forward-compat but ignored. */
+  boxShadow?:
+    | string
+    | { offsetX: number; offsetY: number; blur?: number; color: string };
   textDecoration?: 'none' | 'underline' | 'line-through';
   textTransform?: 'none' | 'uppercase' | 'lowercase' | 'capitalize';
   hyphens?: 'none' | 'manual' | 'auto';
@@ -121,6 +132,17 @@ export interface Style {
   // Visual
   color?: string;
   backgroundColor?: string;
+  /**
+   * CSS background. Supports:
+   *   - solid colors (`"#1e293b"`, `"rgba(...)"`) — equivalent to backgroundColor
+   *   - 2-stop linear gradients: `"linear-gradient(180deg, #fff 0%, #000 100%)"`
+   *   - 2-stop radial gradients: `"radial-gradient(circle, #fff 0%, #000 100%)"`
+   *
+   * v1 supports exactly 2 color stops; gradients with 3+ stops fall back to
+   * the first and last stop. Multi-stop support is planned via PDF Type 3
+   * stitching functions in a follow-up.
+   */
+  background?: string;
   opacity?: number;
   borderWidth?: number | Edges;
   borderTopWidth?: number;
@@ -218,6 +240,15 @@ export interface DocumentProps {
 export interface PageProps {
   size?: 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'Tabloid' | { width: number; height: number };
   margin?: number | string | number[] | Edges;
+  /** Optional background image painted behind the page's content. URL,
+   *  file path, or `data:image/...;base64,` URI. */
+  backgroundImage?: string;
+  /** Background image opacity 0–1. Defaults to 1.0. */
+  backgroundOpacity?: number;
+  /** How the background image is sized within the page. */
+  backgroundSize?: 'fill' | 'cover' | 'contain';
+  /** Where the background image is positioned within the page. */
+  backgroundPosition?: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
   children?: ReactNode;
 }
 
@@ -612,6 +643,10 @@ export interface FormePageConfig {
   size: FormePageSize;
   margin: FormeEdges;
   wrap: boolean;
+  backgroundImage?: string;
+  backgroundOpacity?: number;
+  backgroundSize?: 'fill' | 'cover' | 'contain';
+  backgroundPosition?: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 }
 
 export type FormePageSize =
@@ -624,6 +659,23 @@ export interface FormeEdges {
   bottom: number;
   left: number;
 }
+
+export interface FormeBoxShadow {
+  offsetX: number;
+  offsetY: number;
+  blur?: number;
+  color: { r: number; g: number; b: number; a: number };
+}
+
+export interface FormeGradientStop {
+  position: number;
+  color: { r: number; g: number; b: number; a: number };
+}
+
+export type FormeBackground =
+  | { type: 'color'; value: { r: number; g: number; b: number; a: number } }
+  | { type: 'linear'; angleDeg: number; stops: FormeGradientStop[] }
+  | { type: 'radial'; stops: FormeGradientStop[] };
 
 /** Margin edges that support auto values (for centering). */
 export interface FormeMarginEdges {
@@ -755,6 +807,8 @@ export interface FormeStyle {
   lineHeight?: number;
   textAlign?: string;
   letterSpacing?: number;
+  wordSpacing?: number;
+  boxShadow?: FormeBoxShadow;
   textDecoration?: string;
   textTransform?: string;
   hyphens?: string;
@@ -765,6 +819,7 @@ export interface FormeStyle {
   overflow?: string;
   color?: FormeColor;
   backgroundColor?: FormeColor;
+  background?: FormeBackground;
   opacity?: number;
   borderWidth?: FormeEdgeValues<number>;
   borderColor?: FormeEdgeValues<FormeColor>;

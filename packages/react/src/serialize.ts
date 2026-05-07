@@ -29,6 +29,9 @@ import type {
   FormeColumnWidth,
   FormeDimension,
   FormeColor,
+  FormeBoxShadow,
+  FormeBackground,
+  FormeGradientStop,
   FormeEdgeValues,
   FormeCornerValues,
   FormeGridTrackSize,
@@ -249,7 +252,16 @@ export function serialize(element: ReactElement): FormeDocument {
 // ─── Page serialization ──────────────────────────────────────────────
 
 function serializePage(element: ReactElement): FormeNode {
-  const props = element.props as { size?: string | { width: number; height: number }; margin?: number | string | number[] | Edges; style?: Style; children?: unknown };
+  const props = element.props as {
+    size?: string | { width: number; height: number };
+    margin?: number | string | number[] | Edges;
+    style?: Style;
+    children?: unknown;
+    backgroundImage?: string;
+    backgroundOpacity?: number;
+    backgroundSize?: 'fill' | 'cover' | 'contain';
+    backgroundPosition?: 'center' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  };
 
   let size: FormePageSize = 'A4';
   if (props.size !== undefined) {
@@ -266,6 +278,10 @@ function serializePage(element: ReactElement): FormeNode {
   }
 
   const config: FormePageConfig = { size, margin, wrap: true };
+  if (props.backgroundImage !== undefined) config.backgroundImage = props.backgroundImage;
+  if (props.backgroundOpacity !== undefined) config.backgroundOpacity = props.backgroundOpacity;
+  if (props.backgroundSize !== undefined) config.backgroundSize = props.backgroundSize;
+  if (props.backgroundPosition !== undefined) config.backgroundPosition = props.backgroundPosition;
   const childElements = flattenChildren(props.children);
   const children = serializeChildren(childElements, 'Page');
 
@@ -1179,6 +1195,11 @@ export function mapStyle(style?: Style): FormeStyle {
   if (style.lineHeight !== undefined) result.lineHeight = style.lineHeight;
   if (style.textAlign !== undefined) result.textAlign = TEXT_ALIGN_MAP[style.textAlign];
   if (style.letterSpacing !== undefined) result.letterSpacing = style.letterSpacing;
+  if (style.wordSpacing !== undefined) result.wordSpacing = style.wordSpacing;
+  if (style.boxShadow !== undefined) {
+    const parsed = parseBoxShadow(style.boxShadow);
+    if (parsed) result.boxShadow = parsed;
+  }
   if (style.textDecoration !== undefined) result.textDecoration = TEXT_DECORATION_MAP[style.textDecoration];
   if (style.textTransform !== undefined) result.textTransform = TEXT_TRANSFORM_MAP[style.textTransform];
   if (style.hyphens !== undefined) result.hyphens = HYPHENS_MAP[style.hyphens];
@@ -1191,6 +1212,19 @@ export function mapStyle(style?: Style): FormeStyle {
   // Color
   if (style.color !== undefined) result.color = parseColor(style.color);
   if (style.backgroundColor !== undefined) result.backgroundColor = parseColor(style.backgroundColor);
+  if (style.background !== undefined) {
+    const parsed = parseBackground(style.background);
+    if (parsed) {
+      if (parsed.type === 'color') {
+        // Solid color string in `background`: route to backgroundColor for
+        // engine compatibility (Background::Color also works, but
+        // backgroundColor is the canonical solid path).
+        if (result.backgroundColor === undefined) result.backgroundColor = parsed.value;
+      } else {
+        result.background = parsed;
+      }
+    }
+  }
   if (style.opacity !== undefined) result.opacity = style.opacity;
 
   // Border — cascade: border < borderTop/Right/Bottom/Left < borderWidth/borderColor < borderTopWidth/borderTopColor
@@ -1408,6 +1442,252 @@ export function parseColor(hex: string): FormeColor {
 
   // Fallback: black
   return { r: 0, g: 0, b: 0, a: 1 };
+}
+
+/**
+ * Parse a `boxShadow` value (object form or CSS-like string
+ * `"offsetX offsetY blur color"`) into the engine's FormeBoxShadow shape.
+ * Returns null on malformed input. v1 ignores blur but parses it.
+ */
+function parseBoxShadow(
+  val: string | { offsetX: number; offsetY: number; blur?: number; color: string },
+): FormeBoxShadow | null {
+  if (typeof val === 'object') {
+    const c = parseColor(val.color);
+    return {
+      offsetX: val.offsetX,
+      offsetY: val.offsetY,
+      blur: val.blur ?? 0,
+      color: c,
+    };
+  }
+  // String form: "offsetX offsetY blur color".
+  // Split on whitespace, but preserve any rgba(...)/rgb(...) parens.
+  const tokens: string[] = [];
+  let depth = 0;
+  let buf = '';
+  for (const ch of val.trim()) {
+    if (ch === '(') depth += 1;
+    if (ch === ')') depth = Math.max(0, depth - 1);
+    if (/\s/.test(ch) && depth === 0) {
+      if (buf) {
+        tokens.push(buf);
+        buf = '';
+      }
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf) tokens.push(buf);
+  if (tokens.length < 4) return null;
+  const offsetX = parseFloat(tokens[0]);
+  const offsetY = parseFloat(tokens[1]);
+  const blur = parseFloat(tokens[2]);
+  if (Number.isNaN(offsetX) || Number.isNaN(offsetY) || Number.isNaN(blur)) return null;
+  const color = parseColor(tokens[3]);
+  return { offsetX, offsetY, blur, color };
+}
+
+/**
+ * Parse a CSS `background` value. Supports three forms:
+ *   - `linear-gradient(<angle>, <stop>, <stop>, ...)` — CSS angle conventions
+ *     (`0deg` = bottom→top, `90deg` = left→right, `180deg` = top→bottom).
+ *     Angle is optional; defaults to `180deg` (top→bottom). Side keywords
+ *     (`to bottom`, `to right`, etc.) also supported.
+ *   - `radial-gradient(circle, <stop>, <stop>, ...)` — `circle` is the only
+ *     shape in v1. The `circle` keyword is optional.
+ *   - solid color (`#abc`, `rgb(...)`, `rgba(...)`) — falls through to a
+ *     `Color`-typed background, which the caller routes to `backgroundColor`.
+ *
+ * v1 supports exactly 2 stops; gradients with 3+ stops are flattened to
+ * the first and last stop (the engine's v1 ShadingType 2 only renders 2
+ * colors). Multi-stop support is planned via PDF Type 3 stitching.
+ *
+ * Returns null on parse failure (e.g. malformed gradient string with no
+ * usable color tokens) so the caller can omit the property.
+ */
+function parseBackground(val: string): FormeBackground | null {
+  const s = val.trim();
+
+  // linear-gradient(...)
+  const linearMatch = s.match(/^linear-gradient\s*\(\s*([\s\S]*)\s*\)$/i);
+  if (linearMatch) {
+    const inner = linearMatch[1];
+    const parts = splitGradientArgs(inner);
+    if (parts.length === 0) return null;
+
+    let angleDeg = 180;
+    let stopParts = parts;
+    const first = parts[0].trim();
+    const angleParsed = parseGradientAngle(first);
+    if (angleParsed !== null) {
+      angleDeg = angleParsed;
+      stopParts = parts.slice(1);
+    }
+    const stops = parseGradientStops(stopParts);
+    if (stops.length < 2) return null;
+    return { type: 'linear', angleDeg, stops };
+  }
+
+  // radial-gradient(...)
+  const radialMatch = s.match(/^radial-gradient\s*\(\s*([\s\S]*)\s*\)$/i);
+  if (radialMatch) {
+    const inner = radialMatch[1];
+    const parts = splitGradientArgs(inner);
+    if (parts.length === 0) return null;
+    let stopParts = parts;
+    // Optional shape keyword (`circle`, `ellipse`) — only `circle` honored
+    // here; `ellipse` strings parse but render as a circle.
+    const first = parts[0].trim().toLowerCase();
+    if (first === 'circle' || first === 'ellipse' || first.startsWith('circle ') || first.startsWith('ellipse ')) {
+      stopParts = parts.slice(1);
+    }
+    const stops = parseGradientStops(stopParts);
+    if (stops.length < 2) return null;
+    return { type: 'radial', stops };
+  }
+
+  // Solid color fallback. parseColor never throws; on garbage input it
+  // returns black, so check that the input looks color-shaped first to
+  // avoid silently turning a typo'd gradient into a black background.
+  if (/^(#|rgb\(|rgba\()/i.test(s)) {
+    return { type: 'color', value: parseColor(s) };
+  }
+  return null;
+}
+
+/**
+ * Split a gradient's interior comma-separated arguments, respecting parens
+ * so `rgba(0, 0, 0, 0.5)` doesn't get split mid-color.
+ */
+function splitGradientArgs(inner: string): string[] {
+  const parts: string[] = [];
+  let depth = 0;
+  let buf = '';
+  for (const ch of inner) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (ch === ',' && depth === 0) {
+      parts.push(buf);
+      buf = '';
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf.trim()) parts.push(buf);
+  return parts.map((p) => p.trim()).filter((p) => p.length > 0);
+}
+
+/**
+ * Parse a CSS gradient angle token. Returns degrees, or null if the token
+ * isn't an angle.
+ *
+ * Forms supported:
+ *   - `<n>deg` (e.g. `135deg`)
+ *   - `<n>turn` (e.g. `0.5turn`)
+ *   - `<n>rad` / `<n>grad`
+ *   - `to <side>` keywords: `to top` (0), `to right` (90), `to bottom` (180), `to left` (270),
+ *     and the four diagonal forms (`to top right`, etc.).
+ */
+function parseGradientAngle(token: string): number | null {
+  const t = token.trim().toLowerCase();
+  const degMatch = t.match(/^(-?\d+(?:\.\d+)?)deg$/);
+  if (degMatch) return parseFloat(degMatch[1]);
+  const turnMatch = t.match(/^(-?\d+(?:\.\d+)?)turn$/);
+  if (turnMatch) return parseFloat(turnMatch[1]) * 360;
+  const radMatch = t.match(/^(-?\d+(?:\.\d+)?)rad$/);
+  if (radMatch) return (parseFloat(radMatch[1]) * 180) / Math.PI;
+  const gradMatch = t.match(/^(-?\d+(?:\.\d+)?)grad$/);
+  if (gradMatch) return parseFloat(gradMatch[1]) * 0.9;
+  if (t === 'to top') return 0;
+  if (t === 'to right') return 90;
+  if (t === 'to bottom') return 180;
+  if (t === 'to left') return 270;
+  if (t === 'to top right' || t === 'to right top') return 45;
+  if (t === 'to bottom right' || t === 'to right bottom') return 135;
+  if (t === 'to bottom left' || t === 'to left bottom') return 225;
+  if (t === 'to top left' || t === 'to left top') return 315;
+  return null;
+}
+
+/**
+ * Parse a list of gradient color stops. Each stop is `<color>` or
+ * `<color> <position>`. Position can be `<n>%` (CSS) or `<n>` (treated as
+ * a 0..1 fraction). Stops without explicit positions get evenly distributed
+ * positions matching CSS defaults: first at 0, last at 1, intermediate
+ * stops linearly interpolated.
+ */
+function parseGradientStops(parts: string[]): FormeGradientStop[] {
+  if (parts.length === 0) return [];
+  const positions: (number | null)[] = [];
+  const colors: { r: number; g: number; b: number; a: number }[] = [];
+  for (const p of parts) {
+    // Find the last whitespace-separated token; if it's a position
+    // (`50%` or `0.5`), treat it as such, else everything is the color.
+    const trimmed = p.trim();
+    const tokens = splitColorAndPosition(trimmed);
+    if (!tokens) continue;
+    colors.push(parseColor(tokens.color));
+    positions.push(tokens.position);
+  }
+  if (colors.length === 0) return [];
+
+  // Fill in missing positions with CSS defaults.
+  if (positions[0] === null) positions[0] = 0;
+  if (positions[positions.length - 1] === null) positions[positions.length - 1] = 1;
+  for (let i = 1; i < positions.length - 1; i += 1) {
+    if (positions[i] === null) {
+      // Linear interpolate between previous known and next known.
+      let prev = i - 1;
+      while (prev >= 0 && positions[prev] === null) prev -= 1;
+      let next = i + 1;
+      while (next < positions.length && positions[next] === null) next += 1;
+      const p0 = positions[prev] ?? 0;
+      const p1 = positions[next] ?? 1;
+      positions[i] = p0 + ((p1 - p0) * (i - prev)) / (next - prev);
+    }
+  }
+  return colors.map((color, i) => ({
+    position: Math.max(0, Math.min(1, positions[i] as number)),
+    color,
+  }));
+}
+
+/**
+ * Split a stop string like `"#fff 50%"` into color + position.
+ * Position can be percentage or fraction; null if not specified.
+ */
+function splitColorAndPosition(s: string): { color: string; position: number | null } | null {
+  // The position token, if present, is the last whitespace-separated piece
+  // and matches `<number>%` or a bare number. Splitting on whitespace
+  // respects parens so `rgba(...)` is not chopped up.
+  const tokens: string[] = [];
+  let depth = 0;
+  let buf = '';
+  for (const ch of s) {
+    if (ch === '(') depth += 1;
+    else if (ch === ')') depth = Math.max(0, depth - 1);
+    if (/\s/.test(ch) && depth === 0) {
+      if (buf) {
+        tokens.push(buf);
+        buf = '';
+      }
+    } else {
+      buf += ch;
+    }
+  }
+  if (buf) tokens.push(buf);
+  if (tokens.length === 0) return null;
+  const last = tokens[tokens.length - 1];
+  const pctMatch = last.match(/^(-?\d+(?:\.\d+)?)%$/);
+  if (pctMatch) {
+    return { color: tokens.slice(0, -1).join(' '), position: parseFloat(pctMatch[1]) / 100 };
+  }
+  const fracMatch = last.match(/^(-?\d+(?:\.\d+)?)$/);
+  if (fracMatch && tokens.length > 1) {
+    return { color: tokens.slice(0, -1).join(' '), position: parseFloat(fracMatch[1]) };
+  }
+  return { color: tokens.join(' '), position: null };
 }
 
 /**

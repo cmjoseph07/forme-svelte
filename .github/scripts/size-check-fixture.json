@@ -1,0 +1,111 @@
+{
+  "metadata": {
+    "title": "PDF size regression check",
+    "author": "Forme CI"
+  },
+  "default_page": {
+    "size": "Letter",
+    "margin": { "top": 36, "right": 36, "bottom": 36, "left": 36 },
+    "wrap": true
+  },
+  "fonts": [],
+  "default_style": null,
+  "tagged": false,
+  "pdfa": null,
+  "embedded_data": null,
+  "pdf_ua": false,
+  "flatten_forms": false,
+  "certification": null,
+  "children": [
+    {
+      "kind": { "type": "View" },
+      "style": {
+        "background": {
+          "type": "linear",
+          "angleDeg": 135,
+          "stops": [
+            { "position": 0.0, "color": { "r": 0.4, "g": 0.49, "b": 0.92, "a": 1 } },
+            { "position": 0.5, "color": { "r": 0.62, "g": 0.27, "b": 0.71, "a": 1 } },
+            { "position": 1.0, "color": { "r": 0.93, "g": 0.34, "b": 0.45, "a": 1 } }
+          ]
+        },
+        "padding": { "top": 24, "right": 24, "bottom": 24, "left": 24 },
+        "margin": { "top": 0, "right": 0, "bottom": 16, "left": 0 },
+        "borderRadius": { "top_left": 12, "top_right": 12, "bottom_right": 12, "bottom_left": 12 },
+        "boxShadow": {
+          "offsetX": 4,
+          "offsetY": 6,
+          "blur": 0,
+          "color": { "r": 0, "g": 0, "b": 0, "a": 0.25 }
+        }
+      },
+      "children": [
+        {
+          "kind": {
+            "type": "Text",
+            "content": "Forme PDF Size Regression Fixture",
+            "runs": []
+          },
+          "style": {
+            "color": { "r": 1, "g": 1, "b": 1, "a": 1 },
+            "fontSize": 18,
+            "fontWeight": 700,
+            "letterSpacing": 0.5,
+            "wordSpacing": 1
+          }
+        }
+      ]
+    },
+    {
+      "kind": { "type": "View" },
+      "style": {
+        "background": {
+          "type": "radial",
+          "stops": [
+            { "position": 0.0, "color": { "r": 0.06, "g": 0.72, "b": 0.51, "a": 1 } },
+            { "position": 1.0, "color": { "r": 0.02, "g": 0.59, "b": 0.41, "a": 1 } }
+          ]
+        },
+        "padding": { "top": 16, "right": 16, "bottom": 16, "left": 16 },
+        "margin": { "top": 0, "right": 0, "bottom": 16, "left": 0 },
+        "borderRadius": { "top_left": 8, "top_right": 8, "bottom_right": 8, "bottom_left": 8 },
+        "opacity": 0.85
+      },
+      "children": [
+        {
+          "kind": {
+            "type": "Text",
+            "content": "Radial gradient · opacity 0.85 · rounded corners",
+            "runs": []
+          },
+          "style": {
+            "color": { "r": 1, "g": 1, "b": 1, "a": 1 },
+            "fontSize": 12
+          }
+        }
+      ]
+    },
+    {
+      "kind": { "type": "View" },
+      "style": {
+        "overflow": "Hidden",
+        "borderRadius": { "top_left": 16, "top_right": 16, "bottom_right": 16, "bottom_left": 16 },
+        "backgroundColor": { "r": 0.97, "g": 0.97, "b": 0.97, "a": 1 },
+        "padding": { "top": 12, "right": 12, "bottom": 12, "left": 12 }
+      },
+      "children": [
+        {
+          "kind": {
+            "type": "Text",
+            "content": "overflow: hidden + borderRadius — clip path uses rounded corners.",
+            "runs": []
+          },
+          "style": {
+            "color": { "r": 0.13, "g": 0.13, "b": 0.13, "a": 1 },
+            "fontSize": 11
+          }
+        }
+      ]
+    }
+  ]
+}

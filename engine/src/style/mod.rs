@@ -97,6 +97,11 @@ pub struct Style {
     pub text_align: Option<TextAlign>,
     /// Letter spacing in points.
     pub letter_spacing: Option<f64>,
+    /// Word spacing in points (extra width added to each ASCII space, PDF
+    /// `Tw` operator). Negative tightens word gaps. When the text is
+    /// justified (`text-align: justify`), the layout engine adds the
+    /// computed slack-per-space on top of this user value.
+    pub word_spacing: Option<f64>,
     /// Text decoration.
     pub text_decoration: Option<TextDecoration>,
     /// Text transform.
@@ -120,8 +125,17 @@ pub struct Style {
     pub color: Option<Color>,
     /// Background color.
     pub background_color: Option<Color>,
+    /// Background paint that may be a solid color or a gradient. Wins
+    /// over `background_color` when set. Parsed from CSS strings on
+    /// the React side: `"#1e293b"`, `"linear-gradient(180deg, #fff
+    /// 0%, #000 100%)"`, `"radial-gradient(circle, #fff, #000)"`.
+    pub background: Option<Background>,
     /// Opacity (0.0 - 1.0).
     pub opacity: Option<f64>,
+    /// Drop shadow painted behind the element. v1 supports offset + color
+    /// (no blur — `blur` is parsed for forward-compat but ignored). When
+    /// the element has `border_radius`, the shadow path is rounded too.
+    pub box_shadow: Option<BoxShadow>,
 
     // ── Border ─────────────────────────────────────────────────
     /// Border width for all sides.
@@ -377,6 +391,58 @@ pub struct Color {
     pub a: f64,
 }
 
+/// CSS-style drop shadow. v1 paints a filled rectangle offset behind the
+/// element with the given color; the `blur` field is parsed for forward
+/// compatibility but ignored. Honors `border_radius` for rounded shadows.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BoxShadow {
+    pub offset_x: f64,
+    pub offset_y: f64,
+    /// Currently ignored (no blur in v1).
+    #[serde(default)]
+    pub blur: f64,
+    pub color: Color,
+}
+
+/// CSS-style background that may be a solid color or a gradient. The
+/// React layer parses CSS strings (`linear-gradient(180deg, #fff, #000)`,
+/// `radial-gradient(circle, #fff, #000)`, `#abcdef`) into this shape.
+///
+/// v1 supports 2-stop gradients via PDF Type 2 (axial) and Type 3
+/// (radial) shading dictionaries. Multi-stop gradients fall back to the
+/// first and last stop in v1; full stitching is a v2 task.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum Background {
+    Color(Color),
+    Linear(LinearGradient),
+    Radial(RadialGradient),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinearGradient {
+    /// CSS angle in degrees. 0deg = bottom-to-top, 90deg = left-to-right,
+    /// 180deg = top-to-bottom (CSS clockwise-from-up convention).
+    pub angle_deg: f64,
+    pub stops: Vec<GradientStop>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RadialGradient {
+    pub stops: Vec<GradientStop>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GradientStop {
+    /// Position along the gradient axis (0.0 to 1.0).
+    pub position: f64,
+    pub color: Color,
+}
+
 impl Color {
     pub const BLACK: Color = Color {
         r: 0.0,
@@ -519,6 +585,7 @@ pub struct ResolvedStyle {
     pub line_height: f64,
     pub text_align: TextAlign,
     pub letter_spacing: f64,
+    pub word_spacing: f64,
     pub text_decoration: TextDecoration,
     pub text_transform: TextTransform,
     pub hyphens: Hyphens,
@@ -535,6 +602,8 @@ pub struct ResolvedStyle {
     pub border_width: Edges,
     pub border_color: EdgeValues<Color>,
     pub border_radius: CornerValues,
+    pub box_shadow: Option<BoxShadow>,
+    pub background: Option<Background>,
 
     // Positioning
     pub position: Position,
@@ -655,6 +724,7 @@ impl Style {
                 })
             },
             letter_spacing: self.letter_spacing.unwrap_or(0.0),
+            word_spacing: self.word_spacing.unwrap_or(0.0),
             text_decoration: self
                 .text_decoration
                 .unwrap_or(parent.map(|p| p.text_decoration).unwrap_or_default()),
@@ -680,6 +750,8 @@ impl Style {
             background_color: self.background_color,
             opacity: self.opacity.unwrap_or(1.0),
             overflow: self.overflow.unwrap_or_default(),
+            box_shadow: self.box_shadow,
+            background: self.background.clone(),
 
             border_width: self
                 .border_width

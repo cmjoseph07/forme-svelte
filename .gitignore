@@ -29,8 +29,10 @@ Thumbs.db
 .env
 .env.*
 
-# Scripts
+# Scripts (local dev only; CI helpers under .github/scripts/ are tracked)
 scripts/
+!.github/scripts/
+!.github/scripts/**
 
 # Scratch files
 test-*.tsx

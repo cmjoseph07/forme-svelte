@@ -22,6 +22,8 @@ jobs:
       - name: Clippy
         working-directory: engine
         run: cargo clippy -- -D warnings
+      - name: PDF size regression check
+        run: bash .github/scripts/check-pdf-size.sh
 
   packages:
     name: TypeScript Packages
