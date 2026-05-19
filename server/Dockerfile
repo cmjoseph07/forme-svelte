@@ -2,7 +2,7 @@
 #   docker build -f server/Dockerfile -t formepdf/forme .
 
 # Pull pre-built rasterizer binary
-FROM formepdf/rasterizer:0.9.2 AS rasterizer
+FROM formepdf/rasterizer:0.10.0 AS rasterizer
 
 FROM rust:1.88-bookworm AS builder
 
