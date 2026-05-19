@@ -94,13 +94,21 @@ Files to update when bumping (e.g. 0.8.3 -> 0.9.0):
 - [ ] `packages/python-sdk/pyproject.toml` — `version = "0.9.0"`
 - [ ] `rasterizer/Cargo.toml` — `version = "0.9.0"`
 - [ ] Go SDK `packages/go-sdk/` — no version file; versioned by git tag
+- [ ] `engine/Cargo.lock` — auto-regenerates on the next `cargo build` after a `Cargo.toml` bump. Stage and commit the resulting diff with the version bump; CI will fail if `Cargo.lock` is stale.
+
+### Dockerfile rasterizer pins
+After bumping the engine/server/rasterizer versions, **two Dockerfiles** still reference the old rasterizer tag and must be bumped to the new version:
+- [ ] `server/Dockerfile` — `FROM formepdf/rasterizer:{version}` (line 3). Required: bump *after* the new rasterizer image is published to Docker Hub, *before* building the server image (server pulls rasterizer at build time).
+- [ ] `forme-dashboard/packages/api/Dockerfile` — `FROM formepdf/rasterizer:{version}`. Different repo; commit + push separately so Railway's next deploy picks up the new tag.
 
 ### SDK WASM binaries (if engine/ changed)
 - [ ] `packages/python-sdk/formepdf/forme.wasm` — rebuild via `bash build_wasm.sh`
-- [ ] `packages/go-sdk/templates/forme.wasm` — rebuild via `bash templates/build_wasm.sh` or copy from `engine/target/wasm32-wasip1/release/forme.wasm`
+- [ ] `forme-go/templates/forme.wasm` (separate `forme-go` git repo) — rebuild via `bash templates/build_wasm.sh` OR copy the artifact built by the python-sdk script (same target + flags)
 - Both use the `wasm32-wasip1` target with `--features wasm-raw` (C-ABI exports for non-JS hosts)
 - The Python SDK WASM is gitignored — use `git add -f` to commit it
-- The Go SDK WASM is gitignored — use `git add -f` to commit it (separate git repo)
+- The Go SDK WASM is **tracked** in the forme-go repo (not gitignored) — `git add` it normally
+
+> **Known bug**: `forme-go/templates/build_wasm.sh` computes `REPO_ROOT="$SCRIPT_DIR/../../.."` which assumed the old in-monorepo layout. After the Go SDK split into `forme-go/`, this resolves to `/path/to/forme/engine` instead of `/path/to/forme/forme/engine`. Until the script is fixed (point it at the `forme/` sibling, or accept an `ENGINE_DIR` env override), the workaround is: build the python-sdk WASM first (`cd packages/python-sdk && bash build_wasm.sh`), then `cp packages/python-sdk/formepdf/forme.wasm ../forme-go/templates/forme.wasm`. The python-sdk build script uses the same `wasm32-wasip1 + --features wasm-raw` target as the Go SDK, so the artifact is interchangeable.
 
 ### Cross-package dependency references
 Update peer/runtime dependencies that pin to the formepdf packages:
@@ -148,6 +156,68 @@ Update peer/runtime dependencies that pin to the formepdf packages:
 
 ## Publish
 
+### Pre-Publish Gate
+
+**Do not start the publish steps below until every item here passes.** The npm/PyPI/crates.io registries are immutable per version — if you ship broken code, the only fix is bumping the version and republishing.
+
+```bash
+# 1. Working tree must be clean (no dangling uncommitted changes)
+cd forme && git status --short    # should be empty
+cd forme-go && git status --short # should be empty (the Go SDK is its own repo)
+
+# 2. Engine + all packages must build cleanly
+cd forme/engine && cargo build --release && cargo fmt --check && cargo clippy -- -D warnings
+cd forme/packages/react && npm run build
+cd forme/packages/core && npm run build      # rebuilds WASM (pkg/ + pkg-node/)
+cd forme/packages/renderer && npm run build
+cd forme/packages/cli && npm run build
+cd forme/packages/vscode && npm run build    # copies WASM from core
+cd forme/packages/hono && npm run build
+cd forme/packages/next && npm run build
+cd forme/packages/mcp && npm run build
+cd forme/packages/resend && npm run build
+cd forme/packages/sdk && npm run build
+cd forme/packages/tailwind && npm run build
+cd forme/packages/templates && npm run build
+
+# 3. Every test suite must pass
+cd forme/engine && cargo test
+cd forme/packages/react && npm test
+cd forme/packages/core && npm test
+cd forme/packages/renderer && npm test
+cd forme/packages/cli && npm test
+cd forme/packages/hono && npm test
+cd forme/packages/next && npm test
+cd forme/packages/resend && npm test
+cd forme/packages/mcp && npm test
+cd forme-go && go clean -testcache && go test ./...
+
+# 4. Lockfile must be regenerated after version bumps
+cd forme && npm install
+cd forme && git diff --stat package-lock.json   # should show the @formepdf/* deps moved to the new version
+```
+
+### Supply-chain audit (pre-publish)
+
+Active npm supply-chain campaigns (mini Shai-Hulud and successors) periodically poison maintainer accounts and re-publish trojaned versions of widely-used packages. Before any publish:
+
+```bash
+# 1. Pull the current IoC list — check the dated advisories on:
+#    - https://socket.dev/supply-chain-attacks/
+#    - https://snyk.io/advisor/ (search "shai-hulud")
+#    - Cloud-vendor advisories if you saw a public incident
+#
+# 2. Audit our lockfiles for any matching package@version pairs
+cd forme && grep -cE '"@<affected-ns>/|"<affected-pkg>"' package-lock.json packages/*/package-lock.json
+cd forme-dashboard && grep -cE '"@<affected-ns>/|"<affected-pkg>"' packages/*/package-lock.json
+#
+# 3. If any matches: STOP. Do not publish. Rotate npm tokens, GitHub tokens, and any
+#    cloud credentials that were resident on the publishing machine. Coordinate with
+#    upstream maintainers and the security tracker before any further action.
+```
+
+A clean audit is not a guarantee — it only proves the *lockfile* doesn't reference known-bad versions. A workstation that ran `npm install` against an unpinned poisoned dep in the window between publish and detection is independently compromised. If in doubt, run the publish from a fresh CI runner or container, not a developer machine.
+
 ### npm packages
 
 ```bash
@@ -194,9 +264,13 @@ cargo publish
 # Note: cargo publish does a dry run check first; add --dry-run to verify before publishing
 ```
 
-### Docker image
+### Docker images
 
-Build and push multi-platform image from the monorepo root:
+The two images **must be published in order**: rasterizer first, then server. The server's Dockerfile (`server/Dockerfile:3`) starts with `FROM formepdf/rasterizer:{version}` and pulls the sidecar binary at build time — building server first will either pull the OLD rasterizer tag (silent regression) or fail outright if the new tag isn't on Docker Hub yet.
+
+#### Step 1 — Rasterizer image
+
+Build and push from the monorepo root:
 
 ```bash
 # One-time builder setup (if not already done)
@@ -205,6 +279,41 @@ docker buildx inspect --bootstrap
 
 docker login
 
+docker buildx build \
+  --platform linux/amd64,linux/arm64 \
+  --provenance=true \
+  --sbom=true \
+  -f rasterizer/Dockerfile \
+  -t formepdf/rasterizer:{version} \
+  -t formepdf/rasterizer:latest \
+  --push \
+  .
+
+# Verify
+docker run --rm -p 3001:3001 formepdf/rasterizer:{version}
+curl http://localhost:3001/health
+```
+
+#### Step 2 — Bump both Dockerfile pins
+
+After the rasterizer image is on Docker Hub, update the `FROM formepdf/rasterizer:...` line in **both** Dockerfiles to the new version, then commit:
+
+```bash
+# forme repo — server image
+sed -i '' "s|FROM formepdf/rasterizer:[0-9.]\+|FROM formepdf/rasterizer:{version}|" server/Dockerfile
+
+# forme-dashboard repo — API image (separate repo, separate commit)
+cd ../forme-dashboard
+sed -i '' "s|FROM formepdf/rasterizer:[0-9.]\+|FROM formepdf/rasterizer:{version}|" packages/api/Dockerfile
+```
+
+Don't bump these before publishing the rasterizer image — between the pin update and the actual publish, any Railway deploy or fresh `docker build` will fail to pull the (not-yet-existing) tag.
+
+#### Step 3 — Server image
+
+Build and push, also from the monorepo root:
+
+```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
   --provenance=true \
@@ -221,31 +330,6 @@ curl http://localhost:3000/health
 ```
 
 Note: The Dockerfile requires Rust 1.88+ due to dependencies. Use `rust:latest` in the Dockerfile if the pinned version is too old.
-
-### Rasterizer Docker image
-
-Build and push multi-platform rasterizer image from the monorepo root:
-
-```bash
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  --provenance=true \
-  --sbom=true \
-  -f rasterizer/Dockerfile \
-  -t formepdf/rasterizer:{version} \
-  -t formepdf/rasterizer:latest \
-  --push \
-  .
-
-# Verify
-docker run --rm -p 3001:3001 formepdf/rasterizer:{version}
-curl http://localhost:3001/health
-```
-
-After publishing, update `forme-dashboard/packages/api/Dockerfile` to reference the new tag:
-```dockerfile
-FROM formepdf/rasterizer:{version} AS rasterizer
-```
 
 ### Go SDK
 
@@ -326,4 +410,6 @@ go get github.com/formepdf/forme-go@v0.9.0
 - **Docker buildx context**: Run the buildx build from the monorepo root (`forme/`), not from `server/`. The Dockerfile copies both `engine/` and `server/` directories.
 - **PyPI stale dist/**: `twine upload dist/*` uploads everything in `dist/`, including old versions. Clean old builds first (`rm dist/formepdf-0.*.whl dist/formepdf-0.*.tar.gz`) or upload only the target version (`twine upload dist/formepdf-{version}*`).
 - **PyPI token scope**: Make sure the PyPI token has upload rights for the `formepdf` project specifically (project-scoped token), not just your account.
-- **Rasterizer version in dashboard Dockerfile**: After publishing a new `formepdf/rasterizer` tag, update the `FROM formepdf/rasterizer:{version}` line in `forme-dashboard/packages/api/Dockerfile`. Otherwise the dashboard will use the old rasterizer.
+- **Rasterizer version pins (TWO Dockerfiles)**: After publishing a new `formepdf/rasterizer` tag, update the `FROM formepdf/rasterizer:{version}` line in BOTH `server/Dockerfile` (this repo) AND `forme-dashboard/packages/api/Dockerfile` (separate repo). Missing the server one means the published `formepdf/forme:{version}` image will silently bundle the old rasterizer binary.
+- **Docker publish order**: Always publish rasterizer BEFORE server. The server Dockerfile pulls the rasterizer image at build time — if you publish server first, you'll either bundle the old rasterizer or fail the build outright.
+- **forme-go build script is broken**: `forme-go/templates/build_wasm.sh` has a stale `REPO_ROOT="$SCRIPT_DIR/../../.."` that assumes the old in-monorepo layout. After the Go SDK was split into its own repo, this path no longer resolves to the engine. Workaround: build the python-sdk WASM (`cd packages/python-sdk && bash build_wasm.sh`), then `cp packages/python-sdk/formepdf/forme.wasm ../forme-go/templates/forme.wasm`. Same target + flags, interchangeable artifact. A real fix is small — point the script at `../../forme/engine` or accept an `ENGINE_DIR` env override.
