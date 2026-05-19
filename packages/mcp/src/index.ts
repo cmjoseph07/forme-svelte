@@ -99,7 +99,7 @@ server.tool(
 
 server.tool(
   'render_custom_pdf',
-  'Render arbitrary JSX to PDF. Components: Document, Page, View, Text, Image, PageBreak, Table/Row/Cell, Fixed, Watermark, Svg, Canvas, QrCode, Barcode, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton, StyleSheet, Font. Document supports pdfUa/pdfa/signature/fonts/embedData options.',
+  'Render arbitrary JSX to PDF. Components: Document, Page, View, Text, Image, PageBreak, Table/Row/Cell, Fixed, Watermark, Svg, Canvas, QrCode, Barcode, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton, StyleSheet, Font. Document supports pdfUa/pdfa/signature/fonts/embedData options. JSX runs in a worker_thread + vm sandbox: imports/requires, eval, dynamic code construction, http(s) URLs, and filesystem font/image paths are blocked. Output paths are restricted to the current working directory by default. Intended for trusted local use — the sandbox is a guardrail, not a service-grade boundary for untrusted input.',
   {
     jsx: z.string().describe('JSX/TSX source code using Forme components (Document, Page, View, Text, etc.)'),
     output: z.string().optional().describe('Output file path (defaults to ./custom.pdf)'),

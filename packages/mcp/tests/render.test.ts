@@ -40,8 +40,10 @@ describe('renderPdf', () => {
     await expect(renderPdf('invoice', { bad: true }, tmpFile('x.pdf'))).rejects.toThrow();
   });
 
-  it('resolves absolute output paths', async () => {
-    const out = '/tmp/forme-test-invoice.pdf';
+  it('resolves absolute output paths inside the allowed dirs', async () => {
+    // Absolute paths inside CWD must work — full resolution to the same
+    // absolute path. The default policy allows CWD.
+    const out = join(process.cwd(), '.test-output', `${Date.now()}-abs.pdf`);
     filesToClean.push(out);
     const result = await renderPdf('invoice', invoiceExample as any, out);
     expect(result.path).toBe(out);

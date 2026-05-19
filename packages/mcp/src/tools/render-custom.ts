@@ -1,125 +1,95 @@
+/// Render arbitrary user-supplied JSX to a PDF file.
+///
+/// Trust model: this tool is hardened for accidental misuse (infinite
+/// loops, accidental fs reads, typo'd code). It is NOT a service-grade
+/// boundary for arbitrary attacker code — see README.md for the full
+/// picture. The sandbox layers:
+///
+///   1. AST denylist (host) — blocks imports, requires, eval/Function,
+///      and constructor-chain escapes before paying worker startup cost.
+///   2. Worker isolation — JSX evaluates in a `node:worker_threads`
+///      Worker with V8 memory limits. Crash isolation: a bad template
+///      cannot crash the MCP server.
+///   3. `vm.Context` inside the worker — fresh global with only React +
+///      Forme components. No `process`, `Buffer`, `fetch`, `require`.
+///   4. `vm.runInContext({ timeout })` — synchronous 5s timeout that
+///      actually interrupts `while(true){}`, unlike `new Function`.
+///   5. Outer wall-clock timeout (10s) backed by `worker.terminate()`
+///      — covers async hangs the inner timeout can't.
+///   6. Post-eval document sanitizer — blocks file paths and http(s)
+///      URLs in font/image `src` to close the asset-resolution side
+///      channel.
+///   7. Output path allowlist — writes restricted to CWD by default;
+///      opt-in extra dirs via `FORME_MCP_OUTPUT_DIRS`.
+
 import { writeFile } from 'node:fs/promises';
-import * as React from 'react';
-import * as FormeReact from '@formepdf/react';
+import { transform } from 'esbuild';
+import { renderPdf } from '@formepdf/core';
 import { validateOutputPath } from '../utils/validate-output-path.js';
-import { withTimeout } from '../utils/timeout.js';
+import { evaluateInSandbox } from '../sandbox/host.js';
+import { sanitizeDocument } from '../sandbox/sanitize-doc.js';
+import { resolveBundledAssets } from '../sandbox/resolve-assets.js';
 
 export async function renderCustom(
   jsx: string,
   output?: string,
 ): Promise<{ path: string; size: number }> {
-  // Lazy-import esbuild and core to avoid startup side effects with stdio
-  const [{ transform }, { renderDocument }] = await Promise.all([
-    import('esbuild'),
-    import('@formepdf/core'),
-  ]);
+  // Resolve + validate the output path FIRST so we fail fast if the
+  // caller asked to write somewhere disallowed (e.g. /etc/passwd).
+  const outputPath = validateOutputPath(output || './custom.pdf');
 
-  // Transpile JSX to JS
-  let result;
+  // Transpile JSX → JS. Cheap (~ms), happens in the host — the worker
+  // doesn't need esbuild and we avoid sending TSX into the sandbox at all.
+  let transpiled: string;
   try {
-    result = await transform(jsx, {
+    const result = await transform(jsx, {
       loader: 'tsx',
       jsx: 'transform',
       jsxFactory: 'React.createElement',
       jsxFragment: 'React.Fragment',
     });
-  } catch (err: any) {
+    transpiled = result.code;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     throw new Error(
-      `JSX transpilation failed: ${err.message}\n\nSource:\n${jsx.slice(0, 500)}`
+      `JSX transpilation failed: ${msg}\n\nSource:\n${jsx.slice(0, 500)}`,
     );
   }
 
-  // Sanitize transpiled code to block imports/requires
-  let sanitized = result.code;
-  sanitized = sanitized.replace(/\bimport\s+.*?\s+from\s+['"][^'"]*['"]\s*;?/g, '');
-  sanitized = sanitized.replace(/\bimport\s*\(/g, '(undefined)(');
-  sanitized = sanitized.replace(/\bexport\s+default\s+/g, '');
-  sanitized = sanitized.replace(/\bexport\s+/g, '');
-  sanitized = sanitized.replace(/\brequire\s*\(/g, '(undefined)(');
+  // The denylist allows `export default` (so users can write
+  // `export default <Doc/>`) but vm.runInContext is script mode and
+  // can't execute ES module syntax. Rewrite `export default X` →
+  // `const __default__ = X` so the worker's fallback wrapper picks it up.
+  const preparedCode = stripExportDefault(transpiled);
 
-  // Build the function body: provide all Forme components + React in scope.
-  // This list is the source of truth — the tool description, the
-  // create-custom-pdf prompt, and the README must all stay in sync with it,
-  // because anything missing here becomes a ReferenceError at eval time.
-  const componentNames = [
-    // Layout
-    'Document', 'Page', 'View', 'Text', 'Image', 'PageBreak',
-    // Tables
-    'Table', 'Row', 'Cell',
-    // Fixed / decorative
-    'Fixed', 'Watermark',
-    // Graphics
-    'Svg', 'Canvas', 'QrCode', 'Barcode',
-    // Charts
-    'BarChart', 'LineChart', 'PieChart', 'AreaChart', 'DotPlot',
-    // Forms (AcroForms)
-    'TextField', 'Checkbox', 'Dropdown', 'RadioButton',
-    // Style / font helpers
-    'StyleSheet', 'Font',
-  ];
+  // Evaluate in the worker sandbox. Returns the serialized document tree.
+  const rawDoc = await evaluateInSandbox(preparedCode);
 
-  const preamble = componentNames
-    .map(name => `const ${name} = FormeReact.${name};`)
-    .join('\n');
+  // Post-eval sanitization: block file-path / http URL src on fonts and
+  // images before they reach `@formepdf/core`'s asset resolver.
+  sanitizeDocument(rawDoc);
 
-  const code = `${preamble}\n${sanitized}`;
+  // Bypass renderDocument()'s built-in resolveFonts/resolveImages
+  // (filesystem + fetch). The sanitizer guarantees every asset is a
+  // data: URI, which the WASM engine reads directly. Render via the
+  // pure-JSON entry point.
+  const doc = await resolveBundledAssets(rawDoc);
+  const pdfBytes = await renderPdf(JSON.stringify(doc));
 
-  // Dangerous globals to shadow in the sandbox
-  const shadowNames = ['globalThis', 'global', 'process', 'require'];
-
-  // Strip trailing semicolons/whitespace and trailing line comments
-  const trimmedCode = sanitized
-    .replace(/\/\/[^\n]*$/, '')
-    .replace(/;\s*$/, '')
-    .trim();
-
-  // Try evaluating as a bare JSX expression first (most common case).
-  let element: any = null;
-
-  try {
-    const exprFn = new Function('React', 'FormeReact', ...componentNames, ...shadowNames, `
-      return (${trimmedCode});
-    `);
-    element = exprFn(React, FormeReact, ...componentNames.map(n => (FormeReact as any)[n]), ...shadowNames.map(() => undefined));
-  } catch {
-    // Not a bare expression — try as a script with named exports
-  }
-
-  // If bare expression didn't work, try as a script defining Template/App
-  if (!element || !React.isValidElement(element)) {
-    try {
-      const fn = new Function('React', 'FormeReact', ...shadowNames, `
-        ${code}
-        if (typeof Template !== 'undefined') return Template;
-        if (typeof App !== 'undefined') return App;
-        return null;
-      `);
-      element = fn(React, FormeReact, ...shadowNames.map(() => undefined));
-    } catch (err: any) {
-      throw new Error(
-        `JSX evaluation failed: ${err.message}\n\nTranspiled code:\n${sanitized.slice(0, 500)}`
-      );
-    }
-  }
-
-  // If we got a function, call it to get the element
-  if (typeof element === 'function') {
-    element = element({});
-  }
-
-  if (!element || !React.isValidElement(element)) {
-    throw new Error(
-      'Could not find a React element to render. Your JSX should either:\n' +
-      '- Be a single JSX expression (e.g. <Document>...</Document>)\n' +
-      '- Define a function called Template or App that returns JSX\n' +
-      '- Export a default function'
-    );
-  }
-
-  const pdfBytes = await withTimeout(renderDocument(element), 30_000, 'PDF rendering');
-
-  const outputPath = validateOutputPath(output || './custom.pdf');
   await writeFile(outputPath, pdfBytes);
 
   return { path: outputPath, size: pdfBytes.length };
+}
+
+/// Strip leading `export default` from each statement in transpiled code,
+/// replacing with a `const __default__ = ` binding so the worker can find
+/// it. esbuild always emits `export default` at statement-start (column
+/// 0 after any preceding statements), so a line-anchored regex is
+/// reliable — and any false positive inside a string literal would have
+/// triggered the AST visitor in the denylist, which we already passed.
+function stripExportDefault(code: string): string {
+  return code.replace(
+    /(^|\n)(\s*)export\s+default\s+/g,
+    (_match, lead, indent) => `${lead}${indent}const __default__ = `,
+  );
 }

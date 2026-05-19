@@ -106,8 +106,24 @@ The server provides prompts to guide agents through data collection:
 
 ## Security
 
-- **Code sandbox** — `render_custom_pdf` strips imports/requires and shadows dangerous globals
-- **Rendering timeout** — 30-second timeout prevents hangs
+`render_custom_pdf` is **intended for trusted local use**. The sandbox is a guardrail against accidental misuse — not a service-grade boundary for arbitrary attacker code.
+
+What's enforced:
+
+- **AST-level denylist** (host) — rejects `import`/`require`/`eval`, `new Function(...)`, dynamic imports, constructor-chain escapes (`({}).constructor.constructor`), and named/re-exports before the worker starts.
+- **Worker isolation** — JSX evaluates in a `node:worker_threads` Worker with `resourceLimits` (128 MB old-gen heap). A crash in user JSX cannot bring down the MCP server.
+- **`vm.Context` inside the worker** — fresh global with only React + Forme components. No `process`, `Buffer`, `fetch`, `require`, `setTimeout`. Code generation (`eval`, `Function`) is disabled at the context level.
+- **Synchronous timeout** — `vm.runInContext` with a 5-second timeout actually interrupts `while(true){}`. An outer 10-second wall-clock timeout, backed by `worker.terminate()`, catches anything the inner timeout can't. **The synchronous timeout does not catch async hangs** — a template that awaits an unresolved Promise is caught by the outer 10-second wall-clock timeout, not the 5-second vm timeout.
+- **Asset src restriction** — font and image `src` values must be `data:` URIs (or `Uint8Array`). File paths and `http(s)://` URLs are rejected, closing the exfiltration vector through `@formepdf/core`'s asset resolver.
+- **Output path allowlist** — writes are restricted to the current working directory by default. Set `FORME_MCP_OUTPUT_DIRS` (colon-separated on Unix, semicolon on Windows) to opt in to additional directories.
+
+What's NOT enforced:
+
+- This is not isolation-grade. `node:vm` is explicitly not a security boundary per the Node docs, and the worker shares an OS process with the MCP server. A determined attacker with Node-vm CVE-level skills can probably escape.
+- No network sandboxing of the host. If you trust the JSX to the point of running it through the sandbox at all, the MCP server still has whatever network access your machine grants it.
+- No multi-tenant isolation. The sandbox protects you from your own templates and from your AI agent's accidents — not from arbitrary attacker code submitted by other users.
+
+For multi-tenant code execution (e.g. running JSX templates from untrusted users on a shared service), use OS-level isolation: a container, a separate process with seccomp/AppArmor, or `isolated-vm` (V8 isolates). None of these are baked into `@formepdf/mcp` because they'd hurt the local-dev use case this package is built for.
 
 ## How it works
 
