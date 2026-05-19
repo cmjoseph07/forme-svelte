@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+### Fixed
+- Next.js (Webpack + Turbopack) builds no longer fail with `Module not found: Can't resolve './forme_bg.js'`. Root cause was `@formepdf/core` shipping a `--target web` WASM build whose binary referenced `./forme_bg.js`, which the build didn't emit. `@formepdf/core@0.10.0` now ships both a bundler-target and a nodejs-target build, and `@formepdf/next` consumes the bundler-target so Webpack and Turbopack can statically resolve the WASM imports.
+
+### Changed
+- Dropped the `import('@formepdf/core/pkg/forme_bg.wasm')` + `browser.init(wasm)` workaround that was previously required to work around the WASM resolution. The bundler-target build makes it unnecessary
+
 ## [0.9.2] - 2026-04-28
 
 _Version bump only._

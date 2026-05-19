@@ -74,6 +74,10 @@ Defines a page boundary with explicit size and margin configuration. Content ins
 |------|------|---------|-------------|
 | `size` | `"A4"` \| `"Letter"` \| `"Legal"` \| `"A3"` \| `"A5"` \| `"Tabloid"` \| `{ width, height }` | `"Letter"` | Page dimensions. Custom sizes are in points (72 points = 1 inch). |
 | `margin` | `number` \| `{ top, right, bottom, left }` | `54` | Page margins in points. A single number applies to all sides. |
+| `backgroundImage` | `string` | - | URL or `data:` URI for a page background. Painted behind all content. Identical URLs across pages share a single embedded XObject. |
+| `backgroundSize` | `"fill"` \| `"cover"` \| `"contain"` | `"fill"` | How the background image fills the page. `fill` stretches to the page bounds; `cover` and `contain` preserve aspect ratio. |
+| `backgroundPosition` | `"center"` \| `"top-left"` \| `"top-right"` \| `"bottom-left"` \| `"bottom-right"` | `"top-left"` | Positioning for `cover` and `contain` modes. |
+| `backgroundOpacity` | `number` | `1.0` | Opacity for the background image (0.0 to 1.0). Useful for watermark-style overlays. |
 
 ### Example
 
@@ -91,6 +95,18 @@ Defines a page boundary with explicit size and margin configuration. Content ins
 {/* A4 with different margins per side */}
 <Page size="A4" margin={{ top: 72, right: 54, bottom: 72, left: 54 }}>
   <Text>A4 with asymmetric margins</Text>
+</Page>
+
+{/* Letter page with a logo watermark */}
+<Page
+  size="Letter"
+  margin={54}
+  backgroundImage="https://cdn.example.com/logo.png"
+  backgroundSize="cover"
+  backgroundPosition="center"
+  backgroundOpacity={0.08}
+>
+  <Text>Watermarked content</Text>
 </Page>
 ```
 

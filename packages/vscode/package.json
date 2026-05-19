@@ -2,7 +2,7 @@
   "name": "forme-pdf",
   "displayName": "Forme PDF Preview",
   "description": "Live PDF preview for React/TSX templates. Component inspector, layout overlays, and hot reload.",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "publisher": "formepdf",
   "license": "MIT",
   "repository": {
@@ -86,7 +86,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@formepdf/renderer": "0.9.2",
+    "@formepdf/renderer": "0.10.0",
     "esbuild-wasm": "^0.24.0"
   },
   "devDependencies": {

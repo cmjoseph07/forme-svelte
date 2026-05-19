@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+### Security
+- **`render_custom_pdf` sandbox hardening.** The previous regex-strip + `new Function(...)` evaluator was bypassable in one line via `new Function('return process')()`. The sync 30s timeout only covered the WASM render, not JSX evaluation — `while(true){}` hung the MCP server. `validateOutputPath` only resolved to absolute, no actual validation.
+- New pipeline: AST denylist (acorn) for clear pre-execution errors; `node:worker_threads` isolation with 128 MB memory cap; `vm.Context` with `codeGeneration: false` to neuter `eval` and string-based `Function`; `vm.runInContext` with a 5s sync timeout; outer 10s wall-clock timeout backed by `worker.terminate()`. Asset src restricted to `data:` URIs (file paths and http(s) URLs blocked). Output path restricted to CWD by default; opt-in extra dirs via `FORME_MCP_OUTPUT_DIRS`.
+- README rewritten to honestly describe the trust model: hardened for accidental misuse, not service-grade isolation. The sync-timeout limitation around async hangs is explicitly called out.
+
+### Added
+- `acorn` and `acorn-walk` as runtime dependencies (AST denylist)
+- `FORME_MCP_OUTPUT_DIRS` environment variable for opting in additional output directories
+
+### Changed
+- `render_custom_pdf` tool description now includes a one-line trust-model statement so AI agents have context that the sandbox is local-trust, not internet-trust
+
 ## [0.9.2] - 2026-04-28
 
 ### Changed

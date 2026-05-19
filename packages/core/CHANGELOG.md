@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+### Changed
+- WASM build now produces two targets: `pkg/` (bundler) for Vite / Webpack / Turbopack / Wrangler consumers, and `pkg-node/` (nodejs, CJS) for Node SSR. The previous `--target web` build shipped `forme.js` without `forme_bg.js`, which broke static-analysis bundlers (Next.js / Turbopack) that resolve WASM imports at build time
+- Node entry (`src/index.ts`) now imports from `pkg-node/forme.js` and drops the manual `fileURLToPath` + `readFile` + `initWasm` dance — the nodejs target self-initializes
+- Browser entry (`src/browser.ts`) imports named exports directly from `pkg/forme.js`; bundlers instantiate the WASM implicitly. `init()` is kept as a deprecated no-op for backward compatibility
+- Picks up engine 0.10.0's six new visual properties (opacity cascade, wordSpacing, rounded clipping, boxShadow, page backgroundImage, CSS gradients)
+
 ## [0.9.2] - 2026-04-28
 
 _Version bump only._

@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+_Dependency bump only._
+
+
 ## [0.9.2] - 2026-04-28
 
 _Version bump only._

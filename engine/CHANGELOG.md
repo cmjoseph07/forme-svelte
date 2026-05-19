@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+### Added
+- `opacity` now cascades to children — wrapping happens at the element level (single `q ... Q` covering own paint and child recursion) instead of the previous per-Rect wrap that left text inside opaque parents at full alpha. Nested opacities multiply via the PDF graphics-state stack
+- `wordSpacing` style property — user-facing, emits the PDF `Tw` operator. Stacks with `text-align: justify`'s computed slack
+- Rounded clipping when `overflow: hidden` + `borderRadius` — clip path uses the rounded rectangle (m/c/h W n) instead of the rectangular `re W n`
+- `boxShadow` style property — offset filled rect behind the element, honors borderRadius, alpha routed through ExtGState
+- Page `backgroundImage` with `backgroundOpacity` / `backgroundSize` (fill/cover/contain) / `backgroundPosition`. XObjects dedupe across pages by URL
+- `background` style property accepting CSS linear and radial gradients. 2-stop gradients use a Type 2 (exponential) Shading; 3+ stops use a Type 3 (stitching) function. CSS angle convention (0deg = bottom→top, 180deg = top→bottom)
+
+### Internal
+- CI now runs a PDF size regression check (`.github/scripts/check-pdf-size.sh`) against a fixture that exercises all six new features. Fails on >5% byte growth over the committed baseline
+
 ## [0.9.2] - 2026-04-28
 
 ### Fixed

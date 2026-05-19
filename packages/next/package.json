@@ -1,6 +1,6 @@
 {
   "name": "@formepdf/next",
-  "version": "0.9.2",
+  "version": "0.10.0",
   "description": "PDF route handlers and responses for Next.js App Router",
   "type": "module",
   "main": "./dist/index.js",
@@ -13,9 +13,9 @@
     "dist"
   ],
   "dependencies": {
-    "@formepdf/react": "0.9.2",
-    "@formepdf/core": "0.9.2",
-    "@formepdf/templates": "0.9.2"
+    "@formepdf/react": "0.10.0",
+    "@formepdf/core": "0.10.0",
+    "@formepdf/templates": "0.10.0"
   },
   "peerDependencies": {
     "next": ">=14.0.0"

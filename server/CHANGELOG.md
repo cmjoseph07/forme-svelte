@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+_Picks up engine 0.10.0 — six new visual style features (opacity cascade, wordSpacing, rounded clipping, boxShadow, page backgroundImage, CSS gradients)._
+
 ## [0.9.2] - 2026-04-28
 
 _Version bump only._

@@ -102,6 +102,7 @@ Margins in Forme are always additive (like flexbox gap). There is no CSS margin 
 | `lineHeight` | `number` | `1.2` | Line height as a multiplier of font size |
 | `textAlign` | `"left"` \| `"center"` \| `"right"` \| `"justify"` | `"left"` | Horizontal text alignment |
 | `letterSpacing` | `number` | `0` | Extra space between characters in points |
+| `wordSpacing` | `number` | `0` | Extra space between words in points (PDF `Tw` operator — affects ASCII spaces). Stacks additively with `text-align: justify` slack |
 | `textDecoration` | `"none"` \| `"underline"` \| `"line-through"` | `"none"` | Text decoration |
 | `textTransform` | `"none"` \| `"uppercase"` \| `"lowercase"` \| `"capitalize"` | `"none"` | Text case transformation |
 
@@ -130,10 +131,12 @@ Margins in Forme are always additive (like flexbox gap). There is no CSS margin 
 |----------|------|---------|-------------|
 | `color` | `string` | `"#000000"` | Text color. Hex string (e.g., `"#1e293b"`). |
 | `backgroundColor` | `string` | - | Background fill color |
-| `opacity` | `number` | `1.0` | Element opacity (0.0 to 1.0) |
+| `background` | `string` | - | CSS gradient or solid color string. Linear: `"linear-gradient(135deg, #667eea, #764ba2)"`. Radial: `"radial-gradient(circle, #10b981, #059669)"`. Multi-stop supported. Solid colors fall through to `backgroundColor`. |
+| `opacity` | `number` | `1.0` | Element opacity (0.0 to 1.0). Cascades to children — nested opacities multiply. |
+| `boxShadow` | `{ offsetX, offsetY, blur, color }` or `string` | - | Offset drop shadow behind the element. String form: `"2 4 0 #00000033"`. Honors `borderRadius`. `blur` is parsed but rendered sharp in this release. |
 | `borderWidth` | `number \| { top, right, bottom, left }` | `0` | Border width in points. A single number applies to all sides. |
 | `borderColor` | `string \| { top, right, bottom, left }` | `"#000000"` | Border color. A single string applies to all sides. |
-| `borderRadius` | `number \| { topLeft, topRight, bottomRight, bottomLeft }` | `0` | Corner radius in points. A single number applies to all corners. |
+| `borderRadius` | `number \| { topLeft, topRight, bottomRight, bottomLeft }` | `0` | Corner radius in points. A single number applies to all corners. Also rounds the clip path when `overflow: 'hidden'`. |
 
 ### Background and border examples
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.0] - 2026-05-19
+
+### Added
+- `wordSpacing` style property
+- `boxShadow` style property (object form `{ offsetX, offsetY, blur, color }` or CSS string `"2 4 0 #00000033"`)
+- `background` style property accepting CSS gradient strings — `"linear-gradient(135deg, #667eea, #764ba2)"`, `"radial-gradient(circle, #10b981, #059669)"`. Supports `deg` / `turn` / `rad` / `grad` units and `to <side>` keywords. Multi-stop gradients pass through to the engine's Type 3 stitching function
+- Page props: `backgroundImage`, `backgroundOpacity`, `backgroundSize` (`'fill' | 'cover' | 'contain'`), `backgroundPosition`
+- `FormeBoxShadow`, `FormeBackground`, `FormeGradientStop` types
+
 ## [0.9.2] - 2026-04-28
 
 _Version bump only._

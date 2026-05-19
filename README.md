@@ -82,6 +82,8 @@ Install [Forme PDF Preview](https://marketplace.visualstudio.com/items?itemName=
 - **Inline text styling**: Nest `<Text>` inside `<Text>` to bold a word, change colors mid-sentence, or apply strikethrough.
 - **Images**: JPEG, PNG, and WebP with transparency support. `alt` text for accessibility.
 - **CSS shorthands**: `border: "1px solid #000"`, `padding: "8 16"`, `margin: [20, 40]` — CSS-style shorthand strings and arrays parse automatically.
+- **Visual style properties**: `opacity` cascades to children, `wordSpacing`, `boxShadow`, ubiquitous `borderRadius` (rounded clipping when `overflow: hidden`), and `background` accepting CSS gradient strings — `linear-gradient(135deg, #667eea, #764ba2)`, `radial-gradient(circle, #10b981, #059669)`. Multi-stop gradients supported.
+- **Page backgrounds**: `<Page backgroundImage="..." backgroundSize="cover" backgroundOpacity={0.08} />` for watermark-style overlays. Sizes: `fill` / `cover` / `contain`.
 - **Document language**: `<Document lang="en-US">` sets the PDF `/Lang` tag for accessibility.
 - **Dynamic page numbers**: `{{pageNumber}}` and `{{totalPages}}` in any text element.
 - **Embedded data**: Attach structured JSON to any PDF. Recipients can extract the original data programmatically — invoices carry their line items, reports carry their datasets.
