@@ -15,7 +15,7 @@
   "dependencies": {
     "@formepdf/react": "0.10.1",
     "@formepdf/core": "0.10.1",
-    "@formepdf/templates": "0.10.0"
+    "@formepdf/templates": "0.10.1"
   },
   "peerDependencies": {
     "hono": ">=4.0.0"

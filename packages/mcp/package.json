@@ -18,7 +18,7 @@
   "dependencies": {
     "@formepdf/core": "0.10.1",
     "@formepdf/react": "0.10.1",
-    "@formepdf/templates": "0.10.0",
+    "@formepdf/templates": "0.10.1",
     "@modelcontextprotocol/sdk": "^1.27.0",
     "@types/estree": "^1.0.8",
     "acorn": "^8.16.0",
