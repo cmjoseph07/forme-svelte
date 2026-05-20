@@ -55,6 +55,7 @@
     "build:ts": "tsc",
     "build": "npm run build:wasm && npm run build:ts",
     "test": "vitest run",
+    "test:workers": "vitest run --config vitest.config.workers.ts",
     "prepublishOnly": "npm run build && ./scripts/assert-tarball.sh"
   },
   "dependencies": {
@@ -64,6 +65,7 @@
     "react": "^18 || ^19"
   },
   "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.12.21",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "react": "^19.0.0",
