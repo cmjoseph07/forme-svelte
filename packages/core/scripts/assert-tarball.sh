@@ -14,12 +14,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-# npm pack writes <name>-<version>.tgz to cwd. Capture the name.
-TARBALL=$(npm pack --silent)
-trap 'rm -f "$TARBALL"' EXIT
-
-# Read the tarball's file list once.
-FILES=$(tar -tzf "$TARBALL")
+# Ask npm what it *would* publish. --ignore-scripts is critical: we're
+# called from prepublishOnly, and npm pack itself fires prepublishOnly,
+# which would recurse forever (or silently fail with an empty tarball
+# name and a confusing `tar: Failed to open ''` error). --dry-run skips
+# writing a real .tgz to disk. --json gives us structured output we
+# don't need to parse out of human-readable notices.
+FILES=$(npm pack --dry-run --json --ignore-scripts \
+  | sed -n 's/^[[:space:]]*"path": "\([^"]*\)".*/package\/\1/p')
 
 REQUIRED=(
   package/dist/index.js
