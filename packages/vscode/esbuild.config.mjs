@@ -6,22 +6,24 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '../..');
 
-// Copy WASM to pkg/ (core's ensureInit does join(__dirname, '..', 'pkg'))
-// and preview HTML to dist/preview/
-mkdirSync(resolve(__dirname, 'pkg'), { recursive: true });
+// dist/forme_bg.wasm is where the bundled extension.js looks for WASM
+// at runtime. esbuild inlines core/pkg-node/forme.js (the nodejs target
+// CJS glue) into extension.js; that glue does
+//   `${__dirname}/forme_bg.wasm` + require('fs').readFileSync
+// and after bundling, __dirname is <ext>/dist/. Pre-0.10.1 the path
+// was '..'/pkg/forme_bg.wasm, which is why we used to copy into pkg/.
 mkdirSync(resolve(__dirname, 'dist/preview'), { recursive: true });
 
 const corePkgDir = resolve(root, 'packages/core');
 const rendererPkgDir = resolve(root, 'packages/renderer');
 
-const corePkg = existsSync(join(corePkgDir, 'pkg'))
+const corePkg = existsSync(join(corePkgDir, 'pkg-node'))
   ? corePkgDir
   : resolve(__dirname, 'node_modules/@formepdf/core');
 const rendererPkg = existsSync(join(rendererPkgDir, 'dist/preview'))
   ? rendererPkgDir
   : resolve(__dirname, 'node_modules/@formepdf/renderer');
 
-cpSync(resolve(corePkg, 'pkg'), resolve(__dirname, 'pkg'), { recursive: true });
 cpSync(resolve(rendererPkg, 'dist/preview'), resolve(__dirname, 'dist/preview'), { recursive: true });
 
 await build({
@@ -41,5 +43,12 @@ await build({
     js: `const FORME_IMPORT_META_URL = require('url').pathToFileURL(__filename).href;`,
   },
 });
+
+// Drop the WASM next to the bundled extension.js. esbuild only writes
+// the outfile, so we do this post-build to avoid any ordering surprises.
+cpSync(
+  resolve(corePkg, 'pkg-node/forme_bg.wasm'),
+  resolve(__dirname, 'dist/forme_bg.wasm'),
+);
 
 console.log('Built extension');

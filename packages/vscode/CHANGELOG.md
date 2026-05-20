@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.10.1] - 2026-05-20
+
+### Fixed
+- WASM resolves correctly under the new `@formepdf/core@0.10.1` layout. Core 0.10.x moved Node-runtime WASM loading from `pkg/forme_bg.wasm` (an `import.meta.url`/`fileURLToPath` lookup) to `pkg-node/forme.js`'s self-init via `${__dirname}/forme_bg.wasm`. The esbuild bundler inlines that into `dist/extension.js`, so the extension now needs `dist/forme_bg.wasm` at runtime — `esbuild.config.mjs` copies it there after the bundle step, and `scripts/package.mjs` no longer stages a separate `pkg/` dir.
+- `pkg/` added to `.vscodeignore` so any leftover local build artifact from 0.10.0 can't sneak into the .vsix.
+
 ## [0.10.0] - 2026-05-19
 
 _Dependency bump only._

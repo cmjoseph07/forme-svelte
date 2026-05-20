@@ -24,11 +24,11 @@ execSync('npm run build', { stdio: 'inherit' });
 // 2. Create staging dir
 rmSync('staging', { recursive: true, force: true });
 mkdirSync('staging/dist', { recursive: true });
-mkdirSync('staging/pkg', { recursive: true });
 
-// 3. Copy dist (bundled extension.js, preview HTML), pkg (WASM), and resources (icons)
+// 3. Copy dist (bundled extension.js, preview HTML, forme_bg.wasm) and
+// resources (icons). The bundled extension reads forme_bg.wasm from
+// dist/ at runtime (it was at pkg/forme_bg.wasm pre-0.10.1).
 cpSync('dist', 'staging/dist', { recursive: true });
-cpSync('pkg', 'staging/pkg', { recursive: true });
 cpSync('resources', 'staging/resources', { recursive: true });
 cpSync('README.md', 'staging/README.md');
 cpSync('CHANGELOG.md', 'staging/CHANGELOG.md');

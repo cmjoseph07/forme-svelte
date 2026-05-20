@@ -3,3 +3,4 @@ scripts/
 staging/
 tsconfig.json
 esbuild.config.mjs
+pkg/
