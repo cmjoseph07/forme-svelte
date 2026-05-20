@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.1] - 2026-05-20
+
+_Version bump only._
+
 ## [0.10.0] - 2026-05-19
 
 ### Added
