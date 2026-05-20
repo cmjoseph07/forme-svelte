@@ -48,6 +48,14 @@ jobs:
       - name: Build Core (WASM + TS)
         working-directory: packages/core
         run: npm run build
+      - name: Assert Core tarball layout
+        # Belt-and-braces against the 0.10.0 publish miss: pack the
+        # package and verify every entry-point file is present. Catches
+        # stray `.gitignore`s inside wasm-pack output dirs (which silently
+        # drop their contents at publish time) and any future build
+        # script that forgets to emit a required entry.
+        working-directory: packages/core
+        run: bash ./scripts/assert-tarball.sh
       - name: Build Renderer
         working-directory: packages/renderer
         run: npm run build

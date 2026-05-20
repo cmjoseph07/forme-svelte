@@ -3,6 +3,7 @@ engine/target/
 
 # WASM build output
 packages/core/pkg/
+packages/core/pkg-web/
 packages/core/pkg-node/
 
 packages/go-sdk/templates/forme.wasm
@@ -30,10 +31,13 @@ Thumbs.db
 .env
 .env.*
 
-# Scripts (local dev only; CI helpers under .github/scripts/ are tracked)
+# Scripts (local dev only; CI helpers under .github/scripts/ and
+# per-package scripts/ dirs that ship in npm tarballs are tracked)
 scripts/
 !.github/scripts/
 !.github/scripts/**
+!packages/*/scripts/
+!packages/*/scripts/**
 
 # Scratch files
 test-*.tsx

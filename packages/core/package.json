@@ -1,6 +1,6 @@
 {
   "name": "@formepdf/core",
-  "version": "0.10.0",
+  "version": "0.10.1",
   "description": "WASM-powered PDF rendering engine for Forme",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,16 +8,16 @@
   "exports": {
     ".": {
       "worker": {
-        "types": "./dist/browser.d.ts",
-        "import": "./dist/browser.js"
+        "types": "./dist/worker.d.ts",
+        "import": "./dist/worker.js"
       },
       "edge-light": {
-        "types": "./dist/browser.d.ts",
-        "import": "./dist/browser.js"
+        "types": "./dist/worker.d.ts",
+        "import": "./dist/worker.js"
       },
       "deno": {
-        "types": "./dist/browser.d.ts",
-        "import": "./dist/browser.js"
+        "types": "./dist/worker.d.ts",
+        "import": "./dist/worker.js"
       },
       "react-native": {
         "types": "./dist/browser.d.ts",
@@ -35,20 +35,30 @@
       "types": "./dist/browser.d.ts",
       "import": "./dist/browser.js"
     },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
     "./pkg/forme.js": {
       "types": "./pkg/forme.d.ts",
       "import": "./pkg/forme.js"
     },
-    "./pkg/forme_bg.wasm": "./pkg/forme_bg.wasm"
+    "./pkg/forme_bg.wasm": "./pkg/forme_bg.wasm",
+    "./pkg-web/forme.js": {
+      "types": "./pkg-web/forme.d.ts",
+      "import": "./pkg-web/forme.js"
+    },
+    "./pkg-web/forme_bg.wasm": "./pkg-web/forme_bg.wasm"
   },
   "scripts": {
-    "build:wasm": "./build.sh && rm -f pkg/.gitignore",
+    "build:wasm": "./build.sh && rm -f pkg/.gitignore pkg-web/.gitignore pkg-node/.gitignore",
     "build:ts": "tsc",
     "build": "npm run build:wasm && npm run build:ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "prepublishOnly": "npm run build && ./scripts/assert-tarball.sh"
   },
   "dependencies": {
-    "@formepdf/react": "0.10.0"
+    "@formepdf/react": "0.10.1"
   },
   "peerDependencies": {
     "react": "^18 || ^19"
@@ -63,7 +73,9 @@
   "files": [
     "dist/",
     "pkg/",
-    "pkg-node/"
+    "pkg-web/",
+    "pkg-node/",
+    "scripts/"
   ],
   "license": "MIT",
   "repository": {

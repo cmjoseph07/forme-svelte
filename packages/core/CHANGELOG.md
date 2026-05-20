@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.1] - 2026-05-20
+
+### Fixed
+- **Cloudflare Workers crash on import** — 0.10.0's bundler-target `pkg/forme.js` called `wasm.__wbindgen_start()` at module load, which threw in Wrangler because Wrangler returns `{ default: WebAssembly.Module }` for direct `.wasm` imports instead of an instantiated namespace. The package now ships a third build, `pkg-web/` (wasm-pack `--target web`), and a new `dist/worker.js` entry that requires an explicit `init(wasmModule)` call. The `worker`, `edge-light`, and `deno` conditional exports now route here. Workers users can write the same `await init(wasm)` pattern that worked on 0.9.x.
+- **Missing `pkg-node/` in the published tarball** — wasm-pack `--target nodejs` writes a `.gitignore` containing `*` inside its output dir, which `npm publish` honours by dropping the directory's contents. The `build:wasm` script removed `pkg/.gitignore` but not `pkg-node/.gitignore`, so 0.10.0's Node entry tried to import a file that wasn't in the tarball. The cleanup step now strips `.gitignore` from all three pkg dirs, and `prepublishOnly` runs an `assert-tarball.sh` check that fails publish if any required file is missing.
+
+### Added
+- `@formepdf/core/worker` subpath export for the new edge entry.
+- `@formepdf/core/pkg-web/forme.js` and `/forme_bg.wasm` for direct WASM imports in Workers (legacy `pkg/forme_bg.wasm` still works).
+- `packages/core/scripts/assert-tarball.sh` — invoked by `prepublishOnly` and by CI on every PR. Lists the required tarball contents and fails loudly if any pkg dir ships a stray `.gitignore`.
+
 ## [0.10.0] - 2026-05-19
 
 ### Changed

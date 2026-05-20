@@ -1,17 +1,31 @@
 /**
- * Browser / edge entry point for @formepdf/core.
+ * Cloudflare Workers / edge entry point for @formepdf/core.
  *
- * Import as `@formepdf/core/browser` — no Node APIs, works in any
- * modern browser, edge runtime, or worker with WebAssembly support.
+ * Backed by the wasm-pack `--target web` build of `pkg-web/`. Unlike
+ * the bundler-target browser entry, this one does **not** auto-init
+ * the WASM at module load — that's incompatible with Wrangler's
+ * WASM-as-ESM contract (Wrangler returns `{ default: WebAssembly.Module }`
+ * rather than an instantiated namespace, so the bundler glue's
+ * top-level `wasm.__wbindgen_start()` would throw).
  *
- * Backed by the wasm-pack `--target bundler` build of pkg/, so the
- * WASM module is wired up implicitly by the consuming bundler at
- * module-load time (via `import * as wasm from './forme_bg.wasm'`
- * inside pkg/forme.js). Vite, esbuild, Webpack, Turbopack, and
- * Wrangler all handle this — there is no explicit init step.
+ * Instead, callers pass the `WebAssembly.Module` they imported
+ * themselves into `init(module)` once at request time:
+ *
+ *   import { init, renderDocument } from '@formepdf/core'           // resolves here under the 'worker' condition
+ *   import wasm from '@formepdf/core/pkg-web/forme_bg.wasm'         // recommended
+ *   // or:
+ *   import wasm from '@formepdf/core/pkg/forme_bg.wasm'             // legacy, also works
+ *
+ *   export default {
+ *     async fetch() {
+ *       await init(wasm);
+ *       const pdf = await renderDocument(<Doc />);
+ *       return new Response(pdf, { headers: { 'content-type': 'application/pdf' } });
+ *     },
+ *   };
  */
 
-import {
+import __wbg_init, {
   certify_pdf as wasmCertifyPdf,
   find_text_regions as wasmFindTextRegions,
   merge_pdfs as wasmMergePdfs,
@@ -21,7 +35,7 @@ import {
   render_pdf_with_layout as wasmRenderPdfWithLayout,
   render_template_pdf as wasmRenderTemplatePdf,
   render_template_pdf_with_layout as wasmRenderTemplatePdfWithLayout,
-} from '../pkg/forme.js';
+} from '../pkg-web/forme.js';
 import {
   resolveFonts,
   resolveImages,
@@ -44,33 +58,59 @@ export type {
   RedactionPattern,
 } from './index.js';
 
-import type { LayoutInfo, RenderWithLayoutResult, RenderDocumentOptions, RedactionRegion, RedactionPattern } from './index.js';
+import type {
+  LayoutInfo,
+  RenderWithLayoutResult,
+  RenderDocumentOptions,
+  RedactionRegion,
+  RedactionPattern,
+} from './index.js';
 
 // ── WASM initialization ────────────────────────────────────────────
-//
-// Kept as a no-op for backward compatibility. The bundler-target build
-// instantiates the WASM at module-load time, so by the time anyone can
-// invoke any of the exports below, the engine is already live.
-//
-// If you need an explicit `init(module)` driven by a `WebAssembly.Module`
-// you imported yourself (e.g. Cloudflare Workers), import from
-// `@formepdf/core/worker` instead — that entry is backed by the web
-// target which supports manual instantiation.
-/** @deprecated No-op under the bundler-target build. For explicit
- *  instantiation in Workers/edge, import from `@formepdf/core/worker`. */
-export async function init(_module?: unknown): Promise<void> {
-  return;
+
+let initPromise: Promise<unknown> | null = null;
+
+/**
+ * Initialize the WASM engine. Pass a `WebAssembly.Module` (the default
+ * shape Wrangler/esbuild give you when you `import wasm from '…/forme_bg.wasm'`)
+ * or any other value `__wbg_init` accepts: a `URL`, a `Response`, a
+ * `Promise<Response>`, raw bytes (`BufferSource`), or `undefined` to
+ * fall back to fetching `forme_bg.wasm` next to `pkg-web/forme.js`.
+ *
+ * Idempotent: subsequent calls reuse the first invocation's promise.
+ * Must complete before any render/redact/merge call.
+ */
+export async function init(module?: unknown): Promise<void> {
+  if (!initPromise) {
+    initPromise = __wbg_init(
+      module === undefined ? undefined : { module_or_path: module as never },
+    );
+  }
+  await initPromise;
+}
+
+function ensureInit(): void {
+  if (!initPromise) {
+    throw new Error(
+      '[@formepdf/core/worker] WASM not initialized. Call `await init(wasmModule)` ' +
+        'with the `WebAssembly.Module` imported from `@formepdf/core/pkg-web/forme_bg.wasm` ' +
+        'before invoking any render/redact/merge function.',
+    );
+  }
 }
 
 // ── Render functions ───────────────────────────────────────────────
 
 export async function renderPdf(json: string): Promise<Uint8Array> {
+  ensureInit();
+  await initPromise;
   return wasmRenderPdf(json);
 }
 
 export async function renderPdfWithLayout(json: string): Promise<RenderWithLayoutResult> {
-  const result = wasmRenderPdfWithLayout(json) as { pdf: Uint8Array; layout: LayoutInfo };
-  return result;
+  ensureInit();
+  await initPromise;
+  return wasmRenderPdfWithLayout(json) as { pdf: Uint8Array; layout: LayoutInfo };
 }
 
 export async function renderDocument(
@@ -107,14 +147,6 @@ export async function renderDocumentWithLayout(
 
 // ── Serialized document rendering ────────────────────────────────────
 
-/**
- * Render a pre-serialized document object (from `serialize()`) to PDF,
- * resolving any HTTP image/font URLs to data URIs first.
- *
- * Use this when you have a serialized doc (e.g. from a web worker that
- * calls `serialize()` directly) and need image resolution without going
- * through the React element–based `renderDocument()`.
- */
 export async function renderSerializedDoc(
   doc: Record<string, unknown>,
   options?: RenderDocumentOptions,
@@ -129,9 +161,6 @@ export async function renderSerializedDoc(
   return renderPdf(JSON.stringify(doc));
 }
 
-/**
- * Like `renderSerializedDoc` but also returns layout info for overlays.
- */
 export async function renderSerializedDocWithLayout(
   doc: Record<string, unknown>,
   options?: RenderDocumentOptions,
@@ -148,10 +177,9 @@ export async function renderSerializedDocWithLayout(
 
 // ── Template rendering ──────────────────────────────────────────────
 
-export async function renderTemplate(
-  templateJson: string,
-  dataJson: string,
-): Promise<Uint8Array> {
+export async function renderTemplate(templateJson: string, dataJson: string): Promise<Uint8Array> {
+  ensureInit();
+  await initPromise;
   return wasmRenderTemplatePdf(templateJson, dataJson);
 }
 
@@ -159,19 +187,34 @@ export async function renderTemplateWithLayout(
   templateJson: string,
   dataJson: string,
 ): Promise<RenderWithLayoutResult> {
-  const result = wasmRenderTemplatePdfWithLayout(templateJson, dataJson) as {
+  ensureInit();
+  await initPromise;
+  return wasmRenderTemplatePdfWithLayout(templateJson, dataJson) as {
     pdf: Uint8Array;
     layout: LayoutInfo;
   };
-  return result;
 }
 
 // ── PDF certification ────────────────────────────────────────────────
 
 export async function certifyPdf(
   pdfBytes: Uint8Array,
-  config: { certificatePem: string; privateKeyPem: string; reason?: string; location?: string; contact?: string; visible?: boolean; page?: number; x?: number; y?: number; width?: number; height?: number },
+  config: {
+    certificatePem: string;
+    privateKeyPem: string;
+    reason?: string;
+    location?: string;
+    contact?: string;
+    visible?: boolean;
+    page?: number;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  },
 ): Promise<Uint8Array> {
+  ensureInit();
+  await initPromise;
   return wasmCertifyPdf(pdfBytes, JSON.stringify(config));
 }
 
@@ -184,47 +227,37 @@ export async function redactPdf(
   pdfBytes: Uint8Array,
   regions: RedactionRegion[],
 ): Promise<Uint8Array> {
+  ensureInit();
+  await initPromise;
   return wasmRedactPdf(pdfBytes, JSON.stringify(regions));
 }
 
 // ── Text-search redaction ─────────────────────────────────────────────
 
-/**
- * Find text regions matching patterns in a PDF.
- *
- * Searches PDF content streams for literal or regex patterns and returns
- * redaction regions (in web top-origin coordinates) for each match.
- */
 export async function findTextRegions(
   pdfBytes: Uint8Array,
   patterns: RedactionPattern[],
 ): Promise<RedactionRegion[]> {
+  ensureInit();
+  await initPromise;
   const json = wasmFindTextRegions(pdfBytes, JSON.stringify(patterns));
   return JSON.parse(json) as RedactionRegion[];
 }
 
-/**
- * Redact text matching patterns from a PDF.
- *
- * Convenience wrapper: finds all text matching the patterns, then
- * applies coordinate-based redaction to each match.
- */
 export async function redactText(
   pdfBytes: Uint8Array,
   patterns: RedactionPattern[],
 ): Promise<Uint8Array> {
+  ensureInit();
+  await initPromise;
   return wasmRedactText(pdfBytes, JSON.stringify(patterns));
 }
 
 // ── PDF merging ──────────────────────────────────────────────────────
 
-/**
- * Merge multiple PDF documents into a single PDF.
- *
- * @param pdfs - Array of PDF byte arrays to merge in order.
- * @returns The merged PDF as a Uint8Array.
- */
 export async function mergePdfs(pdfs: Uint8Array[]): Promise<Uint8Array> {
+  ensureInit();
+  await initPromise;
   const base64Pdfs = pdfs.map((pdf) =>
     btoa(Array.from(pdf, (b) => String.fromCharCode(b)).join('')),
   );
