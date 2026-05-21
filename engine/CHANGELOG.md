@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.10.2] - 2026-05-21
+
+### Fixed
+- Flex row children with percentage widths (e.g. `width: '30%'`) are no longer double-resolved against their own already-resolved width — the percentage now correctly resolves against the parent's content width. Two children at 100% now shrink to 50/50 instead of collapsing
+- Grid containers that wrap over a page break now page-break by row (all columns moved to the next page together) instead of letting each cell trigger its own page break, which was scattering the columns across separate pages
+
+### Internal
+- `layout_node` now accepts a `forced_outer_width: Option<f64>` parameter so flex parents can hand the distributed width to the child without re-running style resolution
+
+## [0.10.1]
+
+_Skipped — npm-only patch._
+
 ## [0.10.0] - 2026-05-19
 
 ### Added

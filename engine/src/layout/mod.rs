@@ -946,6 +946,7 @@ impl LayoutEngine {
                         Some(&root_style),
                         font_context,
                         None,
+                        None,
                     );
                 }
             }
@@ -971,6 +972,7 @@ impl LayoutEngine {
         parent_style: Option<&ResolvedStyle>,
         font_context: &FontContext,
         cross_axis_height: Option<f64>,
+        forced_outer_width: Option<f64>,
     ) {
         let mut style = node.style.resolve(parent_style, available_width);
 
@@ -980,6 +982,14 @@ impl LayoutEngine {
             if matches!(style.height, SizeConstraint::Auto) {
                 style.height = SizeConstraint::Fixed(h);
             }
+        }
+
+        // When a flex parent has already resolved this child's outer width
+        // (via flex-basis / flex-grow / flex-shrink distribution), override
+        // style.width so layout_view uses the distributed value instead of
+        // re-resolving the raw percentage against the constrained width.
+        if let Some(w) = forced_outer_width {
+            style.width = SizeConstraint::Fixed(w);
         }
 
         if style.break_before {
@@ -1859,6 +1869,7 @@ impl LayoutEngine {
                         parent_style,
                         font_context,
                         None,
+                        None,
                     );
 
                     child_ranges.push((child_start, cursor.elements.len()));
@@ -2055,6 +2066,7 @@ impl LayoutEngine {
                 child_width,
                 parent_style,
                 font_context,
+                None,
                 None,
             );
 
@@ -2292,10 +2304,11 @@ impl LayoutEngine {
                     cursor,
                     pages,
                     x,
-                    fw,
+                    available_width,
                     parent_style,
                     font_context,
                     cross_h,
+                    Some(fw),
                 );
 
                 cursor.y = saved_y;
@@ -2501,6 +2514,7 @@ impl LayoutEngine {
                     inner_width,
                     Some(&cell_style),
                     font_context,
+                    None,
                     None,
                 );
             }
@@ -5213,11 +5227,16 @@ impl LayoutEngine {
 
         // Layout each row
         for (row, &row_height) in row_heights.iter().enumerate().take(num_rows) {
-            // Check page break: treat each row as unbreakable
-            if row_height > cursor.remaining_height() && row > 0 {
+            // Check page break: treat each row as unbreakable. The whole row
+            // moves to the next page so all columns share the same baseline
+            // (otherwise each cell's layout_node would page-break individually
+            // and scatter the columns across separate pages).
+            if row_height > cursor.remaining_height() {
                 pages.push(cursor.finalize());
                 *cursor = cursor.new_page();
             }
+
+            let row_start_y = cursor.y;
 
             // Layout items in this row
             for placement in &item_placements {
@@ -5231,8 +5250,6 @@ impl LayoutEngine {
 
                 let child = &children[placement.child_index];
 
-                // Save cursor state, layout child in cell bounds
-                let saved_y = cursor.y;
                 self.layout_node(
                     child,
                     cursor,
@@ -5242,12 +5259,13 @@ impl LayoutEngine {
                     Some(parent_style),
                     font_context,
                     None,
+                    None,
                 );
                 // Restore y to row baseline (items don't affect each other's y)
-                cursor.y = saved_y;
+                cursor.y = row_start_y;
             }
 
-            cursor.y += row_height + row_gap;
+            cursor.y = row_start_y + row_height + row_gap;
         }
 
         // Remove trailing gap

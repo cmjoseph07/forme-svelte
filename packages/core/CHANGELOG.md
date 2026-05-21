@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.2] - 2026-05-21
+
+### Fixed
+- WASM rebuilt against engine 0.10.2, picking up two layout fixes:
+  - Flex row children with percentage widths (e.g. `width: '30%'` / `'70%'`) now resolve against the parent's content width instead of being double-resolved against their own already-distributed width. Two children at `width: '100%'` now shrink to 50/50 instead of collapsing
+  - Grid containers that span a page break now move the whole row to the next page together — previously each cell triggered its own page break and the columns scattered across separate pages
+
 ## [0.10.1] - 2026-05-20
 
 ### Fixed

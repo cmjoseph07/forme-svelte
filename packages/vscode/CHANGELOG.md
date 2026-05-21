@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.2] - 2026-05-21
+
+_Bump `@formepdf/renderer` to 0.10.2 — picks up engine flex row percentage-width and grid page-break layout fixes via `@formepdf/core@0.10.2`._
+
 ## [0.10.1] - 2026-05-20
 
 ### Fixed

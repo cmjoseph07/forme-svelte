@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.2] - 2026-05-21
+
+_Bump `@formepdf/core` to 0.10.2 — picks up engine flex row percentage-width and grid page-break layout fixes._
+
 ## [0.10.1] - 2026-05-20
 
 _Bump `@formepdf/core` to 0.10.1 — picks up the Cloudflare Workers init crash fix and the missing `pkg-node/` tarball fix._

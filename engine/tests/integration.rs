@@ -9006,3 +9006,197 @@ fn test_gradient_stops_normalized_when_out_of_order() {
         &pdf_str[..pdf_str.len().min(2000)],
     );
 }
+
+#[test]
+fn test_flex_row_percentage_widths_resolve_against_parent() {
+    // Regression: children with width: 30% / 70% in a flex row were getting
+    // double-resolved against their own (already-resolved) width, ending up
+    // at ~9%/49% of the row instead of 30%/70%.
+    let child30 = make_styled_view(
+        Style {
+            width: Some(Dimension::Percent(30.0)),
+            ..Default::default()
+        },
+        vec![make_text("30%", 12.0)],
+    );
+    let child70 = make_styled_view(
+        Style {
+            width: Some(Dimension::Percent(70.0)),
+            ..Default::default()
+        },
+        vec![make_text("70%", 12.0)],
+    );
+    let row = make_styled_view(
+        Style {
+            flex_direction: Some(FlexDirection::Row),
+            ..Default::default()
+        },
+        vec![child30, child70],
+    );
+
+    let doc = default_doc(vec![row]);
+    let pages = layout_doc(&doc);
+    assert_eq!(pages.len(), 1);
+
+    let row_el = &pages[0].elements[0];
+    assert_eq!(row_el.children.len(), 2);
+
+    let row_w = row_el.width;
+    let expected_30 = row_w * 0.3;
+    let expected_70 = row_w * 0.7;
+
+    assert!(
+        (row_el.children[0].width - expected_30).abs() < 1.0,
+        "30% child width {:.2} != expected {:.2} (row_w={:.2})",
+        row_el.children[0].width,
+        expected_30,
+        row_w,
+    );
+    assert!(
+        (row_el.children[1].width - expected_70).abs() < 1.0,
+        "70% child width {:.2} != expected {:.2} (row_w={:.2})",
+        row_el.children[1].width,
+        expected_70,
+        row_w,
+    );
+}
+
+#[test]
+fn test_flex_row_equal_percentage_widths_split_evenly() {
+    // Two children with width: 100% should shrink to 50/50 — flex-shrink
+    // distributes the overflow evenly. Regression coverage for the same
+    // double-resolution bug.
+    let mk_child = || {
+        make_styled_view(
+            Style {
+                width: Some(Dimension::Percent(100.0)),
+                ..Default::default()
+            },
+            vec![make_text("x", 12.0)],
+        )
+    };
+    let row = make_styled_view(
+        Style {
+            flex_direction: Some(FlexDirection::Row),
+            ..Default::default()
+        },
+        vec![mk_child(), mk_child()],
+    );
+
+    let doc = default_doc(vec![row]);
+    let pages = layout_doc(&doc);
+    assert_eq!(pages.len(), 1);
+
+    let row_el = &pages[0].elements[0];
+    assert_eq!(row_el.children.len(), 2);
+
+    let half = row_el.width / 2.0;
+    for (i, child) in row_el.children.iter().enumerate() {
+        assert!(
+            (child.width - half).abs() < 1.0,
+            "child{} width {:.2} != expected {:.2}",
+            i,
+            child.width,
+            half,
+        );
+    }
+}
+
+#[test]
+fn test_grid_page_break_keeps_columns_aligned() {
+    // Regression: when a grid wraps over a page break, each column was ending
+    // up on its own page instead of the grid breaking by row. This happened
+    // because the first row's page-break check had `&& row > 0`, so an
+    // oversized first row was force-laid-out at the bottom of the current
+    // page and each cell's layout_node triggered its own page break.
+    let make_tall_cell = |label: &str| {
+        make_styled_view(
+            Style {
+                padding: Some(Edges::uniform(4.0)),
+                background_color: Some(Color {
+                    r: 0.9,
+                    g: 0.9,
+                    b: 0.9,
+                    a: 1.0,
+                }),
+                height: Some(Dimension::Pt(400.0)),
+                ..Default::default()
+            },
+            vec![make_text(label, 12.0)],
+        )
+    };
+
+    // Big spacer pushes the grid to the bottom of page 1 so the grid won't
+    // fit there. The grid has 3 columns, all 400pt tall — they should all
+    // share page 2, not split across 3 pages.
+    let spacer = make_styled_view(
+        Style {
+            height: Some(Dimension::Pt(500.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+
+    let grid = make_styled_view(
+        Style {
+            display: Some(Display::Grid),
+            grid_template_columns: Some(vec![
+                GridTrackSize::Fr(1.0),
+                GridTrackSize::Fr(1.0),
+                GridTrackSize::Fr(1.0),
+            ]),
+            gap: Some(8.0),
+            ..Default::default()
+        },
+        vec![
+            make_tall_cell("A"),
+            make_tall_cell("B"),
+            make_tall_cell("C"),
+        ],
+    );
+
+    let doc = default_doc(vec![spacer, grid]);
+    let pages = layout_doc(&doc);
+
+    // Should be exactly 2 pages: spacer on page 1, grid on page 2.
+    // Before the fix this produced 4 pages (one per column + the spacer page).
+    assert_eq!(
+        pages.len(),
+        2,
+        "expected 2 pages, got {} — grid columns split across pages",
+        pages.len(),
+    );
+
+    // All three grid cells must be on page 2 at the same y. Walk the tree
+    // and collect every element matching our 400pt cell height.
+    fn collect_matching<'a>(
+        el: &'a forme::layout::LayoutElement,
+        out: &mut Vec<&'a forme::layout::LayoutElement>,
+    ) {
+        if (el.height - 400.0).abs() < 0.5 {
+            out.push(el);
+        }
+        for c in &el.children {
+            collect_matching(c, out);
+        }
+    }
+    let mut tall_cells: Vec<&forme::layout::LayoutElement> = Vec::new();
+    for el in &pages[1].elements {
+        collect_matching(el, &mut tall_cells);
+    }
+    assert_eq!(
+        tall_cells.len(),
+        3,
+        "expected 3 tall cells on page 2, found {}",
+        tall_cells.len(),
+    );
+    let first_y = tall_cells[0].y;
+    for c in &tall_cells {
+        assert!(
+            (c.y - first_y).abs() < 0.5,
+            "grid cells not aligned: y={} vs {}",
+            c.y,
+            first_y,
+        );
+    }
+}
