@@ -9200,3 +9200,157 @@ fn test_grid_page_break_keeps_columns_aligned() {
         );
     }
 }
+
+// Build a <Text> leaf with an explicit fixed width and text alignment.
+fn make_text_fixed_width(content: &str, width: f64, align: TextAlign) -> Node {
+    Node {
+        kind: NodeKind::Text {
+            content: content.to_string(),
+            href: None,
+            runs: vec![],
+        },
+        style: Style {
+            font_size: Some(12.0),
+            width: Some(Dimension::Pt(width)),
+            text_align: Some(align),
+            ..Default::default()
+        },
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }
+}
+
+// LETTER page (612pt) with 48pt insets => content band 48..564, matching the
+// minimal repro from the bug report.
+fn letter_doc_with_inset_48(child: Node) -> Document {
+    default_doc(vec![Node {
+        kind: NodeKind::Page {
+            config: PageConfig {
+                size: PageSize::Letter,
+                margin: Edges::uniform(48.0),
+                ..Default::default()
+            },
+        },
+        style: Style::default(),
+        children: vec![child],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }])
+}
+
+// Collect every element of a given node_type, depth-first.
+fn collect_by_type<'a>(
+    el: &'a forme::layout::LayoutElement,
+    ty: &str,
+    out: &mut Vec<&'a forme::layout::LayoutElement>,
+) {
+    if el.node_type.as_deref() == Some(ty) {
+        out.push(el);
+    }
+    for c in &el.children {
+        collect_by_type(c, ty, out);
+    }
+}
+
+#[test]
+fn test_flex_row_text_fixed_width_box_not_parent_width() {
+    // Regression (0.10.2): <Text style={{ width }}> inside a flex row was
+    // positioned using the requested width but RENDERED at the parent row's full
+    // main-axis width. layout_view honored style.width; layout_text did not, so
+    // the Text box ballooned to the row width and textAlign:right threw glyphs
+    // hundreds of points past the page edge — silent corruption (byte hashes
+    // unchanged). The Text box must equal the requested width and glyphs must
+    // stay inside the page content band.
+    let row = make_styled_view(
+        Style {
+            flex_direction: Some(FlexDirection::Row),
+            justify_content: Some(JustifyContent::FlexEnd),
+            ..Default::default()
+        },
+        vec![
+            make_text_fixed_width("Tax:", 120.0, TextAlign::Right),
+            make_text_fixed_width("$10.00", 80.0, TextAlign::Right),
+        ],
+    );
+
+    let pages = layout_doc(&letter_doc_with_inset_48(row));
+    assert_eq!(pages.len(), 1);
+    let band_right = 612.0 - 48.0; // 564
+
+    // Text container boxes must equal the requested widths, not the 516pt row.
+    let mut texts = Vec::new();
+    for el in &pages[0].elements {
+        collect_by_type(el, "Text", &mut texts);
+    }
+    assert_eq!(texts.len(), 2, "expected 2 Text boxes, got {}", texts.len());
+    let mut widths: Vec<f64> = texts.iter().map(|t| t.width).collect();
+    widths.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    assert!(
+        (widths[0] - 80.0).abs() < 0.5 && (widths[1] - 120.0).abs() < 0.5,
+        "Text boxes should be 80 and 120, got {:?}",
+        widths,
+    );
+
+    // Glyph lines must land inside the page content band (48..564), not off-page.
+    let mut lines = Vec::new();
+    for el in &pages[0].elements {
+        collect_by_type(el, "TextLine", &mut lines);
+    }
+    assert!(!lines.is_empty(), "expected TextLine elements");
+    for line in &lines {
+        assert!(
+            line.x + line.width <= band_right + 0.5,
+            "glyph line runs off-page: x={:.2} width={:.2} (right={:.2} > band {:.2})",
+            line.x,
+            line.width,
+            line.x + line.width,
+            band_right,
+        );
+        assert!(
+            line.x >= 48.0 - 0.5,
+            "glyph line starts before content band: x={:.2}",
+            line.x,
+        );
+    }
+}
+
+#[test]
+fn test_flex_row_text_fixed_width_box_flex_start() {
+    // Same fix, justifyContent: flex-start — the off-page shift isn't visible
+    // here (no right-edge alignment against the bloated box), but the Text box
+    // was still mis-sized to the row width. Lock in the correct box widths.
+    let row = make_styled_view(
+        Style {
+            flex_direction: Some(FlexDirection::Row),
+            justify_content: Some(JustifyContent::FlexStart),
+            ..Default::default()
+        },
+        vec![
+            make_text_fixed_width("Tax:", 120.0, TextAlign::Right),
+            make_text_fixed_width("$10.00", 80.0, TextAlign::Right),
+        ],
+    );
+
+    let pages = layout_doc(&letter_doc_with_inset_48(row));
+    assert_eq!(pages.len(), 1);
+
+    let mut texts = Vec::new();
+    for el in &pages[0].elements {
+        collect_by_type(el, "Text", &mut texts);
+    }
+    assert_eq!(texts.len(), 2);
+    let mut widths: Vec<f64> = texts.iter().map(|t| t.width).collect();
+    widths.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    assert!(
+        (widths[0] - 80.0).abs() < 0.5 && (widths[1] - 120.0).abs() < 0.5,
+        "Text boxes should be 80 and 120, got {:?}",
+        widths,
+    );
+}

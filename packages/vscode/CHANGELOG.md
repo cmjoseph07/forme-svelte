@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.3] - 2026-05-28
+
+_Bump `@formepdf/renderer` to 0.10.3 — picks up the engine fix for `<Text style={{ width }}>` rendering at the parent's full width in a flex row, via `@formepdf/core@0.10.3`._
+
 ## [0.10.2] - 2026-05-21
 
 _Bump `@formepdf/renderer` to 0.10.2 — picks up engine flex row percentage-width and grid page-break layout fixes via `@formepdf/core@0.10.2`._

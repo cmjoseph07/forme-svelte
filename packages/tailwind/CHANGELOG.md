@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.3] - 2026-05-28
+
+_Version bump only._
+
 ## [0.10.2] - 2026-05-21
 
 _Version bump only._

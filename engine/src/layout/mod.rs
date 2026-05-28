@@ -2627,7 +2627,16 @@ impl LayoutEngine {
     ) {
         let margin = &style.margin.to_edges();
         let text_x = x + margin.left;
-        let text_width = available_width - margin.horizontal();
+        // Honor an explicit/resolved fixed width for the text box; only fall back
+        // to available_width when width is Auto. In a flex row, available_width is
+        // the parent row's content width (used for percentage resolution) while the
+        // child's own distributed width arrives via style.width — see layout_node's
+        // forced_outer_width. layout_view already works this way; this keeps leaf
+        // text consistent so textAlign/justify use the real box, not the row width.
+        let text_width = match style.width {
+            SizeConstraint::Fixed(w) => (w - margin.horizontal()).max(0.0),
+            SizeConstraint::Auto => available_width - margin.horizontal(),
+        };
 
         cursor.y += margin.top;
 
@@ -4344,7 +4353,12 @@ impl LayoutEngine {
     ) -> f64 {
         match &node.kind {
             NodeKind::Text { content, runs, .. } => {
-                let measure_width = available_width - style.margin.horizontal();
+                // Mirror layout_text: a fixed width drives line-breaking, so height
+                // measurement must use the same width or it will under-count lines.
+                let measure_width = match style.width {
+                    SizeConstraint::Fixed(w) => (w - style.margin.horizontal()).max(0.0),
+                    SizeConstraint::Auto => available_width - style.margin.horizontal(),
+                };
                 if !runs.is_empty() {
                     // Measure runs
                     let mut styled_chars: Vec<StyledChar> = Vec::new();

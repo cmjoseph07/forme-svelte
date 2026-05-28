@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.3] - 2026-05-28
+
+### Fixed
+- `<Text style={{ width }}>` inside a flex row now renders at the requested width instead of the parent row's full width. A 0.10.2 regression positioned such text using the requested width but sized its box to the row width; combined with `textAlign: 'right'` this pushed glyphs off the page (silent corruption — PDF bytes were deterministic so byte-hash snapshots passed). `layout_text` and the text branch of `measure_node_height` now honor a resolved fixed `style.width`, matching how `layout_view` and `Image` already behave
+
 ## [0.10.2] - 2026-05-21
 
 ### Fixed

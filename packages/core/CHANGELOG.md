@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.3] - 2026-05-28
+
+### Fixed
+- WASM rebuilt against engine 0.10.3: `<Text style={{ width }}>` inside a flex row now renders at the requested width instead of the parent row's full width. The 0.10.2 regression sized such text boxes to the row width, so `textAlign: 'right'` pushed glyphs off the page — silent corruption that byte-hash snapshots didn't catch.
+
 ## [0.10.2] - 2026-05-21
 
 ### Fixed

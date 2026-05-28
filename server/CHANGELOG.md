@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.3] - 2026-05-28
+
+_Picks up engine 0.10.3 — fixes `<Text style={{ width }}>` rendering at the parent's full width inside a flex row._
+
 ## [0.10.2] - 2026-05-21
 
 _Picks up engine 0.10.2 — flex row percentage-width and grid page-break layout fixes._

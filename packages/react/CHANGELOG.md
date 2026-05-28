@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.3] - 2026-05-28
+
+_Version bump only — engine 0.10.3 fixes `<Text style={{ width }}>` in a flex row via `@formepdf/core`._
+
 ## [0.10.2] - 2026-05-21
 
 _Version bump only — engine 0.10.2 ships flex row / grid layout fixes via `@formepdf/core`._
