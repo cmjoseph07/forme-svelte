@@ -9354,3 +9354,291 @@ fn test_flex_row_text_fixed_width_box_flex_start() {
         widths,
     );
 }
+
+// Helper: build a fixed-size child View with the requested top/bottom margins.
+fn make_mt_mb_child(top: EdgeValue, bottom: EdgeValue, w: f64, h: f64) -> Node {
+    make_styled_view(
+        Style {
+            width: Some(Dimension::Pt(w)),
+            height: Some(Dimension::Pt(h)),
+            margin: Some(MarginEdges {
+                top,
+                right: EdgeValue::Pt(0.0),
+                bottom,
+                left: EdgeValue::Pt(0.0),
+            }),
+            ..Default::default()
+        },
+        vec![],
+    )
+}
+
+// Helper: wrap a child in a parent View of a known fixed height and place on a
+// zero-inset Letter page, so child.y is directly comparable to parent geometry.
+fn parent_with_height_doc(parent_h: Option<f64>, child: Node) -> Document {
+    let parent = make_styled_view(
+        Style {
+            width: Some(Dimension::Pt(100.0)),
+            height: parent_h.map(Dimension::Pt),
+            ..Default::default()
+        },
+        vec![child],
+    );
+    default_doc(vec![Node::page(
+        PageConfig {
+            margin: Edges::uniform(0.0),
+            ..Default::default()
+        },
+        Style::default(),
+        vec![parent],
+    )])
+}
+
+#[test]
+fn test_column_mt_auto_pushes_child_to_bottom() {
+    // Regression (issue 1): marginTop: 'auto' on a child in a column-flex
+    // parent with fixed height was a no-op — the child stayed at the top
+    // instead of being pushed to the bottom. The column branch of
+    // layout_children had no per-child auto-margin slack pass; flex-row
+    // already did at mod.rs:2256-2267. Mirroring that block fixes it.
+    let child = make_mt_mb_child(EdgeValue::Auto, EdgeValue::Pt(0.0), 40.0, 10.0);
+    let pages = layout_doc(&parent_with_height_doc(Some(50.0), child));
+    assert_eq!(pages.len(), 1);
+
+    let parent_el = &pages[0].elements[0];
+    assert_eq!(parent_el.children.len(), 1);
+    let child_el = &parent_el.children[0];
+
+    let expected_top = parent_el.y + parent_el.height - child_el.height;
+    assert!(
+        (child_el.y - expected_top).abs() < 0.5,
+        "mt-auto child.y={:.2} expected {:.2} (parent y={:.2} h={:.2} child h={:.2})",
+        child_el.y,
+        expected_top,
+        parent_el.y,
+        parent_el.height,
+        child_el.height,
+    );
+}
+
+#[test]
+fn test_column_mt_and_mb_auto_centers_child() {
+    // Both marginTop AND marginBottom auto → child centered. Slack
+    // distributes equally to the two autos.
+    let child = make_mt_mb_child(EdgeValue::Auto, EdgeValue::Auto, 40.0, 10.0);
+    let pages = layout_doc(&parent_with_height_doc(Some(50.0), child));
+    assert_eq!(pages.len(), 1);
+
+    let parent_el = &pages[0].elements[0];
+    let child_el = &parent_el.children[0];
+
+    let expected_top = parent_el.y + (parent_el.height - child_el.height) / 2.0;
+    assert!(
+        (child_el.y - expected_top).abs() < 0.5,
+        "mt+mb auto centered: child.y={:.2} expected {:.2}",
+        child_el.y,
+        expected_top,
+    );
+}
+
+#[test]
+fn test_column_mb_auto_alone_holds_child_at_top() {
+    // marginBottom: 'auto' alone (no top auto) consumes slack between this
+    // child and any subsequent children — for a single child it just adds
+    // slack below, which is equivalent to leaving the child at the top.
+    let child = make_mt_mb_child(EdgeValue::Pt(0.0), EdgeValue::Auto, 40.0, 10.0);
+    let pages = layout_doc(&parent_with_height_doc(Some(50.0), child));
+    assert_eq!(pages.len(), 1);
+
+    let parent_el = &pages[0].elements[0];
+    let child_el = &parent_el.children[0];
+
+    assert!(
+        (child_el.y - parent_el.y).abs() < 0.5,
+        "mb-auto alone: child.y={:.2} expected parent.y={:.2} (no shift)",
+        child_el.y,
+        parent_el.y,
+    );
+}
+
+#[test]
+fn test_column_mt_auto_noop_without_fixed_parent_height() {
+    // No slack to consume → auto-margin is a no-op. Matches CSS: margin auto
+    // has no effect when the containing block has no definite size in that
+    // axis. The parent View has Auto height here.
+    let child = make_mt_mb_child(EdgeValue::Auto, EdgeValue::Pt(0.0), 40.0, 10.0);
+    let pages = layout_doc(&parent_with_height_doc(None, child));
+    assert_eq!(pages.len(), 1);
+
+    let parent_el = &pages[0].elements[0];
+    let child_el = &parent_el.children[0];
+
+    assert!(
+        (child_el.y - parent_el.y).abs() < 0.5,
+        "no fixed parent height: child should stay at top, child.y={:.2} parent.y={:.2}",
+        child_el.y,
+        parent_el.y,
+    );
+    // And the parent's auto-height shrinks to the child (no slack).
+    assert!(
+        (parent_el.height - child_el.height).abs() < 0.5,
+        "parent auto-height should ≈ child height: parent.h={:.2} child.h={:.2}",
+        parent_el.height,
+        child_el.height,
+    );
+}
+
+// Helper: build an Svg node carrying the given viewBox.
+fn make_svg(width: f64, height: f64, view_box: Option<&str>, content: &str) -> Node {
+    Node {
+        kind: NodeKind::Svg {
+            width,
+            height,
+            view_box: view_box.map(|s| s.to_string()),
+            content: content.to_string(),
+        },
+        style: Style::default(),
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }
+}
+
+#[test]
+fn test_svg_viewbox_scales_to_box() {
+    // Regression (issue 2): an Svg with width/height and a differently-sized
+    // viewBox was rendering content at raw viewBox coordinates (paths spilled
+    // far outside the display box). The PDF emitter scaled by
+    // element.width/svg_w where both were the display dimensions, so the cm
+    // matrix came out to identity. With the fix, the viewBox dims drive the
+    // scale: 200/661 ≈ 0.3025.
+    let doc = default_doc(vec![make_svg(
+        200.0,
+        80.0,
+        Some("0 0 661 176"),
+        // A rect that fills the entire viewBox — easy to verify it's the
+        // viewBox dims (not the display dims) that get scaled.
+        r##"<rect x="0" y="0" width="661" height="176" fill="#0000ff"/>"##,
+    )]);
+    let pdf = render_to_pdf(&doc);
+    assert_valid_pdf(&pdf);
+    let stream = decompress_pdf_streams(&pdf);
+
+    // Aspect ratios: display 200/80 = 2.5, viewBox 661/176 ≈ 3.756. meet
+    // picks the smaller scale: min(200/661, 80/176) = 200/661 ≈ 0.3026.
+    // Centering ty = (80 - 0.3026*176) / 2 ≈ 13.37.
+    let s = 200.0 / 661.0;
+    let ty = (80.0 - s * 176.0) / 2.0;
+    let expected_scale_cm = format!("{:.4} 0 0 {:.4} 0.00 {:.2} cm", s, s, ty);
+    assert!(
+        stream.contains(&expected_scale_cm),
+        "expected scale cm `{}` in stream:\n{}",
+        expected_scale_cm,
+        &stream[..stream.len().min(800)],
+    );
+}
+
+#[test]
+fn test_svg_viewbox_aspect_letterboxes() {
+    // viewBox aspect ratio differs from display: meet picks min(sx, sy) and
+    // centers the unused axis. 200 wide / 100 viewBox = 2.0, 200 tall / 100
+    // viewBox = 2.0 — same scale, so this also exercises the simple case
+    // where centering offsets are zero.
+    let doc = default_doc(vec![make_svg(
+        200.0,
+        200.0,
+        Some("0 0 100 100"),
+        r##"<rect x="0" y="0" width="100" height="100" fill="#ff0000"/>"##,
+    )]);
+    let pdf = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf);
+    assert!(
+        stream.contains("2.0000 0 0 2.0000"),
+        "expected scale 2.0 for matching aspect ratios, content:\n{}",
+        &stream[..stream.len().min(600)],
+    );
+
+    // Now non-matching: 300x100 box with 100x100 viewBox → sx=3, sy=1, meet
+    // picks 1, leaving tx = (300 - 100)/2 = 100 horizontal slack.
+    let doc2 = default_doc(vec![make_svg(
+        300.0,
+        100.0,
+        Some("0 0 100 100"),
+        r##"<rect x="0" y="0" width="100" height="100" fill="#00ff00"/>"##,
+    )]);
+    let pdf2 = render_to_pdf(&doc2);
+    let stream2 = decompress_pdf_streams(&pdf2);
+    assert!(
+        stream2.contains("1.0000 0 0 1.0000 100.00 0.00"),
+        "expected scale 1.0 + tx 100 for letterbox case, content:\n{}",
+        &stream2[..stream2.len().min(600)],
+    );
+}
+
+#[test]
+fn test_svg_no_viewbox_unchanged() {
+    // No viewBox attribute → viewBox defaults to (0, 0, width, height) so
+    // scale is 1 and centering is zero. Path coordinates render in display
+    // space exactly as before the fix.
+    let doc = default_doc(vec![make_svg(
+        120.0,
+        60.0,
+        None, // no viewBox
+        r##"<rect x="0" y="0" width="120" height="60" fill="#000000"/>"##,
+    )]);
+    let pdf = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&pdf);
+    assert!(
+        stream.contains("1.0000 0 0 1.0000 0.00 0.00"),
+        "no-viewBox case should produce identity scale + zero centering, content:\n{}",
+        &stream[..stream.len().min(600)],
+    );
+}
+
+#[test]
+fn test_canvas_renders_at_display_coordinates() {
+    // Canvas reuses DrawCommand::Svg via canvas_ops_to_svg_commands. Canvas
+    // ops are constructed in display coordinates, so the new viewBox plumbing
+    // must default to (0, 0, width, height) — scale 1, no centering — or
+    // Canvas geometry would regress.
+    let doc = default_doc(vec![Node {
+        kind: NodeKind::Canvas {
+            width: 100.0,
+            height: 50.0,
+            operations: vec![
+                CanvasOp::SetFillColor {
+                    r: 255.0,
+                    g: 0.0,
+                    b: 0.0,
+                },
+                CanvasOp::Rect {
+                    x: 10.0,
+                    y: 10.0,
+                    width: 30.0,
+                    height: 20.0,
+                },
+                CanvasOp::Fill,
+            ],
+        },
+        style: Style::default(),
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }]);
+    let pdf = render_to_pdf(&doc);
+    assert_valid_pdf(&pdf);
+    let stream = decompress_pdf_streams(&pdf);
+    // Canvas should still produce identity scale + zero centering — its
+    // commands are already in display space.
+    assert!(
+        stream.contains("1.0000 0 0 1.0000 0.00 0.00"),
+        "Canvas should keep identity viewBox transform, content:\n{}",
+        &stream[..stream.len().min(600)],
+    );
+}

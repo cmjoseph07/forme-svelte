@@ -1622,30 +1622,55 @@ impl PdfWriter {
 
             DrawCommand::Svg {
                 commands,
-                width: svg_w,
-                height: svg_h,
+                width: _svg_w,
+                height: _svg_h,
+                viewbox_min_x,
+                viewbox_min_y,
+                viewbox_width,
+                viewbox_height,
                 clip,
             } => {
                 let x = element.x;
                 let y = page_height - element.y - element.height;
 
-                // Save state, translate to position, flip Y for SVG coordinate system
+                // Save state, translate to position
                 let _ = writeln!(stream, "q");
                 let _ = writeln!(stream, "1 0 0 1 {:.2} {:.2} cm", x, y);
 
-                // Scale from viewBox to target size (if viewBox differs from target)
-                if *svg_w > 0.0 && *svg_h > 0.0 {
-                    let sx = element.width / svg_w;
-                    let sy = element.height / svg_h;
-                    let _ = writeln!(stream, "{:.4} 0 0 {:.4} 0 0 cm", sx, sy);
+                // SVG viewport algorithm with `xMidYMid meet` as the default
+                // preserveAspectRatio: uniform scale to fit, center the
+                // remainder. When viewBox matches the display box (the
+                // no-viewBox case, populated as 0/0/w/h in layout) the scale
+                // is 1 and the translate is 0 — behavior unchanged.
+                if *viewbox_width > 0.0 && *viewbox_height > 0.0 {
+                    let raw_sx = element.width / *viewbox_width;
+                    let raw_sy = element.height / *viewbox_height;
+                    let s = raw_sx.min(raw_sy);
+                    let tx = (element.width - s * *viewbox_width) / 2.0;
+                    let ty = (element.height - s * *viewbox_height) / 2.0;
+                    let _ = writeln!(stream, "{:.4} 0 0 {:.4} {:.2} {:.2} cm", s, s, tx, ty);
                 }
 
-                // Flip Y: SVG has Y increasing down, we need PDF Y increasing up
-                let _ = writeln!(stream, "1 0 0 -1 0 {:.2} cm", svg_h);
+                // Flip Y so SVG-coord Y-down becomes PDF Y-up. The flip
+                // height is the viewBox height (we're now in viewBox space).
+                let _ = writeln!(stream, "1 0 0 -1 0 {:.2} cm", *viewbox_height);
 
-                // Clip to canvas bounds (Canvas always clips, SVG does not)
+                // Shift origin so the viewBox's (min_x, min_y) lands at (0, 0).
+                if *viewbox_min_x != 0.0 || *viewbox_min_y != 0.0 {
+                    let _ = writeln!(
+                        stream,
+                        "1 0 0 1 {:.2} {:.2} cm",
+                        -*viewbox_min_x, -*viewbox_min_y
+                    );
+                }
+
+                // Clip to viewBox bounds (Canvas always clips, SVG does not).
                 if *clip {
-                    let _ = writeln!(stream, "0 0 {:.2} {:.2} re W n", svg_w, svg_h);
+                    let _ = writeln!(
+                        stream,
+                        "{:.2} {:.2} {:.2} {:.2} re W n",
+                        *viewbox_min_x, *viewbox_min_y, *viewbox_width, *viewbox_height
+                    );
                 }
 
                 Self::write_svg_commands(stream, commands, &builder.ext_gstate_map);

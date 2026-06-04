@@ -552,8 +552,17 @@ pub enum DrawCommand {
     /// Draw SVG vector graphics.
     Svg {
         commands: Vec<crate::svg::SvgCommand>,
+        /// Display width (the rendered box width in points).
         width: f64,
+        /// Display height (the rendered box height in points).
         height: f64,
+        /// SVG viewBox origin / dimensions. When the user omits viewBox these
+        /// default to `(0, 0, width, height)` so the scale comes out to 1 and
+        /// the content stream behaves as if no transform was applied.
+        viewbox_min_x: f64,
+        viewbox_min_y: f64,
+        viewbox_width: f64,
+        viewbox_height: f64,
         /// When true, clip content to [0, 0, width, height] (used by Canvas).
         clip: bool,
     },
@@ -1925,6 +1934,58 @@ impl LayoutEngine {
                                         }
                                         cumulative_shift += extra;
                                     }
+                                }
+                                cursor.y += cumulative_shift;
+                            }
+                        }
+                    }
+                }
+
+                // Auto vertical margin pass: distribute any remaining slack to
+                // children with marginTop/marginBottom: Auto. Per CSS flex spec,
+                // this runs AFTER flex-grow and BEFORE justify-content — auto
+                // margins consume free space first, leaving nothing for
+                // justify-content. Mirrors the cross-axis handling in
+                // layout_flex_row (~2256-2267) but applied to the main axis here.
+                if let Some(inner_h) = container_inner_h {
+                    if pages.len() == initial_pages {
+                        let auto_styles: Vec<ResolvedStyle> = items
+                            .iter()
+                            .map(|child| child.style.resolve(parent_style, available_width))
+                            .collect();
+                        let total_autos: usize = auto_styles
+                            .iter()
+                            .map(|s| {
+                                s.margin.top.is_auto() as usize + s.margin.bottom.is_auto() as usize
+                            })
+                            .sum();
+                        if total_autos > 0 {
+                            let children_total = cursor.y - start_y;
+                            let total_slack = (inner_h - children_total).max(0.0);
+                            if total_slack > 0.0 {
+                                let per_auto = total_slack / total_autos as f64;
+                                let mut cumulative_shift = 0.0_f64;
+                                for (i, cs) in auto_styles.iter().enumerate() {
+                                    let (start, end) = child_ranges[i];
+                                    let mt_auto = cs.margin.top.is_auto();
+                                    let mb_auto = cs.margin.bottom.is_auto();
+                                    // mt-auto pushes THIS child down by per_auto;
+                                    // any cumulative_shift from earlier children
+                                    // (including their mb-auto carryover) applies too.
+                                    let this_child_shift =
+                                        cumulative_shift + if mt_auto { per_auto } else { 0.0 };
+                                    if this_child_shift > 0.001 {
+                                        for j in start..end {
+                                            offset_element_y(
+                                                &mut cursor.elements[j],
+                                                this_child_shift,
+                                            );
+                                        }
+                                    }
+                                    // mb-auto adds slack between this child and
+                                    // any subsequent ones (carried forward).
+                                    cumulative_shift =
+                                        this_child_shift + if mb_auto { per_auto } else { 0.0 };
                                 }
                                 cursor.y += cumulative_shift;
                             }
@@ -3936,6 +3997,10 @@ impl LayoutEngine {
                 commands,
                 width: svg_width,
                 height: svg_height,
+                viewbox_min_x: vb.min_x,
+                viewbox_min_y: vb.min_y,
+                viewbox_width: vb.width,
+                viewbox_height: vb.height,
                 clip: false,
             },
             children: vec![],
@@ -4111,6 +4176,12 @@ impl LayoutEngine {
                 commands: svg_commands,
                 width: canvas_width,
                 height: canvas_height,
+                // Canvas constructs commands in display coordinates, so the
+                // viewBox matches the display box 1:1 — scale comes out to 1.
+                viewbox_min_x: 0.0,
+                viewbox_min_y: 0.0,
+                viewbox_width: canvas_width,
+                viewbox_height: canvas_height,
                 clip: true,
             },
             children: vec![],
