@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.4] - 2026-06-05
+
+_Version bump only._
+
 ## [0.10.3] - 2026-05-28
 
 _Version bump only._

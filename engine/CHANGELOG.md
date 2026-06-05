@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.10.4] - 2026-06-05
+
+### Fixed
+- `<Table>` with `<Row header>` no longer inflates page count 3–5× when starting low enough on a page that the header doesn't fit before the page break. The header loop had no pre-fit check (unlike the body loop), so when forced to lay out where it didn't fit, each header cell's inner View/Text triggered a widow/orphan page-break that `layout_table_row` then captured as a "trial" snapshot page. Each successive cell's snapshot accumulated one more cell of the in-progress row — the reporter's "doubled header sliding one column right per page" symptom. `layout_table` now page-breaks before laying out headers if they don't fit; header rows additionally drop any cell-overflow trial pages instead of committing them
+- A `<View>` wrapping a `<Table>` no longer inflates to roughly the page height. `measure_node_height` had no arms for `NodeKind::Table` or `TableRow`, so they fell through to the generic column-summing branch — a 3-column row of 16pt cells measured to 48pt instead of 16pt, and the wrapping View inherited the inflated value. Now delegates to the same `resolve_column_widths` + `measure_table_row_height` helpers `layout_table` already uses, so measurement matches what gets rendered
+- `<Svg width={W} height={H} viewBox="x y w h">` now scales content to fit the display box. `parse_svg`'s viewBox parameters were unused and the PDF emission's `cm` transform scaled by `element.width / display_width` (always 1.0), so paths rendered at raw viewBox coordinates and overflowed. PDF emission now implements the SVG viewport algorithm with `xMidYMid meet` as the default `preserveAspectRatio` (uniform `min(sx, sy)` scale + centering)
+- `marginTop` / `marginBottom: 'auto'` on a child in a column-flex parent with fixed height now pushes the child to the bottom / centers it / etc., matching CSS flex spec. The flex-row cross-axis already had auto-margin slack handling; the column branch of `layout_children` did not. Mirrors that block, ordered before `justify-content` so auto-margins consume free space first
+
+### Internal
+- New `measure_node_height` arms for `NodeKind::Table` and `TableRow`, plus an auto-vertical-margin pass in `layout_children`'s column branch. SVG viewBox dimensions are plumbed through `DrawCommand::Svg`
+
 ## [0.10.3] - 2026-05-28
 
 ### Fixed

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.4] - 2026-06-05
+
+_Picks up engine 0.10.4 — four layout fixes: repeating-header page-count inflation, View-around-Table auto-height inflation, SVG viewBox scaling, and column-axis `marginTop: 'auto'`._
+
 ## [0.10.3] - 2026-05-28
 
 _Picks up engine 0.10.3 — fixes `<Text style={{ width }}>` rendering at the parent's full width inside a flex row._

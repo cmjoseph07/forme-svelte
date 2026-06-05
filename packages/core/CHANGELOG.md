@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.10.4] - 2026-06-05
+
+### Fixed
+- WASM rebuilt against engine 0.10.4, picking up four layout fixes:
+  - `<Table>` with `<Row header>` no longer inflates page count 3–5× when the header doesn't fit before a page break (silent — produced "doubled and sliding column" header artifacts)
+  - A `<View>` wrapping a `<Table>` no longer auto-grows to roughly the page height — Table/TableRow now have explicit measurement arms that match what `layout_table` actually renders
+  - `<Svg viewBox="…">` content now scales to the display box via the SVG viewport algorithm (`xMidYMid meet` default) instead of rendering at raw viewBox coordinates and overflowing
+  - `marginTop: 'auto'` on a child in a column-flex parent with fixed height now pushes the child to the bottom, matching the cross-axis behavior already shipped for flex rows
+
 ## [0.10.3] - 2026-05-28
 
 ### Fixed
