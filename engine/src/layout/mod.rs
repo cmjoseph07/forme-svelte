@@ -4519,6 +4519,44 @@ impl LayoutEngine {
             | NodeKind::Dropdown { height, .. }
             | NodeKind::RadioButton { height, .. } => *height + style.margin.vertical(),
             NodeKind::Watermark { .. } => 0.0, // Watermarks take zero layout height
+            NodeKind::Table { columns } => {
+                // Use the same column-resolution + per-row max-of-cells helpers
+                // that `layout_table` uses, so measurement matches what the
+                // engine actually renders. Without this arm, Table fell into the
+                // generic `_` branch which column-summed each row's children,
+                // and (since TableRow also lacked an arm) over-counted row
+                // heights by a factor of (cell count).
+                if let SizeConstraint::Fixed(h) = style.height {
+                    return h;
+                }
+                let outer_width = match style.width {
+                    SizeConstraint::Fixed(w) => w,
+                    SizeConstraint::Auto => available_width - style.margin.horizontal(),
+                };
+                let inner_width =
+                    outer_width - style.padding.horizontal() - style.border_width.horizontal();
+                let col_widths = self.resolve_column_widths(columns, inner_width, &node.children);
+                let row_gap = style.row_gap;
+                let mut total = 0.0;
+                for (i, row) in node.children.iter().enumerate() {
+                    if i > 0 {
+                        total += row_gap;
+                    }
+                    total += self.measure_table_row_height(row, &col_widths, style, font_context);
+                }
+                total + style.padding.vertical() + style.border_width.vertical()
+            }
+            NodeKind::TableRow { .. } => {
+                // Standalone-row fallback (rare): a TableRow measured outside
+                // a Table context has no ColumnDef source, so split
+                // available_width evenly across cells — matches what
+                // resolve_column_widths does when its defs vec is empty.
+                let n = node.children.len().max(1);
+                let usable = (available_width - style.margin.horizontal()).max(0.0);
+                let col_w = usable / n as f64;
+                let col_widths = vec![col_w; n];
+                self.measure_table_row_height(node, &col_widths, style, font_context)
+            }
             _ => {
                 // If a fixed height is specified, use it directly
                 if let SizeConstraint::Fixed(h) = style.height {

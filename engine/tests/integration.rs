@@ -9642,3 +9642,204 @@ fn test_canvas_renders_at_display_coordinates() {
         &stream[..stream.len().min(600)],
     );
 }
+
+#[test]
+fn test_view_auto_height_wraps_table_tightly() {
+    // Regression (issue 3): a View with auto height wrapping a Table grew
+    // far beyond the table's rendered content. measure_node_height had no
+    // arm for NodeKind::TableRow, so it fell into the generic `_` branch
+    // which SUMS cell heights (column-flex semantics). For a 3-column row
+    // of 16pt cells, that returned 48pt instead of 16pt — the Table then
+    // measured to 5 * 48 = 240pt instead of 5 * 16 = 80pt, and the
+    // wrapping View inherited the wrong height.
+    //
+    // Mirrors the reporter's TSX shape (3 auto-width columns, 1 header row
+    // + 4 body rows, each cell carrying an inner View + Text).
+    fn cell(text: &str) -> Node {
+        let inner = Node {
+            kind: NodeKind::View,
+            style: Style {
+                font_size: Some(10.0),
+                ..Default::default()
+            },
+            children: vec![Node {
+                kind: NodeKind::Text {
+                    content: text.to_string(),
+                    href: None,
+                    runs: vec![],
+                },
+                style: Style::default(),
+                children: vec![],
+                id: None,
+                source_location: None,
+                bookmark: None,
+                href: None,
+                alt: None,
+            }],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        };
+        Node {
+            kind: NodeKind::TableCell {
+                col_span: 1,
+                row_span: 1,
+            },
+            style: Style {
+                padding: Some(Edges::symmetric(1.0, 2.0)),
+                ..Default::default()
+            },
+            children: vec![inner],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }
+    }
+
+    let header_row = make_table_row(
+        true,
+        vec![cell("Description"), cell("Quantity"), cell("Unit Price")],
+    );
+    let body_data = [
+        ("Website Redesign", "1", "4500"),
+        ("Brand Identity Package", "1", "2200"),
+        ("SEO Audit & Strategy", "1", "1800"),
+        ("Monthly Hosting", "12", "29"),
+    ];
+    let mut rows: Vec<Node> = vec![header_row];
+    for (d, q, u) in body_data {
+        rows.push(make_table_row(false, vec![cell(d), cell(q), cell(u)]));
+    }
+    let table = Node {
+        kind: NodeKind::Table {
+            columns: vec![
+                ColumnDef {
+                    width: ColumnWidth::Auto,
+                },
+                ColumnDef {
+                    width: ColumnWidth::Auto,
+                },
+                ColumnDef {
+                    width: ColumnWidth::Auto,
+                },
+            ],
+        },
+        style: Style::default(),
+        children: rows,
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    let view = make_styled_view(
+        Style {
+            background_color: Some(Color {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 1.0,
+            }),
+            ..Default::default()
+        },
+        vec![table],
+    );
+
+    let doc = default_doc(vec![Node::page(
+        PageConfig {
+            size: PageSize::Letter,
+            margin: Edges::uniform(48.0),
+            ..Default::default()
+        },
+        Style::default(),
+        vec![view],
+    )]);
+
+    let pages = layout_doc(&doc);
+    assert_eq!(pages.len(), 1);
+
+    // The View wraps 5 TableRows of 16pt each (font_size 10 × line_height 1.4
+    // = 14pt text, + 2pt cell vertical padding). Total content = 80pt.
+    let view_el = &pages[0].elements[0];
+    assert_eq!(view_el.node_type.as_deref(), Some("View"));
+    assert_eq!(view_el.children.len(), 5, "expected 5 TableRow children");
+    let row_h_sum: f64 = view_el.children.iter().map(|r| r.height).sum();
+    assert!(
+        (view_el.height - row_h_sum).abs() < 0.5,
+        "View height ({:.2}) should equal sum of row heights ({:.2})",
+        view_el.height,
+        row_h_sum,
+    );
+    // Concretely: 80pt (5 × 16), well under the Letter content-band 696pt
+    // that the bug used to fill.
+    assert!(
+        view_el.height < 100.0,
+        "View height should be ≈80pt, not page-sized — got {:.2}",
+        view_el.height,
+    );
+}
+
+#[test]
+fn test_table_row_measures_max_of_cells_not_sum() {
+    // Focused unit-style coverage of the same fix: a standalone TableRow
+    // with three Cells of differing heights measures to the MAX, not the
+    // sum. Before the fix this returned the column-flex sum of cells.
+    fn cell_with_content_height(h: f64) -> Node {
+        // Cell measured height comes from its content (matching
+        // measure_table_row_height), not from style.height on the cell
+        // itself — so put an inner View of known height inside each cell.
+        let content = make_styled_view(
+            Style {
+                height: Some(Dimension::Pt(h)),
+                ..Default::default()
+            },
+            vec![],
+        );
+        Node {
+            kind: NodeKind::TableCell {
+                col_span: 1,
+                row_span: 1,
+            },
+            style: Style::default(),
+            children: vec![content],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }
+    }
+    let row = make_table_row(
+        false,
+        vec![
+            cell_with_content_height(20.0),
+            cell_with_content_height(35.0),
+            cell_with_content_height(12.0),
+        ],
+    );
+    // Wrap in a View so we can read the row's measured height via the
+    // View's auto-height (which now correctly reflects the row's MAX, not
+    // the sum-of-cells).
+    let view = make_styled_view(Style::default(), vec![row]);
+    let doc = default_doc(vec![Node::page(
+        PageConfig {
+            size: PageSize::Letter,
+            margin: Edges::uniform(40.0),
+            ..Default::default()
+        },
+        Style::default(),
+        vec![view],
+    )]);
+    let pages = layout_doc(&doc);
+    let view_el = &pages[0].elements[0];
+    // MAX(20, 35, 12) = 35. Sum (the old wrong value) would be 67.
+    assert!(
+        (view_el.height - 35.0).abs() < 0.5,
+        "View around a TableRow with cell heights [20, 35, 12] should be 35 (max), got {:.2}",
+        view_el.height,
+    );
+}
