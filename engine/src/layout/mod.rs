@@ -2474,6 +2474,29 @@ impl LayoutEngine {
         cursor.y += margin.top + padding.top + border.top;
 
         let cell_x_start = table_x + padding.left + border.left;
+
+        // Initial-header pre-fit check (issue 4). The body-row loop below
+        // already checks remaining_height before each row; the header loop did
+        // not, so when the table started low enough on the page that the
+        // header didn't fit, each header cell's inner content triggered a
+        // widow/orphan page-break via layout_text. layout_table_row's
+        // cell-overflow path then captured those breaks as `cell_pages` and
+        // committed them as spurious "trial" pages — one per cell that broke,
+        // each snapshotting one more cell of the in-progress row (the
+        // "doubled and sliding column" symptom). Page-breaking before laying
+        // out headers eliminates the trigger.
+        if !header_rows.is_empty() {
+            let total_header_h: f64 = header_rows
+                .iter()
+                .map(|r| self.measure_table_row_height(r, &col_widths, style, font_context))
+                .sum();
+            if total_header_h > cursor.remaining_height() {
+                pages.push(cursor.finalize());
+                *cursor = cursor.new_page();
+                cursor.y += padding.top + border.top;
+            }
+        }
+
         for header_row in &header_rows {
             self.layout_table_row(
                 header_row,
@@ -2586,7 +2609,14 @@ impl LayoutEngine {
                 if let Some(last_page) = cell_pages.last_mut() {
                     last_page.elements.extend(post_break_elements);
                 }
-                all_overflow_pages.extend(cell_pages);
+                // Belt-and-suspenders for issue 4: header rows are designed to
+                // be re-emitted on each continuation page and must never
+                // legitimately produce mid-row page breaks. If they somehow do
+                // (e.g. a future regression that puts headers in a tight spot
+                // again), drop the trial pages rather than committing them.
+                if !is_header {
+                    all_overflow_pages.extend(cell_pages);
+                }
                 *cursor = cursor_before_cell;
             }
 

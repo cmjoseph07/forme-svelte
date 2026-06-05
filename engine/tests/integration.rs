@@ -9843,3 +9843,179 @@ fn test_table_row_measures_max_of_cells_not_sum() {
         view_el.height,
     );
 }
+
+// Build the reporter's repro shape for issue 4. Each cell is paddingVertical:8
+// wrapping an inner View with paddingHorizontal:6 wrapping a Text. 5 columns
+// with widths Fixed(100), Fixed(90), Fixed(50), Auto, Fixed(36). A spacer View
+// of height 700 precedes the table on a Letter page with 36pt margin.
+fn build_issue4_doc(use_header_flag: bool, num_body_rows: usize) -> Document {
+    fn cell(text: &str) -> Node {
+        let inner = make_styled_view(
+            Style {
+                padding: Some(Edges::symmetric(0.0, 6.0)),
+                ..Default::default()
+            },
+            vec![Node {
+                kind: NodeKind::Text {
+                    content: text.to_string(),
+                    href: None,
+                    runs: vec![],
+                },
+                style: Style::default(),
+                children: vec![],
+                id: None,
+                source_location: None,
+                bookmark: None,
+                href: None,
+                alt: None,
+            }],
+        );
+        Node {
+            kind: NodeKind::TableCell {
+                col_span: 1,
+                row_span: 1,
+            },
+            style: Style {
+                padding: Some(Edges::symmetric(8.0, 0.0)),
+                ..Default::default()
+            },
+            children: vec![inner],
+            id: None,
+            source_location: None,
+            bookmark: None,
+            href: None,
+            alt: None,
+        }
+    }
+    let labels = ["Manufacturer", "Part #", "Qty", "Desc", "Unit"];
+    let header_row = make_table_row(use_header_flag, labels.iter().map(|l| cell(l)).collect());
+    let body_rows: Vec<Node> = (0..num_body_rows)
+        .map(|r| {
+            make_table_row(
+                false,
+                (0..5)
+                    .map(|i| {
+                        if i == 3 {
+                            cell(&format!("Line item {} description", r + 1))
+                        } else {
+                            cell(&format!("c{}-{}", i, r))
+                        }
+                    })
+                    .collect(),
+            )
+        })
+        .collect();
+    let mut rows = vec![header_row];
+    rows.extend(body_rows);
+    let table = Node {
+        kind: NodeKind::Table {
+            columns: vec![
+                ColumnDef {
+                    width: ColumnWidth::Fixed(100.0),
+                },
+                ColumnDef {
+                    width: ColumnWidth::Fixed(90.0),
+                },
+                ColumnDef {
+                    width: ColumnWidth::Fixed(50.0),
+                },
+                ColumnDef {
+                    width: ColumnWidth::Auto,
+                },
+                ColumnDef {
+                    width: ColumnWidth::Fixed(36.0),
+                },
+            ],
+        },
+        style: Style::default(),
+        children: rows,
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+    // Spacer pushes the table down so its header doesn't fit before the page
+    // break — the trigger condition the reporter narrowed.
+    let spacer = make_styled_view(
+        Style {
+            height: Some(Dimension::Pt(700.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    default_doc(vec![Node::page(
+        PageConfig {
+            size: PageSize::Letter,
+            margin: Edges::uniform(36.0),
+            ..Default::default()
+        },
+        Style::default(),
+        vec![spacer, table],
+    )])
+}
+
+#[test]
+fn test_table_repeating_header_does_not_inflate_pages() {
+    // Regression (issue 4): a Table with <Row header> starting low on a page
+    // (so the header doesn't fit before the page break) inflated the output to
+    // 3–5× the right page count, with header cells visibly "doubling and
+    // sliding one column right" on each successive spurious page.
+    //
+    // The no-header variant is the correctness oracle — same content, same
+    // position, but the body-row loop's existing fit check catches the
+    // page-break cleanly. Page counts should be EQUAL between the two
+    // variants. Before the fix: header → 8, plain → 3.
+    let with_header = layout_doc(&build_issue4_doc(true, 24));
+    let plain = layout_doc(&build_issue4_doc(false, 24));
+    assert_eq!(
+        with_header.len(),
+        plain.len(),
+        "<Row header> produced {} pages but the same content with <Row> produced {} — \
+         the header flag should never inflate page count",
+        with_header.len(),
+        plain.len(),
+    );
+}
+
+#[test]
+fn test_table_repeating_header_no_duplicate_cells_per_page() {
+    // Same repro as above. Page-count parity is one symptom; the more direct
+    // signature of the bug was the "doubled header column sliding one column
+    // right per page" — spurious snapshot pages that captured a partial row
+    // PLUS the next cell's post-break content stuck at top-of-page
+    // coordinates. Asserting no two TableCells on the same page share both
+    // x and y catches that geometry corruption directly.
+    let pages = layout_doc(&build_issue4_doc(true, 24));
+
+    fn collect_cells(el: &forme::layout::LayoutElement, out: &mut Vec<(f64, f64)>) {
+        if el.node_type.as_deref() == Some("TableCell") {
+            out.push((el.x, el.y));
+        }
+        for c in &el.children {
+            collect_cells(c, out);
+        }
+    }
+
+    for (idx, page) in pages.iter().enumerate() {
+        let mut cell_positions: Vec<(f64, f64)> = Vec::new();
+        for el in &page.elements {
+            collect_cells(el, &mut cell_positions);
+        }
+        let n = cell_positions.len();
+        for i in 0..n {
+            for j in (i + 1)..n {
+                let (xi, yi) = cell_positions[i];
+                let (xj, yj) = cell_positions[j];
+                assert!(
+                    (xi - xj).abs() > 0.5 || (yi - yj).abs() > 0.5,
+                    "page {}: two TableCells at the same position ({:.2}, {:.2}) — \
+                     symptom of the issue 4 doubled/sliding column bug",
+                    idx,
+                    xi,
+                    yi,
+                );
+            }
+        }
+    }
+}
