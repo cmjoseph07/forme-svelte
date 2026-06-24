@@ -10019,3 +10019,150 @@ fn test_table_repeating_header_no_duplicate_cells_per_page() {
         }
     }
 }
+
+// ── CSS transforms (#2 from the author-experience batch) ────────────
+
+// Build a small styled View with the requested transform, render to PDF, and
+// return the decompressed content stream so the test can assert the cm
+// matrix made it in. The view sits on a Letter page with default margins.
+fn render_transformed_view(style: Style) -> String {
+    let view = make_styled_view(style, vec![]);
+    let doc = default_doc(vec![view]);
+    let pdf = render_to_pdf(&doc);
+    decompress_pdf_streams(&pdf)
+}
+
+#[test]
+fn test_transform_rotate_emits_cm_matrix() {
+    // rotate(45deg): we negate for PDF's flipped y-axis, so cm becomes
+    // cos(-45) sin(-45) -sin(-45) cos(-45) 0 0 = 0.707107 -0.707107 0.707107 0.707107 0 0.
+    let stream = render_transformed_view(Style {
+        width: Some(Dimension::Pt(100.0)),
+        height: Some(Dimension::Pt(50.0)),
+        background_color: Some(Color {
+            r: 0.0,
+            g: 0.5,
+            b: 0.9,
+            a: 1.0,
+        }),
+        transform: Some(vec![TransformOp::Rotate { deg: 45.0 }]),
+        ..Default::default()
+    });
+    assert!(
+        stream.contains("0.707107 -0.707107 0.707107 0.707107 0 0 cm"),
+        "expected rotate(45) cm matrix in stream; got:\n{}",
+        &stream[..stream.len().min(2000)]
+    );
+}
+
+#[test]
+fn test_transform_scale_emits_cm_matrix() {
+    let stream = render_transformed_view(Style {
+        width: Some(Dimension::Pt(100.0)),
+        height: Some(Dimension::Pt(50.0)),
+        background_color: Some(Color {
+            r: 0.0,
+            g: 0.5,
+            b: 0.9,
+            a: 1.0,
+        }),
+        transform: Some(vec![TransformOp::Scale { x: 2.0, y: 0.5 }]),
+        ..Default::default()
+    });
+    assert!(
+        stream.contains("2.000000 0 0 0.500000 0 0 cm"),
+        "expected scale(2, 0.5) cm matrix in stream; got:\n{}",
+        &stream[..stream.len().min(2000)]
+    );
+}
+
+#[test]
+fn test_transform_compose_rotate_and_scale() {
+    let stream = render_transformed_view(Style {
+        width: Some(Dimension::Pt(100.0)),
+        height: Some(Dimension::Pt(50.0)),
+        background_color: Some(Color {
+            r: 0.0,
+            g: 0.5,
+            b: 0.9,
+            a: 1.0,
+        }),
+        transform: Some(vec![
+            TransformOp::Rotate { deg: 45.0 },
+            TransformOp::Scale { x: 1.2, y: 1.2 },
+        ]),
+        ..Default::default()
+    });
+    // Both cm lines should appear inside a single q/Q block.
+    assert!(
+        stream.contains("0.707107 -0.707107 0.707107 0.707107 0 0 cm"),
+        "expected rotate cm in compose"
+    );
+    assert!(
+        stream.contains("1.200000 0 0 1.200000 0 0 cm"),
+        "expected scale cm in compose"
+    );
+}
+
+#[test]
+fn test_transform_does_not_affect_layout_flow() {
+    // Two stacked Views; the first is transformed, the second is not.
+    // The transform is paint-only — the second View should sit immediately
+    // below where the first View's untransformed box would have been.
+    let first = make_styled_view(
+        Style {
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(40.0)),
+            transform: Some(vec![TransformOp::Rotate { deg: 45.0 }]),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let second = make_styled_view(
+        Style {
+            width: Some(Dimension::Pt(100.0)),
+            height: Some(Dimension::Pt(40.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+    let doc = default_doc(vec![first, second]);
+    let pages = layout_doc(&doc);
+    assert_eq!(pages.len(), 1);
+    let elements = &pages[0].elements;
+    assert!(elements.len() >= 2);
+    // Second element's y should be first.y + first.height (no transform-induced shift).
+    let first_y = elements[0].y;
+    let first_h = elements[0].height;
+    let second_y = elements[1].y;
+    assert!(
+        (second_y - (first_y + first_h)).abs() < 0.5,
+        "transformed sibling shifted layout: second.y={:.2}, expected {:.2}",
+        second_y,
+        first_y + first_h,
+    );
+}
+
+#[test]
+fn test_no_transform_no_cm_wrapper() {
+    // Sanity: a plain View without transform shouldn't generate any of our
+    // shift-origin cm lines. (PDFs may contain other `cm` operations for
+    // text/image positioning, but the `1 0 0 1 ... cm` shift-pair we emit
+    // around transforms shouldn't show up.) We assert the rotate matrix
+    // pattern doesn't appear.
+    let stream = render_transformed_view(Style {
+        width: Some(Dimension::Pt(100.0)),
+        height: Some(Dimension::Pt(50.0)),
+        background_color: Some(Color {
+            r: 0.0,
+            g: 0.5,
+            b: 0.9,
+            a: 1.0,
+        }),
+        ..Default::default()
+    });
+    assert!(
+        !stream.contains("0.707107 -0.707107"),
+        "rotate cm matrix appeared in a no-transform render"
+    );
+}

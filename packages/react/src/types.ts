@@ -144,6 +144,25 @@ export interface Style {
    */
   background?: string;
   opacity?: number;
+  /**
+   * Paint-only transform applied around the element's origin (default:
+   * center). Layout flow is NOT affected — matches CSS `transform`.
+   *
+   * Accepts a CSS-like string with one or more space-separated ops:
+   *   `"rotate(45deg)"`
+   *   `"rotate(-15deg) scale(1.2)"`
+   *   `"translate(10, -4) rotate(30deg)"`
+   *
+   * Supported ops: `rotate(<deg>deg)`, `scale(<x>[, <y>])`,
+   * `translate(<x>[, <y>])`. Angles are degrees, lengths are points.
+   */
+  transform?: string;
+  /**
+   * Origin of the transform as fractions of the element box.
+   * `"50% 50%"` (default) = center, `"0% 0%"` = top-left, `"100% 0%"`
+   * = top-right, etc. Also accepts a tuple `[x, y]` where each is 0–1.
+   */
+  transformOrigin?: string | [number, number];
   borderWidth?: number | Edges;
   borderTopWidth?: number;
   borderRightWidth?: number;
@@ -703,6 +722,13 @@ export interface FormeBoxShadow {
   color: { r: number; g: number; b: number; a: number };
 }
 
+/** A single transform operation in the engine wire format. The discriminator
+ *  is `type` matching the engine's serde tag. */
+export type FormeTransformOp =
+  | { type: 'rotate'; deg: number }
+  | { type: 'scale'; x: number; y: number }
+  | { type: 'translate'; x: number; y: number };
+
 export interface FormeGradientStop {
   position: number;
   color: { r: number; g: number; b: number; a: number };
@@ -845,6 +871,8 @@ export interface FormeStyle {
   letterSpacing?: number;
   wordSpacing?: number;
   boxShadow?: FormeBoxShadow;
+  transform?: FormeTransformOp[];
+  transformOrigin?: [number, number];
   textDecoration?: string;
   textTransform?: string;
   hyphens?: string;

@@ -173,6 +173,30 @@ pub struct Style {
     /// Minimum number of lines to keep at the top of a new page after
     /// breaking (orphan control). Default: 2.
     pub min_orphan_lines: Option<u32>,
+
+    // ── Transform ──────────────────────────────────────────────
+    /// Paint-only transform applied around the element's origin. Layout
+    /// flow is unaffected (matches CSS `transform` semantics) — the
+    /// element occupies the same axis-aligned box as if untransformed.
+    pub transform: Option<Vec<TransformOp>>,
+
+    /// Origin of the transform as fractions of the element box (0.0–1.0).
+    /// Defaults to (0.5, 0.5) — the element's center, matching CSS.
+    pub transform_origin: Option<(f64, f64)>,
+}
+
+/// A single transform operation. Applied in order — the first op listed
+/// is applied first (innermost), the last is applied last (outermost),
+/// matching CSS `transform` semantics.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum TransformOp {
+    /// Rotate by the given angle in degrees, positive = clockwise (CSS).
+    Rotate { deg: f64 },
+    /// Uniform or non-uniform scale.
+    Scale { x: f64, y: f64 },
+    /// Translate in points.
+    Translate { x: f64, y: f64 },
 }
 
 /// A dimension that can be points, percentage, or auto.
@@ -617,6 +641,12 @@ pub struct ResolvedStyle {
     pub break_before: bool,
     pub min_widow_lines: u32,
     pub min_orphan_lines: u32,
+
+    // Transform (paint-only — layout unaffected)
+    pub transform: Vec<TransformOp>,
+    /// Transform origin as fractions of the element box (0.0–1.0).
+    /// `(0.5, 0.5)` is the element center, matching CSS default.
+    pub transform_origin: (f64, f64),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -778,6 +808,10 @@ impl Style {
             break_before: self.break_before.unwrap_or(false),
             min_widow_lines: self.min_widow_lines.unwrap_or(2),
             min_orphan_lines: self.min_orphan_lines.unwrap_or(2),
+
+            // Transform doesn't inherit — explicit per-element only.
+            transform: self.transform.clone().unwrap_or_default(),
+            transform_origin: self.transform_origin.unwrap_or((0.5, 0.5)),
         }
     }
 }

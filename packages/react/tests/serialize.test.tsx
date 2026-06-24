@@ -255,6 +255,75 @@ describe('Style mapping', () => {
     expect(style.opacity).toBe(0.5);
     expect(style.backgroundColor).toEqual({ r: 1, g: 1, b: 1, a: 1 });
   });
+
+  // ─── transform parsing ─────────────────────────────────────────
+
+  it('transform parses rotate(deg)', () => {
+    const style = mapStyle({ transform: 'rotate(45deg)' });
+    expect(style.transform).toEqual([{ type: 'rotate', deg: 45 }]);
+  });
+
+  it('transform parses negative rotate', () => {
+    const style = mapStyle({ transform: 'rotate(-15deg)' });
+    expect(style.transform).toEqual([{ type: 'rotate', deg: -15 }]);
+  });
+
+  it('transform parses rad and turn angle units', () => {
+    const rad = mapStyle({ transform: 'rotate(3.14159rad)' });
+    expect((rad.transform as { deg: number }[])[0].deg).toBeCloseTo(180, 1);
+    const turn = mapStyle({ transform: 'rotate(0.5turn)' });
+    expect(turn.transform).toEqual([{ type: 'rotate', deg: 180 }]);
+  });
+
+  it('transform parses uniform scale', () => {
+    const style = mapStyle({ transform: 'scale(1.2)' });
+    expect(style.transform).toEqual([{ type: 'scale', x: 1.2, y: 1.2 }]);
+  });
+
+  it('transform parses non-uniform scale', () => {
+    const style = mapStyle({ transform: 'scale(2, 0.5)' });
+    expect(style.transform).toEqual([{ type: 'scale', x: 2, y: 0.5 }]);
+  });
+
+  it('transform parses translate', () => {
+    const style = mapStyle({ transform: 'translate(10, -4)' });
+    expect(style.transform).toEqual([{ type: 'translate', x: 10, y: -4 }]);
+  });
+
+  it('transform parses translate with px/pt suffixes', () => {
+    const style = mapStyle({ transform: 'translate(10px, -4pt)' });
+    expect(style.transform).toEqual([{ type: 'translate', x: 10, y: -4 }]);
+  });
+
+  it('transform composes multiple ops in declaration order', () => {
+    const style = mapStyle({ transform: 'rotate(45deg) scale(1.2) translate(5, 10)' });
+    expect(style.transform).toEqual([
+      { type: 'rotate', deg: 45 },
+      { type: 'scale', x: 1.2, y: 1.2 },
+      { type: 'translate', x: 5, y: 10 },
+    ]);
+  });
+
+  it('transform rejects unknown ops by dropping the whole transform', () => {
+    const style = mapStyle({ transform: 'rotate(45deg) skew(10deg)' });
+    expect(style.transform).toBeUndefined();
+  });
+
+  it('transformOrigin parses percentage string', () => {
+    const style = mapStyle({ transformOrigin: '50% 50%' });
+    expect(style.transformOrigin).toEqual([0.5, 0.5]);
+  });
+
+  it('transformOrigin parses CSS keywords', () => {
+    expect(mapStyle({ transformOrigin: 'left top' }).transformOrigin).toEqual([0, 0]);
+    expect(mapStyle({ transformOrigin: 'right bottom' }).transformOrigin).toEqual([1, 1]);
+    expect(mapStyle({ transformOrigin: 'center' }).transformOrigin).toEqual([0.5, 0.5]);
+  });
+
+  it('transformOrigin accepts tuple form', () => {
+    const style = mapStyle({ transformOrigin: [0.25, 0.75] });
+    expect(style.transformOrigin).toEqual([0.25, 0.75]);
+  });
 });
 
 // ─── Color parsing ──────────────────────────────────────────────────

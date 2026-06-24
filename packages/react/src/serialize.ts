@@ -30,6 +30,7 @@ import type {
   FormeDimension,
   FormeColor,
   FormeBoxShadow,
+  FormeTransformOp,
   FormeBackground,
   FormeGradientStop,
   FormeEdgeValues,
@@ -1255,6 +1256,14 @@ export function mapStyle(style?: Style): FormeStyle {
     const parsed = parseBoxShadow(style.boxShadow);
     if (parsed) result.boxShadow = parsed;
   }
+  if (style.transform !== undefined) {
+    const parsed = parseTransform(style.transform);
+    if (parsed && parsed.length > 0) result.transform = parsed;
+  }
+  if (style.transformOrigin !== undefined) {
+    const parsed = parseTransformOrigin(style.transformOrigin);
+    if (parsed) result.transformOrigin = parsed;
+  }
   if (style.textDecoration !== undefined) result.textDecoration = TEXT_DECORATION_MAP[style.textDecoration];
   if (style.textTransform !== undefined) result.textTransform = TEXT_TRANSFORM_MAP[style.textTransform];
   if (style.hyphens !== undefined) result.hyphens = HYPHENS_MAP[style.hyphens];
@@ -1497,6 +1506,157 @@ export function parseColor(hex: string): FormeColor {
 
   // Fallback: black
   return { r: 0, g: 0, b: 0, a: 1 };
+}
+
+/**
+ * Parse a CSS-like `transform` string into the engine's TransformOp[].
+ *
+ * Accepted syntax (space- or comma-separated ops, in any order):
+ *   `rotate(45deg)`, `rotate(-15deg)`, `rotate(0.5turn)`, `rotate(1.2rad)`
+ *   `scale(1.5)`, `scale(2, 0.5)`
+ *   `translate(10, -4)`, `translate(10px, -4pt)`
+ *
+ * Lengths are interpreted as points (px/pt suffix accepted and ignored;
+ * Forme is a print-first engine — 1 point = 1 point). Returns `null` on
+ * unparseable input (the property is silently dropped, matching the
+ * boxShadow precedent).
+ */
+function parseTransform(val: string): FormeTransformOp[] | null {
+  const ops: FormeTransformOp[] = [];
+  // Match `name(args)` pairs. Names: ASCII letters. Args: anything between
+  // parentheses (no nesting in this grammar).
+  const re = /([a-zA-Z]+)\s*\(([^)]*)\)/g;
+  let m: RegExpExecArray | null;
+  let matched = false;
+  while ((m = re.exec(val)) !== null) {
+    matched = true;
+    const name = m[1].toLowerCase();
+    const args = m[2]
+      .split(/[,\s]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    if (name === 'rotate' || name === 'rotatez') {
+      if (args.length !== 1) return null;
+      const deg = parseAngle(args[0]);
+      if (deg === null) return null;
+      ops.push({ type: 'rotate', deg });
+    } else if (name === 'scale') {
+      if (args.length === 0 || args.length > 2) return null;
+      const x = parseFloat(args[0]);
+      if (Number.isNaN(x)) return null;
+      const y = args.length === 2 ? parseFloat(args[1]) : x;
+      if (Number.isNaN(y)) return null;
+      ops.push({ type: 'scale', x, y });
+    } else if (name === 'scalex') {
+      if (args.length !== 1) return null;
+      const x = parseFloat(args[0]);
+      if (Number.isNaN(x)) return null;
+      ops.push({ type: 'scale', x, y: 1 });
+    } else if (name === 'scaley') {
+      if (args.length !== 1) return null;
+      const y = parseFloat(args[0]);
+      if (Number.isNaN(y)) return null;
+      ops.push({ type: 'scale', x: 1, y });
+    } else if (name === 'translate') {
+      if (args.length === 0 || args.length > 2) return null;
+      const x = parseLengthPt(args[0]);
+      if (x === null) return null;
+      const y = args.length === 2 ? parseLengthPt(args[1]) : 0;
+      if (y === null) return null;
+      ops.push({ type: 'translate', x, y });
+    } else if (name === 'translatex') {
+      if (args.length !== 1) return null;
+      const x = parseLengthPt(args[0]);
+      if (x === null) return null;
+      ops.push({ type: 'translate', x, y: 0 });
+    } else if (name === 'translatey') {
+      if (args.length !== 1) return null;
+      const y = parseLengthPt(args[0]);
+      if (y === null) return null;
+      ops.push({ type: 'translate', x: 0, y });
+    } else {
+      // Unknown op (e.g. skew, matrix) — reject the whole transform so
+      // users notice rather than getting silently-half-applied transforms.
+      return null;
+    }
+  }
+  if (!matched) return null;
+  return ops;
+}
+
+/**
+ * Parse an angle in `deg` / `rad` / `turn` (no unit defaults to deg).
+ * Returns the angle in DEGREES, or null on parse failure.
+ */
+function parseAngle(s: string): number | null {
+  const t = s.trim().toLowerCase();
+  let mult = 1;
+  let body = t;
+  if (t.endsWith('deg')) {
+    body = t.slice(0, -3);
+  } else if (t.endsWith('rad')) {
+    body = t.slice(0, -3);
+    mult = 180 / Math.PI;
+  } else if (t.endsWith('turn')) {
+    body = t.slice(0, -4);
+    mult = 360;
+  }
+  const n = parseFloat(body);
+  if (Number.isNaN(n)) return null;
+  return n * mult;
+}
+
+/**
+ * Parse a length value — accepts a bare number or `<n>px`/`<n>pt` and
+ * returns the value in points. Forme is print-first; px/pt are treated
+ * as the same unit at the React layer.
+ */
+function parseLengthPt(s: string): number | null {
+  const t = s.trim().toLowerCase();
+  const body = t.endsWith('px') || t.endsWith('pt') ? t.slice(0, -2) : t;
+  const n = parseFloat(body);
+  return Number.isNaN(n) ? null : n;
+}
+
+/**
+ * Parse a `transformOrigin` value into a `[x, y]` tuple of fractions
+ * (0.0–1.0). Accepts the user-side tuple shape directly, or a CSS-like
+ * string with two tokens (`"50% 50%"`, `"0% 100%"`, `"center top"`,
+ * `"left bottom"`, etc.). Returns null on unparseable input.
+ */
+function parseTransformOrigin(
+  val: string | [number, number],
+): [number, number] | null {
+  if (Array.isArray(val)) {
+    const [x, y] = val;
+    if (typeof x !== 'number' || typeof y !== 'number') return null;
+    return [x, y];
+  }
+  const tokens = val.trim().split(/\s+/).filter((t) => t.length > 0);
+  if (tokens.length === 0 || tokens.length > 2) return null;
+  const x = parseOriginToken(tokens[0], 'x');
+  if (x === null) return null;
+  const y = tokens.length === 2 ? parseOriginToken(tokens[1], 'y') : 0.5;
+  if (y === null) return null;
+  return [x, y];
+}
+
+function parseOriginToken(token: string, axis: 'x' | 'y'): number | null {
+  const t = token.toLowerCase();
+  if (t === 'center') return 0.5;
+  if (axis === 'x') {
+    if (t === 'left') return 0;
+    if (t === 'right') return 1;
+  } else {
+    if (t === 'top') return 0;
+    if (t === 'bottom') return 1;
+  }
+  if (t.endsWith('%')) {
+    const n = parseFloat(t.slice(0, -1));
+    return Number.isNaN(n) ? null : n / 100;
+  }
+  return null;
 }
 
 /**

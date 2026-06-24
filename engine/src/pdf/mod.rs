@@ -41,7 +41,7 @@ use crate::font::subset::subset_ttf;
 use crate::font::{FontContext, FontData, FontKey};
 use crate::layout::*;
 use crate::model::*;
-use crate::style::{Color, FontStyle, Overflow, TextDecoration};
+use crate::style::{Color, FontStyle, Overflow, TextDecoration, TransformOp};
 use crate::svg::SvgCommand;
 use miniz_oxide::deflate::compress_to_vec_zlib;
 
@@ -1204,6 +1204,62 @@ impl PdfWriter {
             }
         }
 
+        // CSS-style `transform` wrap. Sits INSIDE the opacity wrap so the
+        // opacity applies to the transformed output. Layout flow is NOT
+        // affected by the transform (matches CSS) — element.x/y/width/height
+        // are still the axis-aligned box; the transform is paint-only and
+        // also propagates to children via the graphics state stack.
+        let transform_ops: &[TransformOp] = element
+            .resolved_style
+            .as_ref()
+            .map(|s| s.transform.as_slice())
+            .unwrap_or(&[]);
+        let has_transform = !transform_ops.is_empty();
+        if has_transform {
+            let rs = element.resolved_style.as_ref().unwrap();
+            let pdf_x = element.x;
+            let pdf_y_bottom = page_height - element.y - element.height;
+            let (ox_frac, oy_frac) = rs.transform_origin;
+            let origin_x = pdf_x + element.width * ox_frac;
+            // transform_origin's y is 0=top / 1=bottom in layout (CSS) space.
+            // Flip for PDF (1=top / 0=bottom).
+            let origin_y = pdf_y_bottom + (1.0 - oy_frac) * element.height;
+
+            let _ = writeln!(stream, "q");
+            // Shift origin point to PDF (0,0) so subsequent transforms pivot there.
+            let _ = writeln!(stream, "1 0 0 1 {:.4} {:.4} cm", -origin_x, -origin_y);
+            // User transforms: emit in REVERSE of the CSS list order. CSS lists
+            // transforms left-to-right with the LAST one applied first
+            // (closest to the point being drawn). PDF `cm` left-multiplies the
+            // CTM, so the FIRST emitted cm becomes the innermost. Reversing
+            // makes the leftmost CSS transform the last cm emitted = outermost
+            // multiplication = applied last to a point — which matches "first
+            // listed wraps everything inside it" semantics.
+            for op in transform_ops.iter().rev() {
+                match op {
+                    TransformOp::Rotate { deg } => {
+                        // CSS rotates clockwise in screen space. With PDF's
+                        // flipped y-axis, the same matrix would rotate
+                        // counter-clockwise visually. Negate the angle so a
+                        // CSS `rotate(45deg)` looks identical in the PDF.
+                        let theta = (-deg).to_radians();
+                        let c = theta.cos();
+                        let s = theta.sin();
+                        let _ = writeln!(stream, "{:.6} {:.6} {:.6} {:.6} 0 0 cm", c, s, -s, c);
+                    }
+                    TransformOp::Scale { x, y } => {
+                        let _ = writeln!(stream, "{:.6} 0 0 {:.6} 0 0 cm", x, y);
+                    }
+                    TransformOp::Translate { x, y } => {
+                        // CSS y is down, PDF y is up — negate the y component.
+                        let _ = writeln!(stream, "1 0 0 1 {:.4} {:.4} cm", x, -y);
+                    }
+                }
+            }
+            // Shift origin back to its real position.
+            let _ = writeln!(stream, "1 0 0 1 {:.4} {:.4} cm", origin_x, origin_y);
+        }
+
         match &element.draw {
             DrawCommand::None => {}
 
@@ -2180,6 +2236,11 @@ impl PdfWriter {
         }
 
         if clip_overflow {
+            let _ = writeln!(stream, "Q");
+        }
+
+        // Close the transform wrap (paired with the inner q above).
+        if has_transform {
             let _ = writeln!(stream, "Q");
         }
 
