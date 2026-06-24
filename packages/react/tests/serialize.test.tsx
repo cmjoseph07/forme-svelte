@@ -5,6 +5,10 @@ import {
   Page,
   View,
   Text,
+  Strong,
+  Em,
+  Code,
+  Link,
   Image,
   Table,
   Row,
@@ -628,6 +632,105 @@ describe('Edge cases', () => {
       </Document>
     );
     expect(doc.children[0].kind).toEqual({ type: 'Text', content: 'Hello world' });
+  });
+
+  // ─── Inline formatting components ───────────────────────────────────
+
+  it('Strong produces a TextRun with fontWeight 700', () => {
+    const doc = serialize(
+      <Document>
+        <Text>Read the <Strong>fine print</Strong>.</Text>
+      </Document>
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'Text',
+      content: '',
+      runs: [
+        { content: 'Read the ' },
+        { content: 'fine print', style: { fontWeight: 700 } },
+        { content: '.' },
+      ],
+    });
+  });
+
+  it('Em produces a TextRun with italic fontStyle', () => {
+    const doc = serialize(
+      <Document>
+        <Text>This is <Em>important</Em>.</Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string; style?: { fontStyle?: string } }[] }).runs;
+    expect(runs[1]).toEqual({ content: 'important', style: { fontStyle: 'Italic' } });
+  });
+
+  it('Code produces a TextRun with mono font + background', () => {
+    const doc = serialize(
+      <Document>
+        <Text>Run <Code>npm install</Code> now.</Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string; style?: Record<string, unknown> }[] }).runs;
+    expect(runs[1].content).toBe('npm install');
+    expect(runs[1].style?.fontFamily).toBe('Courier');
+    expect(runs[1].style?.backgroundColor).toEqual({ r: 0xf4 / 255, g: 0xf4 / 255, b: 0xf5 / 255, a: 1 });
+  });
+
+  it('Link produces a TextRun with href + blue + underline', () => {
+    const doc = serialize(
+      <Document>
+        <Text>See the <Link href="https://docs.formepdf.com">docs</Link>.</Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string; href?: string; style?: Record<string, unknown> }[] }).runs;
+    expect(runs[1].content).toBe('docs');
+    expect(runs[1].href).toBe('https://docs.formepdf.com');
+    expect(runs[1].style?.color).toEqual({ r: 0x25 / 255, g: 0x63 / 255, b: 0xeb / 255, a: 1 });
+    expect(runs[1].style?.textDecoration).toBe('Underline');
+  });
+
+  it('nested Strong + Em composes (bold + italic on the same run)', () => {
+    const doc = serialize(
+      <Document>
+        <Text><Strong><Em>both</Em></Strong></Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string; style?: Record<string, unknown> }[] }).runs;
+    expect(runs).toEqual([
+      { content: 'both', style: { fontWeight: 700, fontStyle: 'Italic' } },
+    ]);
+  });
+
+  it('user style overrides component defaults', () => {
+    const doc = serialize(
+      <Document>
+        <Text><Strong style={{ fontWeight: 400 }}>not really bold</Strong></Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string; style?: Record<string, unknown> }[] }).runs;
+    expect(runs[0].style?.fontWeight).toBe(400);
+  });
+
+  it('Link href inside Strong preserves href and composes bold styling', () => {
+    const doc = serialize(
+      <Document>
+        <Text><Strong><Link href="/x">bold link</Link></Strong></Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string; href?: string; style?: Record<string, unknown> }[] }).runs;
+    expect(runs[0].content).toBe('bold link');
+    expect(runs[0].href).toBe('/x');
+    expect(runs[0].style?.fontWeight).toBe(700);
+    expect(runs[0].style?.textDecoration).toBe('Underline');
+  });
+
+  it('mixed strings + multiple inline components produce runs in order', () => {
+    const doc = serialize(
+      <Document>
+        <Text>a <Strong>b</Strong> c <Em>d</Em> e</Text>
+      </Document>
+    );
+    const runs = (doc.children[0].kind as { runs: { content: string }[] }).runs;
+    expect(runs.map(r => r.content)).toEqual(['a ', 'b', ' c ', 'd', ' e']);
   });
 
   it('missing optional style props not included in output', () => {

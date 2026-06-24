@@ -267,6 +267,42 @@ export interface TextProps {
   children?: ReactNode;
 }
 
+/**
+ * Inline bold text. Only meaningful as a child of `<Text>` — produces a
+ * TextRun with `fontWeight: 700` merged with any provided `style`.
+ */
+export interface StrongProps {
+  style?: Style;
+  children?: ReactNode;
+}
+
+/**
+ * Inline italic text. Only meaningful as a child of `<Text>`.
+ */
+export interface EmProps {
+  style?: Style;
+  children?: ReactNode;
+}
+
+/**
+ * Inline monospace text with a subtle background. Only meaningful as a
+ * child of `<Text>`.
+ */
+export interface CodeProps {
+  style?: Style;
+  children?: ReactNode;
+}
+
+/**
+ * Inline hyperlink. Renders blue + underlined; clickable in the rendered
+ * PDF. Only meaningful as a child of `<Text>`.
+ */
+export interface LinkProps {
+  href: string;
+  style?: Style;
+  children?: ReactNode;
+}
+
 export interface ImageProps {
   src: string;
   width?: number;

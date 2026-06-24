@@ -3,6 +3,10 @@ import type {
   PageProps,
   ViewProps,
   TextProps,
+  StrongProps,
+  EmProps,
+  CodeProps,
+  LinkProps,
   ImageProps,
   TableProps,
   RowProps,
@@ -111,6 +115,76 @@ export function View(_props: ViewProps): null {
  * ```
  */
 export function Text(_props: TextProps): null {
+  return null;
+}
+
+/**
+ * Inline bold text. Use inside `<Text>` for runs of bold content.
+ * Equivalent to wrapping content in a `<Text style={{ fontWeight: 700 }}>`
+ * — just shorter. Composes with nested inline-formatting components
+ * (e.g. `<Strong><Em>both</Em></Strong>` produces bold + italic).
+ *
+ * @param props.style - Optional style overrides (merged on top of the
+ *   default `fontWeight: 700`)
+ * @param props.children - Inline content (text, numbers, or other inline
+ *   components like `<Em>`)
+ *
+ * @example
+ * ```tsx
+ * <Text>Read the <Strong>fine print</Strong> carefully.</Text>
+ * ```
+ */
+export function Strong(_props: StrongProps): null {
+  return null;
+}
+
+/**
+ * Inline italic text. Use inside `<Text>` for runs of emphasized
+ * content. Equivalent to `<Text style={{ fontStyle: 'italic' }}>`.
+ *
+ * @param props.style - Optional style overrides
+ * @param props.children - Inline content
+ *
+ * @example
+ * ```tsx
+ * <Text>This is <Em>important</Em> to remember.</Text>
+ * ```
+ */
+export function Em(_props: EmProps): null {
+  return null;
+}
+
+/**
+ * Inline monospace text with a subtle background — like Markdown's
+ * `` `code` ``. Use inside `<Text>` for runs of inline code or paths.
+ *
+ * @param props.style - Optional style overrides (merged on top of the
+ *   default font/background/padding)
+ * @param props.children - Inline content
+ *
+ * @example
+ * ```tsx
+ * <Text>Run <Code>npm install</Code> to get started.</Text>
+ * ```
+ */
+export function Code(_props: CodeProps): null {
+  return null;
+}
+
+/**
+ * Inline hyperlink. Renders blue + underlined and is clickable in the
+ * output PDF. Use inside `<Text>` for inline links.
+ *
+ * @param props.href - The URL to link to (required)
+ * @param props.style - Optional style overrides
+ * @param props.children - Inline link content (the visible link text)
+ *
+ * @example
+ * ```tsx
+ * <Text>See the <Link href="https://docs.formepdf.com">docs</Link>.</Text>
+ * ```
+ */
+export function Link(_props: LinkProps): null {
   return null;
 }
 

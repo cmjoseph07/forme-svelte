@@ -1,5 +1,5 @@
 import { type ReactElement, type ReactNode, isValidElement, Children, Fragment } from 'react';
-import { Document, Page, View, Text, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
+import { Document, Page, View, Text, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
   isRefMarker, getRefPath,
@@ -460,34 +460,89 @@ function serializeView(element: ReactElement, _parent: ParentContext = null): Fo
   return node;
 }
 
+// Inline formatting components produce TextRuns with these default styles
+// (merged under any user-supplied style, so user style wins).
+const STRONG_DEFAULTS: Style = { fontWeight: 700 };
+const EM_DEFAULTS: Style = { fontStyle: 'italic' };
+const CODE_DEFAULTS: Style = {
+  fontFamily: 'Courier',
+  backgroundColor: '#F4F4F5',
+};
+const LINK_DEFAULTS: Style = {
+  color: '#2563EB',
+  textDecoration: 'underline',
+};
+
+/** Return the component-default style for a recognized inline component,
+ *  or `null` if the element isn't a recognized inline component.
+ *  `Text` returns `{}` because it carries no defaults beyond the user's style. */
+function inlineDefaults(type: unknown): Style | null {
+  switch (type) {
+    case Text: return {};
+    case Strong: return STRONG_DEFAULTS;
+    case Em: return EM_DEFAULTS;
+    case Code: return CODE_DEFAULTS;
+    case Link: return LINK_DEFAULTS;
+    default: return null;
+  }
+}
+
+/**
+ * Recursively flatten children of a `<Text>` into TextRuns, accumulating
+ * styles and href as we descend. Outer style is overlaid by each inline
+ * component's defaults, which are in turn overlaid by the user-supplied
+ * `style` on that element — so user style wins at every level while
+ * still inheriting whatever wasn't explicitly set.
+ *
+ * E.g. `<Strong><Em>both</Em></Strong>` produces a single run with
+ * `{ fontWeight: 700, fontStyle: 'italic' }`. A `<Link href>` nested in a
+ * `<Strong>` produces a bold underlined blue run with the href set.
+ */
+function buildTextRuns(
+  children: unknown,
+  accStyle: Style = {},
+  accHref: string | undefined = undefined,
+): TextRun[] {
+  const out: TextRun[] = [];
+  const elements = flattenChildren(children);
+  for (const child of elements) {
+    if (child === null || child === undefined || typeof child === 'boolean') continue;
+    if (typeof child === 'string' || typeof child === 'number') {
+      const content = String(child);
+      if (content === '') continue;
+      const run: TextRun = { content };
+      if (Object.keys(accStyle).length > 0) run.style = mapStyle(accStyle);
+      if (accHref) run.href = accHref;
+      out.push(run);
+      continue;
+    }
+    if (!isValidElement(child)) continue;
+    const defaults = inlineDefaults(child.type);
+    if (defaults === null) continue; // unknown element inside <Text> — skip
+    const childProps = child.props as { style?: Style; href?: string; children?: unknown };
+    // Cascade: outer accumulated → this component's defaults → user style.
+    // Later spreads win, so user style overrides defaults and outer.
+    const nextStyle: Style = { ...accStyle, ...defaults, ...(childProps.style || {}) };
+    const nextHref = childProps.href ?? accHref;
+    out.push(...buildTextRuns(childProps.children, nextStyle, nextHref));
+  }
+  return out;
+}
+
 function serializeText(element: ReactElement): FormeNode {
   const props = element.props as { style?: Style; href?: string; bookmark?: string; children?: unknown };
   const childElements = flattenChildren(props.children);
 
-  // Check if any child is a <Text> element (inline runs)
-  const hasTextChild = childElements.some(
-    c => isValidElement(c) && c.type === Text
+  // Detect mixed content: any inline element child (<Text>, <Strong>, <Em>,
+  // <Code>, <Link>) means we need TextRuns rather than a flat content string.
+  const hasInlineChild = childElements.some(
+    c => isValidElement(c) && inlineDefaults(c.type) !== null
   );
 
   const kind: FormeNodeKind & { type: 'Text' } = { type: 'Text', content: '' };
 
-  if (hasTextChild) {
-    // Build runs from children
-    const runs: TextRun[] = [];
-    for (const child of childElements) {
-      if (typeof child === 'string' || typeof child === 'number') {
-        runs.push({ content: String(child) });
-      } else if (isValidElement(child) && child.type === Text) {
-        const childProps = child.props as { style?: Style; href?: string; children?: unknown };
-        const run: TextRun = {
-          content: flattenTextContent(childProps.children),
-        };
-        if (childProps.style) run.style = mapStyle(childProps.style);
-        if (childProps.href) run.href = childProps.href;
-        runs.push(run);
-      }
-    }
-    kind.runs = runs;
+  if (hasInlineChild) {
+    kind.runs = buildTextRuns(props.children);
   } else {
     kind.content = flattenTextContent(props.children);
   }
