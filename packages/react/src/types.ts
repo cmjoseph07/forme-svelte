@@ -287,6 +287,20 @@ export interface TextProps {
 }
 
 /**
+ * Semantic heading. Renders text with sensible default styling per level
+ * (size, weight, margin) AND tags the element as `/H1`–`/H6` in tagged
+ * PDFs (PDF/UA / PDF/A-2a), so screen readers and the PDF outline
+ * builder treat it as a heading. Inline formatting components like
+ * `<Strong>` and `<Em>` work inside.
+ */
+export interface HeadingProps {
+  style?: Style;
+  href?: string;
+  bookmark?: string;
+  children?: ReactNode;
+}
+
+/**
  * Inline bold text. Only meaningful as a child of `<Text>` — produces a
  * TextRun with `fontWeight: 700` merged with any provided `style`.
  */
@@ -761,6 +775,7 @@ export type FormeNodeKind =
   | { type: 'Page'; config: FormePageConfig }
   | { type: 'View' }
   | { type: 'Text'; content: string; href?: string; runs?: TextRun[] }
+  | { type: 'Heading'; level: number; content: string; href?: string; runs?: TextRun[] }
   | { type: 'Image'; src: string; width?: number; height?: number }
   | { type: 'Table'; columns: FormeColumnDef[] }
   | { type: 'TableRow'; is_header: boolean }

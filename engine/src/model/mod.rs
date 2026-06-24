@@ -513,6 +513,19 @@ pub enum NodeKind {
         runs: Vec<TextRun>,
     },
 
+    /// A semantic heading (H1-H6). Lays out as text but carries a level
+    /// so the tagged-PDF builder can emit the right `/H1`...`/H6`
+    /// structure element. The React layer provides sensible default
+    /// styles per level; users can override via `style`.
+    Heading {
+        level: u8,
+        content: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        href: Option<String>,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        runs: Vec<TextRun>,
+    },
+
     /// An image node.
     Image {
         /// Base64-encoded image data, or a file path.
@@ -1070,9 +1083,10 @@ impl Node {
     /// Is this node breakable across pages?
     pub fn is_breakable(&self) -> bool {
         match &self.kind {
-            NodeKind::View | NodeKind::Table { .. } | NodeKind::Text { .. } => {
-                self.style.wrap.unwrap_or(true)
-            }
+            NodeKind::View
+            | NodeKind::Table { .. }
+            | NodeKind::Text { .. }
+            | NodeKind::Heading { .. } => self.style.wrap.unwrap_or(true),
             NodeKind::TableRow { .. } => true,
             NodeKind::Image { .. } => false,
             NodeKind::Svg { .. } => false,

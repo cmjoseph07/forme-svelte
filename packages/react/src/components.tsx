@@ -3,6 +3,7 @@ import type {
   PageProps,
   ViewProps,
   TextProps,
+  HeadingProps,
   StrongProps,
   EmProps,
   CodeProps,
@@ -115,6 +116,44 @@ export function View(_props: ViewProps): null {
  * ```
  */
 export function Text(_props: TextProps): null {
+  return null;
+}
+
+/**
+ * Semantic heading components. `<H1>` … `<H6>`. Each level has sensible
+ * defaults (font size, weight, margin-top, margin-bottom) tuned for
+ * document layout; pass `style` to override individual properties (your
+ * values win on conflict).
+ *
+ * In tagged PDFs (`<Document tagged>` or `<Document pdfUa>`), headings
+ * map to the corresponding `/H1` – `/H6` PDF structure elements
+ * automatically — useful for screen-reader accessibility and for tools
+ * that build a table of contents from the structure tree.
+ *
+ * Inline formatting components work inside: `<H1>Chapter <Em>1</Em></H1>`.
+ *
+ * @example
+ * ```tsx
+ * <H1>Annual Report</H1>
+ * <H2 style={{ marginTop: 32 }}>Executive Summary</H2>
+ * ```
+ */
+export function H1(_props: HeadingProps): null {
+  return null;
+}
+export function H2(_props: HeadingProps): null {
+  return null;
+}
+export function H3(_props: HeadingProps): null {
+  return null;
+}
+export function H4(_props: HeadingProps): null {
+  return null;
+}
+export function H5(_props: HeadingProps): null {
+  return null;
+}
+export function H6(_props: HeadingProps): null {
   return null;
 }
 

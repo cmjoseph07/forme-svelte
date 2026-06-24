@@ -5,6 +5,12 @@ import {
   Page,
   View,
   Text,
+  H1,
+  H2,
+  H3,
+  H4,
+  H5,
+  H6,
   Strong,
   Em,
   Code,
@@ -800,6 +806,104 @@ describe('Edge cases', () => {
     );
     const runs = (doc.children[0].kind as { runs: { content: string }[] }).runs;
     expect(runs.map(r => r.content)).toEqual(['a ', 'b', ' c ', 'd', ' e']);
+  });
+
+  // ─── Headings (H1-H6) ───────────────────────────────────────────────
+
+  it('H1 emits a Heading node with level 1 + default styling', () => {
+    const doc = serialize(
+      <Document>
+        <H1>Annual Report</H1>
+      </Document>
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({ type: 'Heading', level: 1, content: 'Annual Report' });
+    expect(node.style.fontSize).toBe(32);
+    expect(node.style.fontWeight).toBe(700);
+    expect(node.style.margin).toBeDefined(); // marginTop/marginBottom were converted
+  });
+
+  it('each level emits the matching level number', () => {
+    const doc = serialize(
+      <Document>
+        <H1>1</H1>
+        <H2>2</H2>
+        <H3>3</H3>
+        <H4>4</H4>
+        <H5>5</H5>
+        <H6>6</H6>
+      </Document>
+    );
+    const levels = doc.children.map((c) => (c.kind as { level?: number }).level);
+    expect(levels).toEqual([1, 2, 3, 4, 5, 6]);
+  });
+
+  it('default font sizes scale down by level', () => {
+    const doc = serialize(
+      <Document>
+        <H1>a</H1>
+        <H2>a</H2>
+        <H3>a</H3>
+        <H4>a</H4>
+        <H5>a</H5>
+        <H6>a</H6>
+      </Document>
+    );
+    const sizes = doc.children.map((c) => c.style.fontSize);
+    expect(sizes).toEqual([32, 24, 20, 18, 16, 14]);
+    // Strictly descending
+    for (let i = 1; i < sizes.length; i++) {
+      expect(sizes[i]).toBeLessThan(sizes[i - 1]!);
+    }
+  });
+
+  it('user style overrides heading defaults', () => {
+    const doc = serialize(
+      <Document>
+        <H1 style={{ fontSize: 48, fontWeight: 400, color: '#ff0000' }}>Big</H1>
+      </Document>
+    );
+    expect(doc.children[0].style.fontSize).toBe(48);
+    expect(doc.children[0].style.fontWeight).toBe(400);
+    expect(doc.children[0].style.color).toEqual({ r: 1, g: 0, b: 0, a: 1 });
+  });
+
+  it('inline formatting composes inside headings', () => {
+    const doc = serialize(
+      <Document>
+        <H1>Chapter <Em>1</Em></H1>
+      </Document>
+    );
+    const kind = doc.children[0].kind as {
+      type: 'Heading';
+      runs?: { content: string; style?: { fontStyle?: string } }[];
+    };
+    expect(kind.type).toBe('Heading');
+    expect(kind.runs).toEqual([
+      { content: 'Chapter ' },
+      { content: '1', style: { fontStyle: 'Italic' } },
+    ]);
+  });
+
+  it('heading with single text child uses content (no runs)', () => {
+    const doc = serialize(
+      <Document>
+        <H2>Simple heading</H2>
+      </Document>
+    );
+    const kind = doc.children[0].kind as { content: string; runs?: unknown };
+    expect(kind.content).toBe('Simple heading');
+    expect(kind.runs).toBeUndefined();
+  });
+
+  it('heading carries href + bookmark when set', () => {
+    const doc = serialize(
+      <Document>
+        <H1 href="#top" bookmark="Top">Title</H1>
+      </Document>
+    );
+    expect((doc.children[0].kind as { href?: string }).href).toBe('#top');
+    expect(doc.children[0].bookmark).toBe('Top');
   });
 
   it('missing optional style props not included in output', () => {

@@ -1,5 +1,5 @@
 import { type ReactElement, type ReactNode, isValidElement, Children, Fragment } from 'react';
-import { Document, Page, View, Text, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
+import { Document, Page, View, Text, H1, H2, H3, H4, H5, H6, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
   isRefMarker, getRefPath,
@@ -345,6 +345,12 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
   if (element.type === Text) {
     return serializeText(element);
   }
+  if (element.type === H1) return serializeHeading(element, 1);
+  if (element.type === H2) return serializeHeading(element, 2);
+  if (element.type === H3) return serializeHeading(element, 3);
+  if (element.type === H4) return serializeHeading(element, 4);
+  if (element.type === H5) return serializeHeading(element, 5);
+  if (element.type === H6) return serializeHeading(element, 6);
   if (element.type === Image) {
     return serializeImage(element);
   }
@@ -553,6 +559,66 @@ function serializeText(element: ReactElement): FormeNode {
   const node: FormeNode = {
     kind,
     style: mapStyle(props.style),
+    children: [],
+    sourceLocation: extractSourceLocation(element),
+  };
+  if (props.bookmark) node.bookmark = props.bookmark;
+
+  return node;
+}
+
+// Default style per heading level. Tuned for typical document layout —
+// users override individual properties via `style` on the heading element.
+// margin top/bottom are in points; font sizes are points.
+const HEADING_DEFAULTS: Record<1 | 2 | 3 | 4 | 5 | 6, Style> = {
+  1: { fontSize: 32, fontWeight: 700, marginTop: 24, marginBottom: 16 },
+  2: { fontSize: 24, fontWeight: 700, marginTop: 20, marginBottom: 14 },
+  3: { fontSize: 20, fontWeight: 600, marginTop: 16, marginBottom: 12 },
+  4: { fontSize: 18, fontWeight: 600, marginTop: 14, marginBottom: 10 },
+  5: { fontSize: 16, fontWeight: 600, marginTop: 12, marginBottom: 8 },
+  6: { fontSize: 14, fontWeight: 600, marginTop: 10, marginBottom: 6 },
+};
+
+/**
+ * Serialize an H1-H6 element. Mirrors serializeText for the children
+ * machinery (mixed strings + inline-formatting components produce runs)
+ * but emits the engine's `Heading { level }` node kind so the tagged-PDF
+ * builder can pick up the semantic role. Default styles per level are
+ * merged BEFORE the user's `style` prop, so user values win.
+ */
+function serializeHeading(
+  element: ReactElement,
+  level: 1 | 2 | 3 | 4 | 5 | 6,
+): FormeNode {
+  const props = element.props as {
+    style?: Style;
+    href?: string;
+    bookmark?: string;
+    children?: unknown;
+  };
+  const childElements = flattenChildren(props.children);
+  const hasInlineChild = childElements.some(
+    (c) => isValidElement(c) && inlineDefaults(c.type) !== null,
+  );
+
+  const kind: FormeNodeKind & { type: 'Heading' } = {
+    type: 'Heading',
+    level,
+    content: '',
+  };
+  if (hasInlineChild) {
+    kind.runs = buildTextRuns(props.children);
+  } else {
+    kind.content = flattenTextContent(props.children);
+  }
+  if (props.href) kind.href = props.href;
+
+  // Defaults underlay; user style wins on conflicting keys.
+  const mergedStyle: Style = { ...HEADING_DEFAULTS[level], ...(props.style || {}) };
+
+  const node: FormeNode = {
+    kind,
+    style: mapStyle(mergedStyle),
     children: [],
     sourceLocation: extractSourceLocation(element),
   };

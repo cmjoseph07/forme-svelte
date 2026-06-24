@@ -76,7 +76,10 @@ impl TagBuilder {
     ) -> u32 {
         let role = self.map_role(node_type, is_header_row);
         let was_inside_paragraph = self.inside_paragraph;
-        if role == "P" {
+        // Headings act like paragraphs for the inner-text → Span downgrade
+        // rule, so a nested Text inside an H1 maps to a Span rather than
+        // spawning a P child of the H1.
+        if matches!(role, "P" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6") {
             self.inside_paragraph = true;
         }
 
@@ -117,8 +120,12 @@ impl TagBuilder {
     /// End the current structure element. Must be called after `begin_element`.
     pub fn end_element(&mut self) {
         if let Some(idx) = self.parent_stack.pop() {
-            // If we're leaving a paragraph, reset the flag
-            if self.elements[idx].role == "P" {
+            // If we're leaving a paragraph-like element (P or any heading),
+            // reset the flag so the next sibling text gets the P role again.
+            if matches!(
+                self.elements[idx].role,
+                "P" | "H1" | "H2" | "H3" | "H4" | "H5" | "H6"
+            ) {
                 self.inside_paragraph = false;
             }
         }
@@ -140,6 +147,14 @@ impl TagBuilder {
                     "P"
                 }
             }
+            // Semantic headings — map to PDF/UA heading roles. PDF/A-2a and
+            // PDF/UA both treat /H1.../H6 as standard structure elements.
+            "H1" => "H1",
+            "H2" => "H2",
+            "H3" => "H3",
+            "H4" => "H4",
+            "H5" => "H5",
+            "H6" => "H6",
             "TextLine" => "Span",
             "Image" => "Figure",
             "Svg" => "Figure",

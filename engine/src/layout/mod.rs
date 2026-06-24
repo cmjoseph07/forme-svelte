@@ -458,6 +458,15 @@ fn node_kind_name(kind: &NodeKind) -> &'static str {
     match kind {
         NodeKind::View => "View",
         NodeKind::Text { .. } => "Text",
+        NodeKind::Heading { level: 1, .. } => "H1",
+        NodeKind::Heading { level: 2, .. } => "H2",
+        NodeKind::Heading { level: 3, .. } => "H3",
+        NodeKind::Heading { level: 4, .. } => "H4",
+        NodeKind::Heading { level: 5, .. } => "H5",
+        // Default clamps levels outside 1..=6 to H6 (matches HTML's
+        // tolerance: invalid levels still render as the deepest heading
+        // rather than vanishing).
+        NodeKind::Heading { .. } => "H6",
         NodeKind::Image { .. } => "Image",
         NodeKind::Table { .. } => "Table",
         NodeKind::TableRow { .. } => "TableRow",
@@ -1167,6 +1176,34 @@ impl LayoutEngine {
                     font_context,
                     node.source_location.as_ref(),
                     node.bookmark.as_deref(),
+                    None,
+                );
+            }
+
+            NodeKind::Heading {
+                content,
+                href,
+                runs,
+                ..
+            } => {
+                // Headings lay out exactly like Text but tag the wrapping
+                // element as "H1".."H6" via node_type_override so the
+                // tagged-PDF builder picks up the semantic role. Style
+                // defaults (size, weight, margins) come from the React layer.
+                let heading_role = node_kind_name(&node.kind); // "H1".."H6"
+                self.layout_text(
+                    content,
+                    href.as_deref(),
+                    runs,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    available_width,
+                    font_context,
+                    node.source_location.as_ref(),
+                    node.bookmark.as_deref(),
+                    Some(heading_role),
                 );
             }
 
@@ -2702,6 +2739,7 @@ impl LayoutEngine {
     }
 
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     fn layout_text(
         &self,
         content: &str,
@@ -2715,6 +2753,10 @@ impl LayoutEngine {
         font_context: &FontContext,
         source_location: Option<&SourceLocation>,
         bookmark: Option<&str>,
+        // Optional node_type label for the wrapping Text element. Defaults
+        // to "Text". Headings pass "H1".."H6" so tagged-PDF picks up the
+        // semantic role; everything else passes None.
+        node_type_override: Option<&str>,
     ) {
         let margin = &style.margin.to_edges();
         let text_x = x + margin.left;
@@ -2744,6 +2786,7 @@ impl LayoutEngine {
                 font_context,
                 source_location,
                 bookmark,
+                node_type_override,
             );
             cursor.y += margin.bottom;
             return;
@@ -2864,7 +2907,7 @@ impl LayoutEngine {
                         height: container_height,
                         draw: DrawCommand::None,
                         children: line_elements,
-                        node_type: Some("Text".to_string()),
+                        node_type: Some(node_type_override.unwrap_or("Text").to_string()),
                         resolved_style: Some(style.clone()),
                         source_location: source_location.cloned(),
                         href: href.map(|s| s.to_string()),
@@ -2987,7 +3030,7 @@ impl LayoutEngine {
                 height: container_height,
                 draw: DrawCommand::None,
                 children: line_elements,
-                node_type: Some("Text".to_string()),
+                node_type: Some(node_type_override.unwrap_or("Text").to_string()),
                 resolved_style: Some(style.clone()),
                 source_location: source_location.cloned(),
                 href: href.map(|s| s.to_string()),
@@ -3008,6 +3051,7 @@ impl LayoutEngine {
 
     /// Layout text runs with per-run styling.
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_arguments)]
     fn layout_text_runs(
         &self,
         runs: &[TextRun],
@@ -3020,6 +3064,8 @@ impl LayoutEngine {
         font_context: &FontContext,
         source_location: Option<&SourceLocation>,
         bookmark: Option<&str>,
+        // Same role as in layout_text — None defaults to "Text".
+        node_type_override: Option<&str>,
     ) {
         // Build StyledChar list from runs
         let mut styled_chars: Vec<StyledChar> = Vec::new();
@@ -3133,7 +3179,7 @@ impl LayoutEngine {
                         height: container_height,
                         draw: DrawCommand::None,
                         children: line_elements,
-                        node_type: Some("Text".to_string()),
+                        node_type: Some(node_type_override.unwrap_or("Text").to_string()),
                         resolved_style: Some(style.clone()),
                         source_location: source_location.cloned(),
                         href: parent_href.map(|s| s.to_string()),
@@ -3251,7 +3297,7 @@ impl LayoutEngine {
                 height: container_height,
                 draw: DrawCommand::None,
                 children: line_elements,
-                node_type: Some("Text".to_string()),
+                node_type: Some(node_type_override.unwrap_or("Text").to_string()),
                 resolved_style: Some(style.clone()),
                 source_location: source_location.cloned(),
                 href: parent_href.map(|s| s.to_string()),

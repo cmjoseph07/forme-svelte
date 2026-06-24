@@ -10143,6 +10143,107 @@ fn test_transform_does_not_affect_layout_flow() {
     );
 }
 
+// ── Headings (#3 from the author-experience batch) ─────────────────
+
+fn make_heading(level: u8, text: &str) -> Node {
+    Node {
+        kind: NodeKind::Heading {
+            level,
+            content: text.to_string(),
+            href: None,
+            runs: vec![],
+        },
+        style: Style {
+            font_size: Some(match level {
+                1 => 32.0,
+                2 => 24.0,
+                3 => 20.0,
+                _ => 16.0,
+            }),
+            font_weight: Some(700),
+            ..Default::default()
+        },
+        children: vec![],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }
+}
+
+#[test]
+fn test_heading_emits_h1_through_h6_structure_roles_in_tagged_pdf() {
+    // Each level should produce its matching /S /H1 .. /S /H6 structure
+    // element. Tagged PDF builder maps node_type "H1".."H6" to those roles.
+    let doc = Document {
+        children: vec![Node::page(
+            PageConfig::default(),
+            Style::default(),
+            vec![
+                make_heading(1, "h1"),
+                make_heading(2, "h2"),
+                make_heading(3, "h3"),
+                make_heading(4, "h4"),
+                make_heading(5, "h5"),
+                make_heading(6, "h6"),
+            ],
+        )],
+        metadata: Default::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: true,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+        certification: None,
+    };
+    let bytes = forme::render(&doc).unwrap();
+    let pdf_str = String::from_utf8_lossy(&bytes);
+
+    for level in 1..=6 {
+        let needle = format!("/S /H{}", level);
+        assert!(
+            pdf_str.contains(&needle),
+            "tagged PDF missing structure role {} (looking for `{}`)",
+            level,
+            needle,
+        );
+    }
+}
+
+#[test]
+fn test_heading_renders_text_content() {
+    // Even without tagged PDF, the heading content has to land in the
+    // rendered text. This catches regressions where a new NodeKind variant
+    // would forget to dispatch to layout_text.
+    let doc = Document {
+        children: vec![Node::page(
+            PageConfig::default(),
+            Style::default(),
+            vec![make_heading(1, "Annual Report")],
+        )],
+        metadata: Default::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: false,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+        certification: None,
+    };
+    let bytes = forme::render(&doc).unwrap();
+    let stream = decompress_pdf_streams(&bytes);
+    assert!(
+        stream.contains("Annual Report") || stream.contains("(Annual Report)"),
+        "heading text content missing from rendered stream"
+    );
+}
+
 #[test]
 fn test_no_transform_no_cm_wrapper() {
     // Sanity: a plain View without transform shouldn't generate any of our
