@@ -11,6 +11,9 @@ import {
   H4,
   H5,
   H6,
+  OrderedList,
+  UnorderedList,
+  ListItem,
   Strong,
   Em,
   Code,
@@ -904,6 +907,142 @@ describe('Edge cases', () => {
     );
     expect((doc.children[0].kind as { href?: string }).href).toBe('#top');
     expect(doc.children[0].bookmark).toBe('Top');
+  });
+
+  // ─── Lists (OrderedList / UnorderedList / ListItem) ────────────────
+
+  it('UnorderedList defaults to ordered:false marker:disc start:1', () => {
+    const doc = serialize(
+      <Document>
+        <UnorderedList>
+          <ListItem>a</ListItem>
+          <ListItem>b</ListItem>
+        </UnorderedList>
+      </Document>
+    );
+    const kind = doc.children[0].kind as {
+      type: string;
+      ordered: boolean;
+      marker_type: string;
+      start: number;
+    };
+    expect(kind.type).toBe('List');
+    expect(kind.ordered).toBe(false);
+    expect(kind.marker_type).toBe('disc');
+    expect(kind.start).toBe(1);
+    expect(doc.children[0].children).toHaveLength(2);
+  });
+
+  it('OrderedList defaults to ordered:true marker:decimal start:1', () => {
+    const doc = serialize(
+      <Document>
+        <OrderedList>
+          <ListItem>a</ListItem>
+        </OrderedList>
+      </Document>
+    );
+    const kind = doc.children[0].kind as {
+      ordered: boolean;
+      marker_type: string;
+      start: number;
+    };
+    expect(kind.ordered).toBe(true);
+    expect(kind.marker_type).toBe('decimal');
+    expect(kind.start).toBe(1);
+  });
+
+  it('OrderedList type prop maps to engine marker type (kebab → camel)', () => {
+    const cases: Array<[string, string]> = [
+      ['lower-alpha', 'lowerAlpha'],
+      ['upper-alpha', 'upperAlpha'],
+      ['lower-roman', 'lowerRoman'],
+      ['upper-roman', 'upperRoman'],
+      ['decimal', 'decimal'],
+    ];
+    for (const [reactType, engineType] of cases) {
+      const doc = serialize(
+        <Document>
+          <OrderedList type={reactType as any}>
+            <ListItem>a</ListItem>
+          </OrderedList>
+        </Document>
+      );
+      const kind = doc.children[0].kind as { marker_type: string };
+      expect(kind.marker_type).toBe(engineType);
+    }
+  });
+
+  it('UnorderedList marker prop maps through correctly', () => {
+    for (const marker of ['disc', 'circle', 'square', 'none'] as const) {
+      const doc = serialize(
+        <Document>
+          <UnorderedList marker={marker}>
+            <ListItem>a</ListItem>
+          </UnorderedList>
+        </Document>
+      );
+      const kind = doc.children[0].kind as { marker_type: string };
+      expect(kind.marker_type).toBe(marker);
+    }
+  });
+
+  it('OrderedList start prop is preserved', () => {
+    const doc = serialize(
+      <Document>
+        <OrderedList start={5}>
+          <ListItem>five</ListItem>
+        </OrderedList>
+      </Document>
+    );
+    expect((doc.children[0].kind as { start: number }).start).toBe(5);
+  });
+
+  it('ListItem children are serialized — string children auto-wrapped as Text', () => {
+    const doc = serialize(
+      <Document>
+        <UnorderedList>
+          <ListItem>plain string</ListItem>
+        </UnorderedList>
+      </Document>
+    );
+    const items = doc.children[0].children;
+    expect(items).toHaveLength(1);
+    expect(items[0].kind).toEqual({ type: 'ListItem' });
+    expect(items[0].children).toHaveLength(1);
+    expect(items[0].children[0].kind).toEqual({ type: 'Text', content: 'plain string' });
+  });
+
+  it('ListItem accepts mixed JSX content (Text, nested list)', () => {
+    const doc = serialize(
+      <Document>
+        <OrderedList>
+          <ListItem>
+            <Text>outer</Text>
+            <UnorderedList>
+              <ListItem>nested</ListItem>
+            </UnorderedList>
+          </ListItem>
+        </OrderedList>
+      </Document>
+    );
+    const item = doc.children[0].children[0];
+    expect(item.kind).toEqual({ type: 'ListItem' });
+    const kindTypes = item.children.map((c) => c.kind.type);
+    expect(kindTypes).toEqual(['Text', 'List']);
+  });
+
+  it('non-ListItem children of a list are dropped silently', () => {
+    const doc = serialize(
+      <Document>
+        <UnorderedList>
+          <ListItem>real</ListItem>
+          <Text>stray</Text>
+          {null}
+          {false}
+        </UnorderedList>
+      </Document>
+    );
+    expect(doc.children[0].children).toHaveLength(1);
   });
 
   it('missing optional style props not included in output', () => {

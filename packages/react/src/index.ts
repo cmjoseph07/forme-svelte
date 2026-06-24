@@ -1,5 +1,5 @@
 // Components
-export { Document, Page, View, Text, H1, H2, H3, H4, H5, H6, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
+export { Document, Page, View, Text, H1, H2, H3, H4, H5, H6, OrderedList, UnorderedList, ListItem, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
 export { LegacyBarChart, LegacyLineChart, LegacyPieChart } from './charts.js';
 
 // Serialization
@@ -32,6 +32,10 @@ export type {
   ViewProps,
   TextProps,
   HeadingProps,
+  OrderedListProps,
+  UnorderedListProps,
+  ListItemProps,
+  ListMarker,
   StrongProps,
   EmProps,
   CodeProps,

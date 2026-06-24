@@ -467,6 +467,8 @@ fn node_kind_name(kind: &NodeKind) -> &'static str {
         // tolerance: invalid levels still render as the deepest heading
         // rather than vanishing).
         NodeKind::Heading { .. } => "H6",
+        NodeKind::List { .. } => "List",
+        NodeKind::ListItem => "ListItem",
         NodeKind::Image { .. } => "Image",
         NodeKind::Table { .. } => "Table",
         NodeKind::TableRow { .. } => "TableRow",
@@ -494,6 +496,137 @@ fn node_kind_name(kind: &NodeKind) -> &'static str {
         NodeKind::Dropdown { .. } => "Dropdown",
         NodeKind::RadioButton { .. } => "RadioButton",
     }
+}
+
+// ─── List marker helpers ────────────────────────────────────────────
+
+/// Produce the visible marker text for a list item at the given index.
+/// For unordered lists, returns the bullet glyph (or empty for `None`).
+/// For ordered lists, returns the index in the chosen numbering system
+/// followed by a period (e.g. "3.", "iii.", "c.").
+fn format_marker(idx: u32, ordered: bool, marker_type: ListMarkerType) -> String {
+    if !ordered {
+        // v1: Disc/Circle/Square all render as "•" (U+2022 BULLET),
+        // which is in standard fonts' WinAnsi range. Proper distinct
+        // glyphs for circle/square are a follow-up.
+        return match marker_type {
+            ListMarkerType::None => String::new(),
+            _ => "•".to_string(),
+        };
+    }
+    let body = match marker_type {
+        ListMarkerType::LowerAlpha => to_alpha(idx, false),
+        ListMarkerType::UpperAlpha => to_alpha(idx, true),
+        ListMarkerType::LowerRoman => to_roman(idx, false),
+        ListMarkerType::UpperRoman => to_roman(idx, true),
+        ListMarkerType::None => return String::new(),
+        // Decimal + every unordered variant routed here (caller shouldn't
+        // mix unordered marker_type with ordered=true, but be permissive).
+        _ => idx.to_string(),
+    };
+    format!("{body}.")
+}
+
+/// Convert a 1-based index to an alphabetic marker (a, b, ..., z, aa,
+/// ab, ...). `upper = true` returns uppercase letters.
+fn to_alpha(mut n: u32, upper: bool) -> String {
+    if n == 0 {
+        return String::new();
+    }
+    let base = if upper { b'A' } else { b'a' };
+    let mut bytes: Vec<u8> = Vec::new();
+    while n > 0 {
+        let rem = ((n - 1) % 26) as u8;
+        bytes.push(base + rem);
+        n = (n - 1) / 26;
+    }
+    bytes.reverse();
+    String::from_utf8(bytes).unwrap_or_default()
+}
+
+/// Convert a 1-based index to a Roman numeral. `upper = true` returns
+/// uppercase. Falls back to the decimal representation for n outside
+/// 1..=3999 (Roman numerals lose meaning past that).
+fn to_roman(n: u32, upper: bool) -> String {
+    if n == 0 || n > 3999 {
+        return n.to_string();
+    }
+    const UPPER: &[(&str, u32)] = &[
+        ("M", 1000),
+        ("CM", 900),
+        ("D", 500),
+        ("CD", 400),
+        ("C", 100),
+        ("XC", 90),
+        ("L", 50),
+        ("XL", 40),
+        ("X", 10),
+        ("IX", 9),
+        ("V", 5),
+        ("IV", 4),
+        ("I", 1),
+    ];
+    const LOWER: &[(&str, u32)] = &[
+        ("m", 1000),
+        ("cm", 900),
+        ("d", 500),
+        ("cd", 400),
+        ("c", 100),
+        ("xc", 90),
+        ("l", 50),
+        ("xl", 40),
+        ("x", 10),
+        ("ix", 9),
+        ("v", 5),
+        ("iv", 4),
+        ("i", 1),
+    ];
+    let table = if upper { UPPER } else { LOWER };
+    let mut out = String::new();
+    let mut remaining = n;
+    for &(sym, val) in table {
+        while remaining >= val {
+            out.push_str(sym);
+            remaining -= val;
+        }
+    }
+    out
+}
+
+/// Reserve a left-side gutter wide enough to fit the widest marker the
+/// list will render at its font size, plus a small gap. v1 uses an
+/// approximation based on font-size × char-count rather than measuring
+/// each marker through the FontContext — works well in practice for the
+/// standard latin fonts and avoids threading font measurement through
+/// the layout entry-point.
+fn compute_marker_gutter_width(
+    ordered: bool,
+    marker_type: ListMarkerType,
+    start: u32,
+    n_items: u32,
+    style: &ResolvedStyle,
+) -> f64 {
+    if matches!(marker_type, ListMarkerType::None) {
+        return 0.0;
+    }
+    // Approximate average character advance — close enough for the gutter.
+    let approx_char_w = style.font_size * 0.6;
+    let gap = 6.0_f64;
+    if !ordered {
+        // Bullet glyph (one char) + gap.
+        return approx_char_w + gap;
+    }
+    // Pick the widest marker the list will ever emit (the last one).
+    let last_idx = start + n_items.saturating_sub(1);
+    let widest = match marker_type {
+        ListMarkerType::Decimal => format_marker(last_idx, true, ListMarkerType::Decimal),
+        ListMarkerType::LowerAlpha => format_marker(last_idx, true, ListMarkerType::LowerAlpha),
+        ListMarkerType::UpperAlpha => format_marker(last_idx, true, ListMarkerType::UpperAlpha),
+        ListMarkerType::LowerRoman => format_marker(last_idx, true, ListMarkerType::LowerRoman),
+        ListMarkerType::UpperRoman => format_marker(last_idx, true, ListMarkerType::UpperRoman),
+        _ => format_marker(last_idx, true, ListMarkerType::Decimal),
+    };
+    widest.chars().count() as f64 * approx_char_w + gap
 }
 
 /// Configuration for an interactive PDF form field.
@@ -1204,6 +1337,41 @@ impl LayoutEngine {
                     node.source_location.as_ref(),
                     node.bookmark.as_deref(),
                     Some(heading_role),
+                );
+            }
+
+            NodeKind::List {
+                ordered,
+                marker_type,
+                start,
+            } => {
+                self.layout_list(
+                    node,
+                    *ordered,
+                    *marker_type,
+                    *start,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    available_width,
+                    font_context,
+                );
+            }
+
+            NodeKind::ListItem => {
+                // A bare ListItem outside of a List is just a container —
+                // fall back to view-style layout. Real list rendering goes
+                // through layout_list which spawns each ListItem with the
+                // proper marker.
+                self.layout_view(
+                    node,
+                    &style,
+                    cursor,
+                    pages,
+                    x,
+                    available_width,
+                    font_context,
                 );
             }
 
@@ -2471,6 +2639,189 @@ impl LayoutEngine {
                 }
             }
         }
+    }
+
+    // ─── Lists ─────────────────────────────────────────────────────
+
+    #[allow(clippy::too_many_arguments)]
+    fn layout_list(
+        &self,
+        node: &Node,
+        ordered: bool,
+        marker_type: ListMarkerType,
+        start: u32,
+        style: &ResolvedStyle,
+        cursor: &mut PageCursor,
+        pages: &mut Vec<LayoutPage>,
+        x: f64,
+        available_width: f64,
+        font_context: &FontContext,
+    ) {
+        let margin = &style.margin.to_edges();
+        let padding = &style.padding;
+
+        cursor.y += margin.top;
+
+        let list_x = x + margin.left;
+        let outer_width = available_width - margin.horizontal();
+        let inner_width = outer_width - padding.horizontal();
+
+        // Count items so we can size the marker gutter for the widest
+        // marker the list will produce (e.g. "12." needs more space than "1.")
+        let n_items = node
+            .children
+            .iter()
+            .filter(|c| matches!(c.kind, NodeKind::ListItem))
+            .count() as u32;
+
+        let marker_gutter =
+            compute_marker_gutter_width(ordered, marker_type, start, n_items, style);
+
+        let list_inner_x = list_x + padding.left;
+        let content_x = list_inner_x + marker_gutter;
+        let content_width = (inner_width - marker_gutter).max(0.0);
+
+        // Snapshot for wrapping the items in a single List container
+        // element (so tagged-PDF picks up the /L role on the whole list).
+        let snapshot = cursor.elements.len();
+        let list_start_y = cursor.content_y + cursor.y;
+        cursor.y += padding.top;
+
+        let mut item_index: u32 = 0;
+        for child in &node.children {
+            if !matches!(child.kind, NodeKind::ListItem) {
+                continue;
+            }
+            let marker_idx = start + item_index;
+            self.layout_list_item(
+                child,
+                marker_idx,
+                ordered,
+                marker_type,
+                marker_gutter,
+                style,
+                cursor,
+                pages,
+                list_inner_x,
+                content_x,
+                content_width,
+                font_context,
+            );
+            item_index += 1;
+        }
+
+        cursor.y += padding.bottom;
+
+        // Wrap collected item elements in a List container
+        let item_elements: Vec<LayoutElement> = cursor.elements.drain(snapshot..).collect();
+        let list_height = cursor.content_y + cursor.y - list_start_y;
+        cursor.elements.push(LayoutElement {
+            x: list_x,
+            y: list_start_y,
+            width: outer_width,
+            height: list_height,
+            draw: DrawCommand::None,
+            children: item_elements,
+            node_type: Some("List".to_string()),
+            resolved_style: Some(style.clone()),
+            source_location: node.source_location.clone(),
+            href: None,
+            bookmark: node.bookmark.clone(),
+            alt: None,
+            is_header_row: false,
+            overflow: style.overflow,
+            opacity: style.opacity,
+        });
+
+        cursor.y += margin.bottom;
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn layout_list_item(
+        &self,
+        item: &Node,
+        marker_idx: u32,
+        ordered: bool,
+        marker_type: ListMarkerType,
+        marker_gutter: f64,
+        parent_style: &ResolvedStyle,
+        cursor: &mut PageCursor,
+        pages: &mut Vec<LayoutPage>,
+        list_inner_x: f64,
+        content_x: f64,
+        content_width: f64,
+        font_context: &FontContext,
+    ) {
+        let item_style = item.style.resolve(Some(parent_style), content_width);
+        let item_margin = item_style.margin.to_edges();
+
+        cursor.y += item_margin.top;
+        let item_start_y = cursor.content_y + cursor.y;
+        let item_snapshot = cursor.elements.len();
+
+        // 1. Render the marker. Save cursor.y, lay out marker as a tiny
+        //    Text node at list_inner_x with width = marker_gutter, then
+        //    restore cursor.y so the content lays out at the same line.
+        let marker_str = format_marker(marker_idx, ordered, marker_type);
+        if !marker_str.is_empty() {
+            let saved_y = cursor.y;
+            self.layout_text(
+                &marker_str,
+                None,
+                &[],
+                &item_style,
+                cursor,
+                pages,
+                list_inner_x,
+                marker_gutter,
+                font_context,
+                None,
+                None,
+                Some("Lbl"),
+            );
+            cursor.y = saved_y;
+        }
+
+        // 2. Lay out item children at content_x using the standard
+        //    layout_children path. Wrapping inside a long item naturally
+        //    indents to content_x for every line because that's the x
+        //    we hand to layout_children — no special hanging-indent
+        //    logic required, since the marker is a separate element.
+        self.layout_children(
+            &item.children,
+            &item.style,
+            cursor,
+            pages,
+            content_x,
+            content_width,
+            Some(&item_style),
+            font_context,
+        );
+
+        // 3. Wrap marker + content in a ListItem container element
+        //    (tagged PDF picks up /LI from the node_type).
+        let item_children: Vec<LayoutElement> = cursor.elements.drain(item_snapshot..).collect();
+        let item_height = cursor.content_y + cursor.y - item_start_y;
+        let item_width = content_x + content_width - list_inner_x;
+        cursor.elements.push(LayoutElement {
+            x: list_inner_x,
+            y: item_start_y,
+            width: item_width,
+            height: item_height,
+            draw: DrawCommand::None,
+            children: item_children,
+            node_type: Some("ListItem".to_string()),
+            resolved_style: Some(item_style.clone()),
+            source_location: item.source_location.clone(),
+            href: None,
+            bookmark: item.bookmark.clone(),
+            alt: None,
+            is_header_row: false,
+            overflow: item_style.overflow,
+            opacity: item_style.opacity,
+        });
+
+        cursor.y += item_margin.bottom;
     }
 
     #[allow(clippy::too_many_arguments)]

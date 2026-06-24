@@ -155,6 +155,14 @@ impl TagBuilder {
             "H4" => "H4",
             "H5" => "H5",
             "H6" => "H6",
+            // Lists: List → /L, ListItem → /LI, Lbl (the marker text) →
+            // /Lbl. PDF/UA-1 + PDF/A-2a both recognize these as standard
+            // structure elements. We don't currently wrap each item's
+            // content in an explicit /LBody — viewers tolerate the
+            // shorthand of placing content directly under /LI.
+            "List" => "L",
+            "ListItem" => "LI",
+            "Lbl" => "Lbl",
             "TextLine" => "Span",
             "Image" => "Figure",
             "Svg" => "Figure",

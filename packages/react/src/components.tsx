@@ -4,6 +4,9 @@ import type {
   ViewProps,
   TextProps,
   HeadingProps,
+  OrderedListProps,
+  UnorderedListProps,
+  ListItemProps,
   StrongProps,
   EmProps,
   CodeProps,
@@ -154,6 +157,62 @@ export function H5(_props: HeadingProps): null {
   return null;
 }
 export function H6(_props: HeadingProps): null {
+  return null;
+}
+
+/**
+ * An ordered (numbered) list. Children must be `<ListItem>` elements.
+ *
+ * Numbering continues across page breaks. The marker gutter is sized
+ * automatically to fit the widest number the list will render.
+ *
+ * @param props.type   - Numbering style. `'decimal'` (default) | `'lower-alpha'`
+ *                       | `'upper-alpha'` | `'lower-roman'` | `'upper-roman'`.
+ * @param props.start  - Starting index. Defaults to `1`.
+ * @param props.style  - Container style overrides.
+ *
+ * @example
+ * ```tsx
+ * <OrderedList type="lower-alpha">
+ *   <ListItem>first</ListItem>
+ *   <ListItem>second</ListItem>
+ * </OrderedList>
+ * ```
+ */
+export function OrderedList(_props: OrderedListProps): null {
+  return null;
+}
+
+/**
+ * An unordered (bulleted) list. Children must be `<ListItem>` elements.
+ *
+ * v1 ships with the standard "•" bullet glyph for `disc`, `circle`, and
+ * `square` (proper distinct glyphs for circle and square are a follow-up).
+ * `none` suppresses the marker entirely.
+ *
+ * @param props.marker - Bullet style. `'disc'` (default) | `'circle'`
+ *                       | `'square'` | `'none'`.
+ * @param props.style  - Container style overrides.
+ *
+ * @example
+ * ```tsx
+ * <UnorderedList>
+ *   <ListItem>first</ListItem>
+ *   <ListItem>second</ListItem>
+ * </UnorderedList>
+ * ```
+ */
+export function UnorderedList(_props: UnorderedListProps): null {
+  return null;
+}
+
+/**
+ * One item inside an `<OrderedList>` or `<UnorderedList>`. Content can
+ * be text, inline-formatted runs, nested lists, or any Forme content
+ * node — the marker is rendered to the left, content (including any
+ * wrapped lines) aligns to the right of the marker gutter.
+ */
+export function ListItem(_props: ListItemProps): null {
   return null;
 }
 

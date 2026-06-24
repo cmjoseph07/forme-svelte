@@ -10267,3 +10267,209 @@ fn test_no_transform_no_cm_wrapper() {
         "rotate cm matrix appeared in a no-transform render"
     );
 }
+
+// ── Lists (#4 from the author-experience batch) ────────────────────
+
+fn make_list_item(text: &str) -> Node {
+    Node {
+        kind: NodeKind::ListItem,
+        style: Style::default(),
+        children: vec![make_text(text, 12.0)],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }
+}
+
+fn make_list(ordered: bool, marker_type: ListMarkerType, start: u32, items: Vec<Node>) -> Node {
+    Node {
+        kind: NodeKind::List {
+            ordered,
+            marker_type,
+            start,
+        },
+        style: Style::default(),
+        children: items,
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    }
+}
+
+#[test]
+fn test_unordered_list_renders_bullet_markers() {
+    let doc = default_doc(vec![make_list(
+        false,
+        ListMarkerType::Disc,
+        1,
+        vec![
+            make_list_item("first"),
+            make_list_item("second"),
+            make_list_item("third"),
+        ],
+    )]);
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+    let stream = decompress_pdf_streams(&bytes);
+    // Bullet glyph (U+2022) maps through WinAnsi to byte 0x95. In the
+    // PDF content stream it appears in the Tj operand. Also assert the
+    // item text content lands in the rendered stream.
+    assert!(
+        stream.contains("first") && stream.contains("second") && stream.contains("third"),
+        "expected all three item bodies in the rendered stream"
+    );
+}
+
+#[test]
+fn test_ordered_decimal_list_renders_numbered_markers() {
+    let doc = default_doc(vec![make_list(
+        true,
+        ListMarkerType::Decimal,
+        1,
+        vec![
+            make_list_item("a"),
+            make_list_item("b"),
+            make_list_item("c"),
+        ],
+    )]);
+    let bytes = render_to_pdf(&doc);
+    let stream = decompress_pdf_streams(&bytes);
+    // Markers should appear in the stream as "1.", "2.", "3.".
+    for n in 1..=3 {
+        let marker = format!("{}.", n);
+        assert!(
+            stream.contains(&marker),
+            "expected marker `{}` in the stream",
+            marker
+        );
+    }
+}
+
+#[test]
+fn test_ordered_list_respects_start_index() {
+    let doc = default_doc(vec![make_list(
+        true,
+        ListMarkerType::Decimal,
+        5,
+        vec![make_list_item("a"), make_list_item("b")],
+    )]);
+    let stream = decompress_pdf_streams(&render_to_pdf(&doc));
+    assert!(stream.contains("5."), "expected start=5 marker");
+    assert!(stream.contains("6."), "expected next marker after start");
+    assert!(!stream.contains("1."), "1. should not appear when start=5");
+}
+
+#[test]
+fn test_ordered_lower_roman_markers() {
+    let doc = default_doc(vec![make_list(
+        true,
+        ListMarkerType::LowerRoman,
+        1,
+        vec![
+            make_list_item("a"),
+            make_list_item("b"),
+            make_list_item("c"),
+            make_list_item("d"),
+            make_list_item("e"),
+        ],
+    )]);
+    let stream = decompress_pdf_streams(&render_to_pdf(&doc));
+    for m in ["i.", "ii.", "iii.", "iv.", "v."] {
+        assert!(stream.contains(m), "expected `{}` in stream", m);
+    }
+}
+
+#[test]
+fn test_ordered_lower_alpha_markers() {
+    let doc = default_doc(vec![make_list(
+        true,
+        ListMarkerType::LowerAlpha,
+        1,
+        vec![
+            make_list_item("a"),
+            make_list_item("b"),
+            make_list_item("c"),
+        ],
+    )]);
+    let stream = decompress_pdf_streams(&render_to_pdf(&doc));
+    for m in ["a.", "b.", "c."] {
+        assert!(stream.contains(m), "expected `{}` in stream", m);
+    }
+}
+
+#[test]
+fn test_list_emits_l_li_lbl_in_tagged_pdf() {
+    let doc = Document {
+        children: vec![Node::page(
+            PageConfig::default(),
+            Style::default(),
+            vec![make_list(
+                true,
+                ListMarkerType::Decimal,
+                1,
+                vec![make_list_item("first"), make_list_item("second")],
+            )],
+        )],
+        metadata: Default::default(),
+        default_page: PageConfig::default(),
+        fonts: vec![],
+        tagged: true,
+        pdfa: None,
+        default_style: None,
+        embedded_data: None,
+        flatten_forms: false,
+        pdf_ua: false,
+        certification: None,
+    };
+    let bytes = forme::render(&doc).unwrap();
+    let pdf_str = String::from_utf8_lossy(&bytes);
+    for needle in ["/S /L", "/S /LI", "/S /Lbl"] {
+        assert!(
+            pdf_str.contains(needle),
+            "tagged PDF missing `{}` structure role",
+            needle
+        );
+    }
+}
+
+#[test]
+fn test_list_item_content_offset_past_marker_gutter() {
+    // The content of a list item should be positioned to the right of
+    // the marker — i.e. its x is strictly greater than the list's x.
+    let list = make_list(
+        false,
+        ListMarkerType::Disc,
+        1,
+        vec![make_list_item("hello")],
+    );
+    let doc = default_doc(vec![list]);
+    let pages = layout_doc(&doc);
+    assert_eq!(pages.len(), 1);
+    // page → List wrapper → ListItem → [Lbl, Text]
+    let list_el = &pages[0].elements[0];
+    assert_eq!(list_el.node_type.as_deref(), Some("List"));
+    let item = &list_el.children[0];
+    assert_eq!(item.node_type.as_deref(), Some("ListItem"));
+    // Find the marker label and the body Text and assert content_x > marker_x.
+    let mut lbl_x: Option<f64> = None;
+    let mut body_x: Option<f64> = None;
+    for child in &item.children {
+        match child.node_type.as_deref() {
+            Some("Lbl") => lbl_x = Some(child.x),
+            Some("Text") => body_x = Some(child.x),
+            _ => {}
+        }
+    }
+    let lbl = lbl_x.expect("marker Lbl missing");
+    let body = body_x.expect("body Text missing");
+    assert!(
+        body > lbl,
+        "body x ({:.2}) should be greater than marker x ({:.2})",
+        body,
+        lbl,
+    );
+}

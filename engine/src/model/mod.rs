@@ -526,6 +526,22 @@ pub enum NodeKind {
         runs: Vec<TextRun>,
     },
 
+    /// An ordered or unordered list. Children should be `ListItem` nodes.
+    /// Marker numbering continues across page breaks.
+    List {
+        /// Whether items are numbered (true) or use a bullet glyph (false).
+        ordered: bool,
+        /// Which marker style to render.
+        marker_type: ListMarkerType,
+        /// Starting index for ordered lists (default 1). Ignored when
+        /// `ordered = false`.
+        #[serde(default = "default_list_start")]
+        start: u32,
+    },
+
+    /// One item inside a `List`. Children are the item content.
+    ListItem,
+
     /// An image node.
     Image {
         /// Base64-encoded image data, or a file path.
@@ -1015,6 +1031,28 @@ pub enum ColumnWidth {
     Auto,
 }
 
+/// Marker style for a `List`. Maps to CSS `list-style-type`:
+///   - `Disc` / `Circle` / `Square` / `None` for unordered lists
+///   - `Decimal` / `LowerAlpha` / `UpperAlpha` / `LowerRoman` / `UpperRoman`
+///     for ordered lists
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum ListMarkerType {
+    Disc,
+    Circle,
+    Square,
+    None,
+    Decimal,
+    LowerAlpha,
+    UpperAlpha,
+    LowerRoman,
+    UpperRoman,
+}
+
+fn default_list_start() -> u32 {
+    1
+}
+
 /// Where a fixed element is placed on the page.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FixedPosition {
@@ -1086,7 +1124,9 @@ impl Node {
             NodeKind::View
             | NodeKind::Table { .. }
             | NodeKind::Text { .. }
-            | NodeKind::Heading { .. } => self.style.wrap.unwrap_or(true),
+            | NodeKind::Heading { .. }
+            | NodeKind::List { .. }
+            | NodeKind::ListItem => self.style.wrap.unwrap_or(true),
             NodeKind::TableRow { .. } => true,
             NodeKind::Image { .. } => false,
             NodeKind::Svg { .. } => false,

@@ -1,5 +1,5 @@
 import { type ReactElement, type ReactNode, isValidElement, Children, Fragment } from 'react';
-import { Document, Page, View, Text, H1, H2, H3, H4, H5, H6, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
+import { Document, Page, View, Text, H1, H2, H3, H4, H5, H6, OrderedList, UnorderedList, ListItem, Strong, Em, Code, Link, Image, Table, Row, Cell, Fixed, Svg, QrCode, Barcode, Canvas, Watermark, PageBreak, BarChart, LineChart, PieChart, AreaChart, DotPlot, TextField, Checkbox, Dropdown, RadioButton } from './components.js';
 import { Font, type FontRegistration } from './font.js';
 import {
   isRefMarker, getRefPath,
@@ -31,6 +31,7 @@ import type {
   FormeColor,
   FormeBoxShadow,
   FormeTransformOp,
+  FormeListMarkerType,
   FormeBackground,
   FormeGradientStop,
   FormeEdgeValues,
@@ -351,6 +352,9 @@ function serializeChild(child: unknown, parent: ParentContext = null): FormeNode
   if (element.type === H4) return serializeHeading(element, 4);
   if (element.type === H5) return serializeHeading(element, 5);
   if (element.type === H6) return serializeHeading(element, 6);
+  if (element.type === OrderedList) return serializeList(element, true);
+  if (element.type === UnorderedList) return serializeList(element, false);
+  if (element.type === ListItem) return serializeListItem(element);
   if (element.type === Image) {
     return serializeImage(element);
   }
@@ -625,6 +629,89 @@ function serializeHeading(
   if (props.bookmark) node.bookmark = props.bookmark;
 
   return node;
+}
+
+// React `list-style-type`-shaped string → engine wire enum value.
+function mapListMarker(
+  marker: string | undefined,
+  defaultValue: FormeListMarkerType,
+): FormeListMarkerType {
+  switch (marker) {
+    case 'disc': return 'disc';
+    case 'circle': return 'circle';
+    case 'square': return 'square';
+    case 'none': return 'none';
+    case 'decimal': return 'decimal';
+    case 'lower-alpha': return 'lowerAlpha';
+    case 'upper-alpha': return 'upperAlpha';
+    case 'lower-roman': return 'lowerRoman';
+    case 'upper-roman': return 'upperRoman';
+    default: return defaultValue;
+  }
+}
+
+function serializeList(element: ReactElement, ordered: boolean): FormeNode {
+  const props = element.props as {
+    type?: string;
+    marker?: string;
+    start?: number;
+    style?: Style;
+    bookmark?: string;
+    children?: unknown;
+  };
+
+  const markerType: FormeListMarkerType = ordered
+    ? mapListMarker(props.type, 'decimal')
+    : mapListMarker(props.marker, 'disc');
+
+  const start = typeof props.start === 'number' && props.start >= 1 ? props.start : 1;
+
+  // Children must be ListItems — anything else is silently dropped to
+  // keep the serializer tolerant. (We don't throw on stray content because
+  // a Fragment / null child in JSX is too common to be a real error.)
+  const childElements = flattenChildren(props.children).filter(
+    (c) => isValidElement(c) && c.type === ListItem,
+  ) as ReactElement[];
+  const children = childElements.map((c) => serializeListItem(c));
+
+  const node: FormeNode = {
+    kind: { type: 'List', ordered, marker_type: markerType, start },
+    style: mapStyle(props.style),
+    children,
+    sourceLocation: extractSourceLocation(element),
+  };
+  if (props.bookmark) node.bookmark = props.bookmark;
+  return node;
+}
+
+function serializeListItem(element: ReactElement): FormeNode {
+  const props = element.props as { style?: Style; children?: unknown };
+  // ListItem content is layed out by the engine using layout_children, so
+  // we serialize whatever the user put inside as the node's children. This
+  // covers plain strings, JSX text, nested lists, formatted runs via
+  // <Text>, etc.
+  const rawChildren = flattenChildren(props.children);
+  const children: FormeNode[] = [];
+  for (const c of rawChildren) {
+    if (typeof c === 'string' || typeof c === 'number') {
+      // Auto-wrap raw strings in a Text node so the engine has something
+      // concrete to render. Matches the convention everywhere else.
+      children.push({
+        kind: { type: 'Text', content: String(c) },
+        style: {},
+        children: [],
+      });
+    } else if (isValidElement(c)) {
+      const node = serializeChild(c, null);
+      if (node) children.push(node);
+    }
+  }
+  return {
+    kind: { type: 'ListItem' },
+    style: mapStyle(props.style),
+    children,
+    sourceLocation: extractSourceLocation(element),
+  };
 }
 
 function serializeImage(element: ReactElement): FormeNode {

@@ -287,6 +287,54 @@ export interface TextProps {
 }
 
 /**
+ * Marker style for an ordered or unordered list. Matches CSS
+ * `list-style-type` for the supported values.
+ */
+export type ListMarker =
+  | 'disc'
+  | 'circle'
+  | 'square'
+  | 'none'
+  | 'decimal'
+  | 'lower-alpha'
+  | 'upper-alpha'
+  | 'lower-roman'
+  | 'upper-roman';
+
+/**
+ * An ordered (numbered) list. Children must be `<ListItem>`s.
+ */
+export interface OrderedListProps {
+  /** Marker style. Defaults to `'decimal'`. */
+  type?: 'decimal' | 'lower-alpha' | 'upper-alpha' | 'lower-roman' | 'upper-roman';
+  /** Starting index. Defaults to `1`. */
+  start?: number;
+  style?: Style;
+  bookmark?: string;
+  children?: ReactNode;
+}
+
+/**
+ * An unordered (bulleted) list. Children must be `<ListItem>`s.
+ */
+export interface UnorderedListProps {
+  /** Bullet glyph style. Defaults to `'disc'`. */
+  marker?: 'disc' | 'circle' | 'square' | 'none';
+  style?: Style;
+  bookmark?: string;
+  children?: ReactNode;
+}
+
+/**
+ * One item inside an `<OrderedList>` or `<UnorderedList>`. Content can be
+ * text, inline-formatted runs, nested lists, or any other Forme node.
+ */
+export interface ListItemProps {
+  style?: Style;
+  children?: ReactNode;
+}
+
+/**
  * Semantic heading. Renders text with sensible default styling per level
  * (size, weight, margin) AND tags the element as `/H1`–`/H6` in tagged
  * PDFs (PDF/UA / PDF/A-2a), so screen readers and the PDF outline
@@ -736,6 +784,19 @@ export interface FormeBoxShadow {
   color: { r: number; g: number; b: number; a: number };
 }
 
+/** Engine wire format for list marker type — matches the Rust enum's
+ *  serde camelCase output. */
+export type FormeListMarkerType =
+  | 'disc'
+  | 'circle'
+  | 'square'
+  | 'none'
+  | 'decimal'
+  | 'lowerAlpha'
+  | 'upperAlpha'
+  | 'lowerRoman'
+  | 'upperRoman';
+
 /** A single transform operation in the engine wire format. The discriminator
  *  is `type` matching the engine's serde tag. */
 export type FormeTransformOp =
@@ -776,6 +837,8 @@ export type FormeNodeKind =
   | { type: 'View' }
   | { type: 'Text'; content: string; href?: string; runs?: TextRun[] }
   | { type: 'Heading'; level: number; content: string; href?: string; runs?: TextRun[] }
+  | { type: 'List'; ordered: boolean; marker_type: FormeListMarkerType; start: number }
+  | { type: 'ListItem' }
   | { type: 'Image'; src: string; width?: number; height?: number }
   | { type: 'Table'; columns: FormeColumnDef[] }
   | { type: 'TableRow'; is_header: boolean }
