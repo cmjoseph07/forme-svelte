@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.5] - 2026-06-29
+
+### Fixed
+- Engine bumped to 0.10.5 — table header page-break fix (see engine CHANGELOG)
+
 ## [0.10.4] - 2026-06-05
 
 _Picks up engine 0.10.4 — four layout fixes: repeating-header page-count inflation, View-around-Table auto-height inflation, SVG viewBox scaling, and column-axis `marginTop: 'auto'`._

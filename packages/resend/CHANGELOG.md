@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.10.5] - 2026-06-29
+
+_Version bump only — engine 0.10.5 fixes table header page-break orphan + long-header contamination via `@formepdf/core`._
+
 ## [0.10.4] - 2026-06-05
 
 _Bump `@formepdf/core` to 0.10.4 — picks up four engine layout fixes (Table repeating-header page-count, View-around-Table auto-height, SVG viewBox scaling, column-axis `marginTop: 'auto'`)._

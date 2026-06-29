@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.10.5] - 2026-06-29
+
+### Fixed
+- WASM rebuilt against engine 0.10.5: `<Table>` with `<Row header>` no longer leaves an orphan header at the bottom of a page when the header alone fits but the first body row does not. The same fix also addresses the long-token-header contamination edge case where a wrapped multi-line header rendered 3 pages with header text leaking onto a prior page
+
 ## [0.10.4] - 2026-06-05
 
 ### Fixed

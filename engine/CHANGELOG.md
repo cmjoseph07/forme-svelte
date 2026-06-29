@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.10.5] - 2026-06-29
+
+### Fixed
+- `<Table>` with `<Row header>` no longer orphans the header at the bottom of a page when the header alone fits in the remaining space but the first body row does not. Closes the GitHub orphan-header bug. The 0.10.4 pre-fit check gated only on `total_header_h > remaining_height`; the body row could still overflow afterward, leaving an orphaned header that re-emitted on the next page. The check now folds in the first body row's measured height (`needed = total_header_h + first_body_h`), capped at fresh-page available height so the existing `!is_header` cell-overflow guard in `layout_table_row` still handles the rare case where the combined block is genuinely taller than a page. Also fixes the long-token-header contamination edge case where a wrapped multi-line header rendered 3 pages with header text leaking onto a prior page
+
+### Internal
+- Two new integration tests: `test_table_header_no_orphan_when_first_body_row_doesnt_fit` and `test_table_long_header_text_no_page_contamination`. Both verified to fail without the fix and pass with it
+
 ## [0.10.4] - 2026-06-05
 
 ### Fixed
