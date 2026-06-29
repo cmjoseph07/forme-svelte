@@ -10473,3 +10473,188 @@ fn test_list_item_content_offset_past_marker_gutter() {
         lbl,
     );
 }
+
+// ─── Table page-break: orphan header + long-token header (issues 1 + 2) ──
+
+/// Count TableRow elements with `is_header_row: true` anywhere in the
+/// page's element tree. The table layout nests cells inside rows inside
+/// arbitrary parent containers, so a flat scan of page.elements isn't
+/// enough — walk recursively.
+fn count_header_table_rows(page: &forme::layout::LayoutPage) -> usize {
+    fn walk(el: &forme::layout::LayoutElement, count: &mut usize) {
+        if el.is_header_row && el.node_type.as_deref() == Some("TableRow") {
+            *count += 1;
+        }
+        for c in &el.children {
+            walk(c, count);
+        }
+    }
+    let mut count = 0;
+    for el in &page.elements {
+        walk(el, &mut count);
+    }
+    count
+}
+
+#[test]
+fn test_table_header_no_orphan_when_first_body_row_doesnt_fit() {
+    // Regression: a spacer pushes the cursor low enough that the header
+    // alone fits in remaining space but the first body row does not. The
+    // 0.10.4 header-only pre-check let the header lay out at the bottom of
+    // page 1; the body-row check then page-broke and re-emitted the header
+    // on page 2 — leaving an orphan header at the bottom of page 1.
+    //
+    // The pre-check now folds in the first body row, so the table moves to
+    // a fresh page where header + first row land together.
+    //
+    // Default A4 doc: content area 487 × 734pt. A 700pt spacer leaves 34pt
+    // remaining. Cell padding 4 each side + 10pt text × 1.4 line-height
+    // ≈ 22pt per row. header_h (22) fits in remaining (34) — the original
+    // header-only pre-check did NOT fire — but header + first body row
+    // (44) does not fit. Combined check fires and page-breaks; header
+    // lands on page 2.
+    let spacer = make_styled_view(
+        Style {
+            height: Some(Dimension::Pt(700.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+
+    let table = Node {
+        kind: NodeKind::Table {
+            columns: vec![ColumnDef {
+                width: ColumnWidth::Fraction(1.0),
+            }],
+        },
+        style: Style::default(),
+        children: vec![
+            make_table_row(true, vec![make_table_cell(vec![make_text("Header", 10.0)])]),
+            make_table_row(false, vec![make_table_cell(vec![make_text("Row 1", 10.0)])]),
+            make_table_row(false, vec![make_table_cell(vec![make_text("Row 2", 10.0)])]),
+        ],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+
+    let doc = default_doc(vec![spacer, table]);
+    let pages = layout_doc(&doc);
+
+    assert_eq!(
+        pages.len(),
+        2,
+        "Expected exactly 2 pages, got {}",
+        pages.len()
+    );
+    assert_eq!(
+        count_header_table_rows(&pages[0]),
+        0,
+        "Page 1 must not contain an orphaned header row"
+    );
+    assert_eq!(
+        count_header_table_rows(&pages[1]),
+        1,
+        "Page 2 should contain the single header row"
+    );
+
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+}
+
+#[test]
+fn test_table_long_header_text_no_page_contamination() {
+    // Regression (mirrors GitHub issue 2 reproduction): a header cell holds
+    // a long no-break-opportunity token ("Amount" × 40). The line breaker
+    // force-breaks at char boundaries, so the header row is several lines
+    // tall. With a spacer pushing the table low on page 1, the symptom
+    // was that header text leaked onto page 1, the page count went 2 → 3,
+    // and the header repeated twice with partial content.
+    //
+    // The combined header + first-body pre-check moves the table to a
+    // fresh page where the entire header and first row land together —
+    // no intra-cell page break inside the header, no contamination, no
+    // doubled header.
+    // Default A4 content area: 487 × 734pt. With this column split, the
+    // long-token header cell wraps to ~12 lines × 12.6pt + 8pt padding ≈
+    // 134pt. A 588pt spacer leaves ~146pt remaining. The header (134) fits
+    // alone — the original 0.10.4 pre-check did NOT fire — but the
+    // header + first body row (134 + 21 ≈ 155) does not fit. Combined
+    // check fires and moves the table to a fresh page.
+    let spacer = make_styled_view(
+        Style {
+            height: Some(Dimension::Pt(588.0)),
+            ..Default::default()
+        },
+        vec![],
+    );
+
+    let long_token = "Amount".repeat(40);
+
+    let table = Node {
+        kind: NodeKind::Table {
+            columns: vec![
+                ColumnDef {
+                    width: ColumnWidth::Fraction(0.7),
+                },
+                ColumnDef {
+                    width: ColumnWidth::Fraction(0.3),
+                },
+            ],
+        },
+        style: Style::default(),
+        children: vec![
+            make_table_row(
+                true,
+                vec![
+                    make_table_cell(vec![make_text("Description", 9.0)]),
+                    make_table_cell(vec![make_text(&long_token, 9.0)]),
+                ],
+            ),
+            make_table_row(
+                false,
+                vec![
+                    make_table_cell(vec![make_text("Website Redesign", 9.0)]),
+                    make_table_cell(vec![make_text("$4500.00", 9.0)]),
+                ],
+            ),
+            make_table_row(
+                false,
+                vec![
+                    make_table_cell(vec![make_text("Brand Identity Package", 9.0)]),
+                    make_table_cell(vec![make_text("$2200.00", 9.0)]),
+                ],
+            ),
+        ],
+        id: None,
+        source_location: None,
+        bookmark: None,
+        href: None,
+        alt: None,
+    };
+
+    let doc = default_doc(vec![spacer, table]);
+    let pages = layout_doc(&doc);
+
+    assert_eq!(
+        pages.len(),
+        2,
+        "Expected exactly 2 pages (no contamination), got {}",
+        pages.len()
+    );
+    assert_eq!(
+        count_header_table_rows(&pages[0]),
+        0,
+        "Page 1 must not contain the table header"
+    );
+    assert_eq!(
+        count_header_table_rows(&pages[1]),
+        1,
+        "Page 2 should contain the single header row"
+    );
+
+    let bytes = render_to_pdf(&doc);
+    assert_valid_pdf(&bytes);
+}

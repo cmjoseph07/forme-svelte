@@ -2863,22 +2863,46 @@ impl LayoutEngine {
 
         let cell_x_start = table_x + padding.left + border.left;
 
-        // Initial-header pre-fit check (issue 4). The body-row loop below
-        // already checks remaining_height before each row; the header loop did
-        // not, so when the table started low enough on the page that the
-        // header didn't fit, each header cell's inner content triggered a
-        // widow/orphan page-break via layout_text. layout_table_row's
-        // cell-overflow path then captured those breaks as `cell_pages` and
-        // committed them as spurious "trial" pages — one per cell that broke,
-        // each snapshotting one more cell of the in-progress row (the
-        // "doubled and sliding column" symptom). Page-breaking before laying
-        // out headers eliminates the trigger.
+        // Initial-header pre-fit check. Covers three related symptoms:
+        //
+        //   * Original issue 4 ("doubled, sliding column"): table starts low
+        //     enough that the header didn't fit. Each header cell's inner
+        //     content triggered a widow/orphan page-break via layout_text,
+        //     and layout_table_row's cell-overflow path committed those
+        //     breaks as spurious "trial" pages.
+        //   * Orphan header: header fits in remaining space but the first
+        //     body row doesn't, so the header gets drawn at the bottom of
+        //     the current page with no rows beneath it, then redrawn on
+        //     the next page above the actual rows.
+        //   * Long-token header (issue 2 reproduction): a single header
+        //     cell wraps to many lines because of a no-break-opportunity
+        //     token. Even though the pre-check would fire on header height
+        //     alone, including the first body row makes the fit decision
+        //     symmetric with body-row checks below and avoids edge cases
+        //     where rounding leaves the header just barely fitting while
+        //     no body row will ever land on the same page.
+        //
+        // Fold the first body row into the fit calculation so we never
+        // leave an orphan header behind. Cap at fresh-page available
+        // height: if the combined block is genuinely taller than a page,
+        // page-breaking can't help — fall through and let the
+        // `!is_header` cell-overflow guard in layout_table_row handle it.
         if !header_rows.is_empty() {
             let total_header_h: f64 = header_rows
                 .iter()
                 .map(|r| self.measure_table_row_height(r, &col_widths, style, font_context))
                 .sum();
-            if total_header_h > cursor.remaining_height() {
+            let first_body_h = body_rows
+                .first()
+                .map(|r| self.measure_table_row_height(r, &col_widths, style, font_context))
+                .unwrap_or(0.0);
+
+            let needed = total_header_h + first_body_h;
+            let fresh_page_available = cursor.content_height
+                - cursor.fixed_header.iter().map(|(_, h)| *h).sum::<f64>()
+                - cursor.fixed_footer.iter().map(|(_, h)| *h).sum::<f64>();
+
+            if needed > cursor.remaining_height() && needed <= fresh_page_available {
                 pages.push(cursor.finalize());
                 *cursor = cursor.new_page();
                 cursor.y += padding.top + border.top;
