@@ -1,0 +1,43 @@
+// Components
+export { default as Document } from './components/Document.svelte';
+export { default as Page } from './components/Page.svelte';
+export { default as View } from './components/View.svelte';
+export { default as Text } from './components/Text.svelte';
+
+// Serialization
+export { serialize, render, renderToObject } from './serialize.js';
+export type { SerializeOptions } from './serialize.js';
+export { mapStyle, mapDimension, parseColor, expandEdges, expandCorners } from '@formepdf/shared';
+
+// StyleSheet
+export { StyleSheet } from './stylesheet.js';
+
+// Types
+export type {
+  // Developer-facing
+  Style,
+  GridTrackSize,
+  Edges,
+  Corners,
+  EdgeColors,
+  CertificationConfig,
+  SignatureConfig,
+  // Forme JSON output
+  FormeDocument,
+  FormeFont,
+  FormeNode,
+  FormeNodeKind,
+  FormeStyle,
+  FormeMetadata,
+  FormePageConfig,
+  FormePageSize,
+  FormeEdges,
+  FormeColumnDef,
+  FormeColumnWidth,
+  FormeDimension,
+  FormeColor,
+  FormeEdgeValues,
+  FormeCornerValues,
+  FormeGridTrackSize,
+  FormeGridPlacement,
+} from '@formepdf/shared';
