@@ -44,3 +44,6 @@ test-*.tsx
 test-*.json
 /tmp/
 *.pdf
+
+# Local issue tracker (see docs/agents/issue-tracker.md)
+.scratch/
