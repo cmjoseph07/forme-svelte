@@ -16,6 +16,7 @@ packages/vscode/pkg/
 # Node
 node_modules/
 dist/
+.svelte-kit/
 
 # OS
 .DS_Store
