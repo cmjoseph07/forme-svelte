@@ -1,7 +1,7 @@
 {
-  "name": "@formepdf/react",
+  "name": "@formepdf/shared",
   "version": "0.10.5",
-  "description": "JSX-to-JSON serializer for Forme PDF engine",
+  "description": "Framework-agnostic document model and serialization core shared by Forme adapters",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,21 +13,10 @@
     }
   },
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "@formepdf/shared": "0.10.5"
-  },
-  "peerDependencies": {
-    "react": "^18 || ^19"
+    "build": "tsc"
   },
   "devDependencies": {
-    "@types/react": "^19.0.0",
-    "react": "^19.0.0",
-    "typescript": "^5.7.0",
-    "vitest": "^3.0.0"
+    "typescript": "^5.7.0"
   },
   "files": [
     "dist"
@@ -36,6 +25,6 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/formepdf/forme",
-    "directory": "packages/react"
+    "directory": "packages/shared"
   }
 }
