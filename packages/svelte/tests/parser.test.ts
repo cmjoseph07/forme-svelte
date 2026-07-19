@@ -258,18 +258,186 @@ describe('text runs', () => {
     ).toEqual([{ content: 'a' }, { content: 'b' }]);
   });
 
-  it('flattens deeper nesting into the run of the outermost span', () => {
+  it('deeper nesting produces separate runs with accumulated styles', () => {
     expect(
       textKind(
-        `x <forme-text props="{}">a<forme-text props="{}">b</forme-text>c</forme-text>`
+        `x <forme-text props="{}">a<forme-text props='${attr({ style: { fontWeight: 700 } })}'>b</forme-text>c</forme-text>`
       ).runs
-    ).toEqual([{ content: 'x ' }, { content: 'abc' }]);
+    ).toEqual([
+      { content: 'x ' },
+      { content: 'a' },
+      { content: 'b', style: { fontWeight: 700 } },
+      { content: 'c' },
+    ]);
   });
 
   it('merges text across SSR block anchor comments within a chunk', () => {
     expect(
       textKind(`Total<!--[--> due<!--]-->: <forme-text props="{}">now</forme-text>`).runs
     ).toEqual([{ content: 'Total due: ' }, { content: 'now' }]);
+  });
+});
+
+describe('inline formatting', () => {
+  function textKind(inner: string) {
+    const doc = parseIn(`<forme-text props="{}">${inner}</forme-text>`);
+    const kind = doc.children[0].kind;
+    if (kind.type !== 'Text') throw new Error('expected Text kind');
+    return kind;
+  }
+
+  it('Strong / Em / Code carry their component defaults', () => {
+    expect(
+      textKind(
+        `<forme-strong props="{}">b</forme-strong><forme-em props="{}">i</forme-em><forme-code props="{}">c</forme-code>`
+      ).runs
+    ).toEqual([
+      { content: 'b', style: { fontWeight: 700 } },
+      { content: 'i', style: { fontStyle: 'Italic' } },
+      { content: 'c', style: { fontFamily: 'Courier', backgroundColor: parseColor('#F4F4F5') } },
+    ]);
+  });
+
+  it('Link produces href + blue underline defaults', () => {
+    expect(
+      textKind(`<forme-link props='${attr({ href: 'https://forme.dev' })}'>go</forme-link>`).runs
+    ).toEqual([
+      {
+        content: 'go',
+        style: { color: parseColor('#2563EB'), textDecoration: 'Underline' },
+        href: 'https://forme.dev',
+      },
+    ]);
+  });
+
+  it('nesting composes styles; user style wins over defaults', () => {
+    expect(
+      textKind(
+        `<forme-strong props="{}"><forme-em props='${attr({ style: { fontWeight: 400 } })}'>x</forme-em></forme-strong>`
+      ).runs
+    ).toEqual([{ content: 'x', style: { fontWeight: 400, fontStyle: 'Italic' } }]);
+  });
+
+  it('Link href survives an outer Strong and styles compose', () => {
+    expect(
+      textKind(
+        `<forme-strong props="{}">see <forme-link props='${attr({ href: 'https://x.dev' })}'>here</forme-link></forme-strong>`
+      ).runs
+    ).toEqual([
+      { content: 'see ', style: { fontWeight: 700 } },
+      {
+        content: 'here',
+        style: { fontWeight: 700, color: parseColor('#2563EB'), textDecoration: 'Underline' },
+        href: 'https://x.dev',
+      },
+    ]);
+  });
+
+  it('throws a helpful error for inline components outside <Text>', () => {
+    expect(() => parseIn(`<forme-strong props="{}">loose</forme-strong>`)).toThrow(
+      '<Strong> is an inline formatting component'
+    );
+  });
+});
+
+describe('headings', () => {
+  it('applies level defaults under the user style', () => {
+    const doc = parseIn(
+      `<forme-h1 props='${attr({ style: { fontSize: 40 } })}'>Title</forme-h1>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: { type: 'Heading', level: 1, content: 'Title' },
+      style: { fontSize: 40, fontWeight: 700, margin: { top: 24, right: 0, bottom: 16, left: 0 } },
+      children: [],
+    });
+  });
+
+  it('each level emits its number and default font size', () => {
+    const sizes = [32, 24, 20, 18, 16, 14];
+    for (let level = 1; level <= 6; level++) {
+      const doc = parseIn(`<forme-h${level} props="{}">t</forme-h${level}>`);
+      const kind = doc.children[0].kind;
+      if (kind.type !== 'Heading') throw new Error('expected Heading kind');
+      expect(kind.level).toBe(level);
+      expect(doc.children[0].style.fontSize).toBe(sizes[level - 1]);
+    }
+  });
+
+  it('supports inline runs, href, and bookmark', () => {
+    const doc = parseIn(
+      `<forme-h2 props='${attr({ href: 'https://x.dev', bookmark: 'B' })}'>a <forme-strong props="{}">b</forme-strong></forme-h2>`
+    );
+    const kind = doc.children[0].kind;
+    if (kind.type !== 'Heading') throw new Error('expected Heading kind');
+    expect(kind.href).toBe('https://x.dev');
+    expect(kind.runs).toEqual([{ content: 'a ' }, { content: 'b', style: { fontWeight: 700 } }]);
+    expect(doc.children[0].bookmark).toBe('B');
+  });
+});
+
+describe('lists', () => {
+  it('OrderedList defaults: ordered, decimal, start 1', () => {
+    const doc = parseIn(
+      `<forme-ordered-list props="{}"><forme-list-item props="{}">a</forme-list-item></forme-ordered-list>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'List',
+      ordered: true,
+      marker_type: 'decimal',
+      start: 1,
+    });
+    expect(doc.children[0].children).toEqual([
+      {
+        kind: { type: 'ListItem' },
+        style: {},
+        children: [{ kind: { type: 'Text', content: 'a' }, style: {}, children: [] }],
+      },
+    ]);
+  });
+
+  it('maps kebab-case marker types to the engine wire enum', () => {
+    const doc = parseIn(
+      `<forme-ordered-list props='${attr({ type: 'lower-roman', start: 3 })}'></forme-ordered-list>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'List',
+      ordered: true,
+      marker_type: 'lowerRoman',
+      start: 3,
+    });
+  });
+
+  it('UnorderedList defaults to disc and accepts marker overrides', () => {
+    const disc = parseIn(`<forme-unordered-list props="{}"></forme-unordered-list>`);
+    expect(disc.children[0].kind).toEqual({
+      type: 'List',
+      ordered: false,
+      marker_type: 'disc',
+      start: 1,
+    });
+    const square = parseIn(
+      `<forme-unordered-list props='${attr({ marker: 'square' })}'></forme-unordered-list>`
+    );
+    const kind = square.children[0].kind;
+    if (kind.type !== 'List') throw new Error('expected List kind');
+    expect(kind.marker_type).toBe('square');
+  });
+
+  it('drops non-ListItem children of a list silently', () => {
+    const doc = parseIn(
+      `<forme-ordered-list props="{}">stray<forme-view props="{}"></forme-view><forme-list-item props="{}">kept</forme-list-item></forme-ordered-list>`
+    );
+    expect(doc.children[0].children).toHaveLength(1);
+  });
+
+  it('ListItem accepts mixed content including nested lists', () => {
+    const doc = parseIn(
+      `<forme-ordered-list props="{}"><forme-list-item props="{}"><forme-text props="{}">t</forme-text><forme-unordered-list props="{}"><forme-list-item props="{}">n</forme-list-item></forme-unordered-list></forme-list-item></forme-ordered-list>`
+    );
+    const item = doc.children[0].children[0];
+    expect(item.children).toHaveLength(2);
+    expect(item.children[0].kind.type).toBe('Text');
+    expect(item.children[1].kind.type).toBe('List');
   });
 });
 

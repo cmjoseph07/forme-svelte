@@ -3,6 +3,19 @@ export { default as Document } from './components/Document.svelte';
 export { default as Page } from './components/Page.svelte';
 export { default as View } from './components/View.svelte';
 export { default as Text } from './components/Text.svelte';
+export { default as H1 } from './components/H1.svelte';
+export { default as H2 } from './components/H2.svelte';
+export { default as H3 } from './components/H3.svelte';
+export { default as H4 } from './components/H4.svelte';
+export { default as H5 } from './components/H5.svelte';
+export { default as H6 } from './components/H6.svelte';
+export { default as OrderedList } from './components/OrderedList.svelte';
+export { default as UnorderedList } from './components/UnorderedList.svelte';
+export { default as ListItem } from './components/ListItem.svelte';
+export { default as Strong } from './components/Strong.svelte';
+export { default as Em } from './components/Em.svelte';
+export { default as Code } from './components/Code.svelte';
+export { default as Link } from './components/Link.svelte';
 export { default as Table } from './components/Table.svelte';
 export { default as Row } from './components/Row.svelte';
 export { default as Cell } from './components/Cell.svelte';
@@ -49,6 +62,7 @@ export type {
   // Developer-facing
   Style,
   TextRun,
+  ListMarker,
   ColumnDef,
   BarcodeFormat,
   ChartDataPoint,
@@ -85,4 +99,6 @@ export type {
   FormeCornerValues,
   FormeGridTrackSize,
   FormeGridPlacement,
+  FormeListMarkerType,
+  FormeTransformOp,
 } from '@formepdf/shared';

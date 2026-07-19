@@ -53,6 +53,9 @@ The same components with the same props as `@formepdf/react`.
 - `Page` - A page with size, margins, and orientation
 - `View` - Flex container (like div)
 - `Text` - Text content with font styling
+- `H1`-`H6` - Semantic headings with per-level default styling and tagged-PDF roles
+- `Strong`, `Em`, `Code`, `Link` - Inline formatting inside `Text` and headings
+- `OrderedList`, `UnorderedList`, `ListItem` - Numbered and bulleted lists
 - `Image` - JPEG, PNG, and WebP images
 - `Fixed` - Fixed headers and footers
 - `PageBreak` - Explicit page break

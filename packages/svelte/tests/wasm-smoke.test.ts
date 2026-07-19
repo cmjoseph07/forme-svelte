@@ -24,6 +24,8 @@ import ChartsFixture from './fixtures/charts.svelte';
 import FormFieldsFixture from './fixtures/form-fields.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import FontsFixture from './fixtures/fonts.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import SemanticsFixture from './fixtures/semantics.svelte';
 
 describe('WASM smoke', () => {
   it('renders a serialized .svelte template to valid PDF bytes', async () => {
@@ -178,5 +180,22 @@ describe('WASM smoke', () => {
     }
     expect(text).not.toContain('{{pageNumber}}');
     expect(text).not.toContain('{{totalPages}}');
+  });
+
+  it('renders headings, lists, inline formatting, and transforms', async () => {
+    const json = await render(SemanticsFixture, { props: { productName: 'Forme PDF' } });
+    const pdf = await renderPdf(json);
+
+    const header = new TextDecoder().decode(pdf.slice(0, 5));
+    expect(header).toBe('%PDF-');
+    const text = decompressedStreams(pdf);
+    // Heading and inline-run content is drawn.
+    expect(text).toContain('Getting started with Forme PDF');
+    expect(text).toContain('(both)');
+    // Ordered list markers respect type + start (lower-roman from iii).
+    expect(text).toContain('(iii.)');
+    expect(text).toContain('(iv.)');
+    // The transformed view emits a transform matrix (cm operator).
+    expect(text).toMatch(/[\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ [\d.-]+ cm/);
   });
 });

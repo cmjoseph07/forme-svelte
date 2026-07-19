@@ -52,9 +52,20 @@ forme/
     │   └── src/
     │       ├── index.ts    # Public exports
     │       ├── types.ts    # Document-model (Forme*) types + Style
-    │       ├── style.ts    # mapStyle + CSS shorthand/color/edge/grid parsing
+    │       ├── style.ts    # mapStyle + CSS shorthand/color/edge/grid/transform parsing
     │       ├── font.ts     # Font.register() store + font merging
-    │       └── canvas.ts   # CanvasContext recorder for <Canvas> draw callbacks
+    │       ├── canvas.ts   # CanvasContext recorder for <Canvas> draw callbacks
+    │       ├── charts.ts   # Chart kind builders (camelCase to snake_case prop mapping)
+    │       └── semantics.ts # Heading/inline-formatting defaults + list marker mapping
+    ├── svelte/             # Svelte 5 adapter: same components authored as .svelte files
+    │   └── src/
+    │       ├── index.ts    # Public exports
+    │       ├── components/ # One .svelte file per component, emitting placeholder tags
+    │       ├── serialize.ts # SSR render + parse entry points (serialize/render)
+    │       ├── parser.ts   # Placeholder markup to Forme document model
+    │       ├── encode.ts   # Props JSON round-trip (byte markers for Uint8Array)
+    │       ├── render-document.ts # One-call PDF rendering over optional @formepdf/core
+    │       └── preview/    # formePreview() SvelteKit route helper
     ├── react/              # JSX component library: <Document>, <Page>, <View>, etc.
     │   └── src/
     │       ├── index.ts    # Public exports
@@ -116,6 +127,7 @@ cd engine && cargo fmt && cargo clippy -- -W clippy::all
 # Build affected packages (build order: shared → react → core → cli)
 # Run tsc for each changed package, e.g.:
 cd packages/react && npm run build
+cd packages/svelte && npm run build
 cd packages/core && npm run build
 cd packages/mcp && npm run build
 ```
@@ -244,7 +256,7 @@ Templates enable a hosted API workflow: store template JSON + dynamic data → p
 Key files: `engine/src/template.rs`, `engine/src/lib.rs` (render_template), `engine/src/wasm.rs` (render_template_pdf), `packages/react/src/template-proxy.ts`, `packages/react/src/expr.ts`, `packages/react/src/serialize.ts` (serializeTemplate), `packages/core/src/index.ts` (renderTemplate), `packages/cli/src/template-build.ts` (buildTemplate), `packages/cli/src/index.ts` (--template flag).
 
 ### CSS String Shorthands (TypeScript layer only)
-Parsed in `mapStyle()` in `packages/shared/src/style.ts` — no engine changes needed. Three capabilities:
+Parsed in `mapStyle()` in `packages/shared/src/style.ts` - no engine changes needed. Three capabilities:
 
 1. **Border shorthand**: `border: "1px solid #000"` → parses into `borderWidth` + `borderColor`. Per-side variants: `borderTop: "2px solid #f00"` or `borderBottom: 3` (number = width only). `parseBorderString()` tokenizes by whitespace, recognizes CSS border-style keywords (ignored), numeric tokens (width), and color tokens.
 2. **Edge strings**: `padding: "8 16"` or `margin: "8 16 24 32"` → CSS 1-4 value shorthand. Optional `px` suffix stripped. `parseCSSEdges()` handles the parsing.

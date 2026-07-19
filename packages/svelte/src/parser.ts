@@ -35,12 +35,18 @@ import {
   buildDotPlotKind,
   buildLineChartKind,
   buildPieChartKind,
+  CODE_DEFAULTS,
+  EM_DEFAULTS,
   expandEdges,
   Font,
+  HEADING_DEFAULTS,
+  LINK_DEFAULTS,
   mapColumnWidth,
+  mapListMarker,
   mapStyle,
   mergeFonts,
   parseColor,
+  STRONG_DEFAULTS,
 } from '@formepdf/shared';
 import type {
   BarcodeFormat,
@@ -208,6 +214,24 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseView(element);
     case 'forme-text':
       return parseText(element);
+    case 'forme-h1':
+      return parseHeading(element, 1);
+    case 'forme-h2':
+      return parseHeading(element, 2);
+    case 'forme-h3':
+      return parseHeading(element, 3);
+    case 'forme-h4':
+      return parseHeading(element, 4);
+    case 'forme-h5':
+      return parseHeading(element, 5);
+    case 'forme-h6':
+      return parseHeading(element, 6);
+    case 'forme-ordered-list':
+      return parseList(element, true);
+    case 'forme-unordered-list':
+      return parseList(element, false);
+    case 'forme-list-item':
+      return parseListItem(element);
     case 'forme-table':
       return parseTable(element);
     case 'forme-row':
@@ -248,6 +272,15 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseDropdown(element);
     case 'forme-radio-button':
       return parseRadioButton(element);
+    case 'forme-strong':
+    case 'forme-em':
+    case 'forme-code':
+    case 'forme-link': {
+      const name = INLINE_COMPONENT_NAMES[element.tagName];
+      throw new Error(
+        `<${name}> is an inline formatting component and must be inside a <Text> or heading. Wrap it: <Text><${name}>...</${name}></Text>`
+      );
+    }
     case 'forme-page-break':
       return { kind: { type: 'PageBreak' }, style: {}, children: [] };
     case 'forme-page':
@@ -288,8 +321,11 @@ function validateNesting(componentName: string, parent: ParentContext): void {
 // ─── Unknown elements ────────────────────────────────────────────────
 
 const HTML_SUGGESTIONS: Record<string, string> = {
-  div: 'View', span: 'Text', p: 'Text', h1: 'Text', h2: 'Text',
-  h3: 'Text', img: 'Image', table: 'Table', tr: 'Row', td: 'Cell',
+  div: 'View', span: 'Text', p: 'Text', h1: 'H1', h2: 'H2',
+  h3: 'H3', h4: 'H4', h5: 'H5', h6: 'H6', img: 'Image',
+  table: 'Table', tr: 'Row', td: 'Cell', ol: 'OrderedList',
+  ul: 'UnorderedList', li: 'ListItem', strong: 'Strong', b: 'Strong',
+  em: 'Em', i: 'Em', code: 'Code', a: 'Link',
 };
 
 function unknownElementError(tagName: string): Error {
@@ -408,19 +444,43 @@ function parseText(element: P5Element): FormeNode {
   return node;
 }
 
+/** Inline formatting placeholder tags and their component-default
+ *  styles. `forme-text` carries no defaults beyond the user's style -
+ *  same table the react adapter keeps in `inlineDefaults()`. */
+const INLINE_DEFAULTS: Record<string, Style> = {
+  'forme-text': {},
+  'forme-strong': STRONG_DEFAULTS,
+  'forme-em': EM_DEFAULTS,
+  'forme-code': CODE_DEFAULTS,
+  'forme-link': LINK_DEFAULTS,
+};
+
+const INLINE_COMPONENT_NAMES: Record<string, string> = {
+  'forme-strong': 'Strong',
+  'forme-em': 'Em',
+  'forme-code': 'Code',
+  'forme-link': 'Link',
+};
+
 /**
- * Build styled text runs from a Text element's children, mirroring the
- * react adapter: only used when at least one direct child is a nested
- * `<Text>` (returns null otherwise). Plain text chunks become unstyled
- * runs; each nested `<Text>` becomes one run carrying its own
- * style/href with all its descendant text merged (deeper nesting
- * flattens - a run has exactly one style). Elements other than
- * `<Text>` are skipped but still split the surrounding text into
- * separate runs, as react's per-child loop does.
+ * Build styled text runs from a Text (or heading) element's children,
+ * mirroring the react adapter's `buildTextRuns`: only used when at
+ * least one direct child is an inline element (`<Text>`, `<Strong>`,
+ * `<Em>`, `<Code>`, `<Link>`) - returns null otherwise. Descent
+ * accumulates style and href: the outer accumulated style is overlaid
+ * by each inline component's defaults, which are overlaid by the
+ * user-supplied `style` on that element, so user style wins at every
+ * level. `<Strong><Em>both</Em></Strong>` produces a single run with
+ * bold + italic. Elements other than inline components are skipped but
+ * still split the surrounding text into separate runs, as react's
+ * per-child loop does.
  */
 function textRunsOf(nodes: P5Node[]): TextRun[] | null {
-  if (!nodes.some(n => isElement(n) && n.tagName === 'forme-text')) return null;
+  if (!nodes.some(n => isElement(n) && n.tagName in INLINE_DEFAULTS)) return null;
+  return buildRuns(nodes, {}, undefined);
+}
 
+function buildRuns(nodes: P5Node[], accStyle: Style, accHref: string | undefined): TextRun[] {
   const runs: TextRun[] = [];
   let buffer = '';
   const flush = () => {
@@ -429,7 +489,11 @@ function textRunsOf(nodes: P5Node[]): TextRun[] | null {
     // JSX drops whitespace-only literals spanning lines but keeps
     // same-line spaces between spans; cleanJsxText reproduces that,
     // leaving only genuinely empty chunks to discard.
-    if (content !== '') runs.push({ content });
+    if (content === '') return;
+    const run: TextRun = { content };
+    if (Object.keys(accStyle).length > 0) run.style = mapStyle(accStyle);
+    if (accHref) run.href = accHref;
+    runs.push(run);
   };
 
   for (const node of nodes) {
@@ -437,18 +501,123 @@ function textRunsOf(nodes: P5Node[]): TextRun[] | null {
       buffer += node.value;
     } else if (isElement(node)) {
       flush();
-      if (node.tagName !== 'forme-text') continue;
-      const props = decodeProps(node, 'Text') as TextProps;
-      const run: TextRun = { content: textContentOf(node.childNodes) };
-      if (props.style) run.style = mapStyle(props.style);
-      if (props.href) run.href = props.href;
-      runs.push(run);
+      const defaults = INLINE_DEFAULTS[node.tagName];
+      if (defaults === undefined) continue; // unknown element inside <Text> - skip
+      const props = decodeProps(node, INLINE_COMPONENT_NAMES[node.tagName] ?? 'Text') as TextProps;
+      // Cascade: outer accumulated -> this component's defaults -> user
+      // style. Later spreads win, so user style overrides defaults and
+      // outer.
+      const nextStyle: Style = { ...accStyle, ...defaults, ...(props.style || {}) };
+      const nextHref = props.href ?? accHref;
+      runs.push(...buildRuns(node.childNodes, nextStyle, nextHref));
     }
     // Comments (SSR block anchors) fall through: the text around them
     // stays one contiguous chunk.
   }
   flush();
   return runs;
+}
+
+// ─── Headings ────────────────────────────────────────────────────────
+
+interface HeadingProps {
+  style?: Style;
+  href?: string;
+  bookmark?: string;
+}
+
+/**
+ * Parse an H1-H6 placeholder. Mirrors parseText for the children
+ * machinery (mixed strings + inline-formatting components produce
+ * runs) but emits the engine's `Heading { level }` node kind so the
+ * tagged-PDF builder can pick up the semantic role. Default styles per
+ * level are merged BEFORE the user's `style` prop, so user values win.
+ */
+function parseHeading(element: P5Element, level: 1 | 2 | 3 | 4 | 5 | 6): FormeNode {
+  const props = decodeProps(element, `H${level}`) as HeadingProps;
+
+  const kind: FormeNode['kind'] = { type: 'Heading', level, content: '' };
+  const runs = textRunsOf(element.childNodes);
+  if (runs) {
+    kind.runs = runs;
+  } else {
+    kind.content = textContentOf(element.childNodes);
+  }
+  if (props.href) kind.href = props.href;
+
+  // Defaults underlay; user style wins on conflicting keys.
+  const mergedStyle: Style = { ...HEADING_DEFAULTS[level], ...(props.style || {}) };
+
+  const node: FormeNode = {
+    kind,
+    style: mapStyle(mergedStyle),
+    children: [],
+  };
+  if (props.bookmark) node.bookmark = props.bookmark;
+
+  return node;
+}
+
+// ─── Lists ───────────────────────────────────────────────────────────
+
+interface OrderedListProps {
+  type?: string;
+  start?: number;
+  style?: Style;
+  bookmark?: string;
+}
+
+interface UnorderedListProps {
+  marker?: string;
+  style?: Style;
+  bookmark?: string;
+}
+
+interface ListItemProps {
+  style?: Style;
+}
+
+function parseList(element: P5Element, ordered: boolean): FormeNode {
+  const props = decodeProps(
+    element,
+    ordered ? 'OrderedList' : 'UnorderedList'
+  ) as OrderedListProps & UnorderedListProps;
+
+  const markerType = ordered
+    ? mapListMarker(props.type, 'decimal')
+    : mapListMarker(props.marker, 'disc');
+
+  const start = typeof props.start === 'number' && props.start >= 1 ? props.start : 1;
+
+  // Children must be ListItems - anything else is silently dropped to
+  // keep the serializer tolerant, matching the react adapter. (Loose
+  // whitespace and `{#if}` anchors between items are too common to be
+  // a real error.)
+  const children = element.childNodes
+    .filter((c): c is P5Element => isElement(c) && c.tagName === 'forme-list-item')
+    .map(c => parseListItem(c));
+
+  const node: FormeNode = {
+    kind: { type: 'List', ordered, marker_type: markerType, start },
+    style: mapStyle(props.style),
+    children,
+  };
+  if (props.bookmark) node.bookmark = props.bookmark;
+  return node;
+}
+
+function parseListItem(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'ListItem') as ListItemProps;
+
+  // ListItem content is laid out by the engine using layout_children,
+  // so whatever the user put inside serializes as the node's children.
+  // Loose strings auto-wrap in a Text node via parseChild, matching
+  // the react adapter's convention.
+  return {
+    kind: { type: 'ListItem' },
+    style: mapStyle(props.style),
+    children: parseChildren(element.childNodes, null),
+  };
 }
 
 /**
