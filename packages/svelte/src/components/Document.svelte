@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { CertificationConfig, Style } from '@formepdf/shared';
+  import type { CertificationConfig, FontRegistration, Style } from '@formepdf/shared';
   import { encodeProps } from '../encode.js';
 
   interface Props {
@@ -22,6 +22,8 @@
     certification?: CertificationConfig;
     /** @deprecated Use certification */
     signature?: CertificationConfig;
+    /** Per-document custom fonts. Merged with `Font.register()` globals; document fonts win on conflict. */
+    fonts?: FontRegistration[];
     children?: Snippet;
   }
 

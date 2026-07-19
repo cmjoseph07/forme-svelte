@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { serialize as serializeReact } from '@formepdf/react';
-import { serialize } from '../src/index.js';
+import { serialize, Font } from '../src/index.js';
 import HelloWorldReact from './fixtures/hello-world';
 import KitchenSinkReact from './fixtures/kitchen-sink';
 import TextRunsReact from './fixtures/text-runs';
@@ -15,6 +15,8 @@ import MediaReact from './fixtures/media';
 import VectorExtrasReact from './fixtures/vector-extras';
 import ChartsReact from './fixtures/charts';
 import FormFieldsReact from './fixtures/form-fields';
+import FontsReact from './fixtures/fonts';
+import TailwindReact from './fixtures/tailwind';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -33,6 +35,10 @@ import VectorExtrasSvelte from './fixtures/vector-extras.svelte';
 import ChartsSvelte from './fixtures/charts.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import FormFieldsSvelte from './fixtures/form-fields.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import FontsSvelte from './fixtures/fonts.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import TailwindSvelte from './fixtures/tailwind.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -119,6 +125,44 @@ describe('cross-adapter parity', () => {
   it('fixed-page-numbers: header/footer, placeholder constants', async () => {
     const svelteDoc = await serialize(FixedPageNumbersSvelte, { props: { paragraphs: 5 } });
     const reactDoc = serializeReact(<FixedPageNumbersReact paragraphs={5} />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('fonts: Font.register globals merge with document fonts, byte srcs intact', async () => {
+    // The Font store is the shared singleton: one registration is
+    // visible to both adapters' serializers.
+    Font.register({ family: 'Global', src: 'global.ttf', fontWeight: 'bold' });
+    Font.register({ family: 'Inter', src: 'global-inter.ttf' });
+    try {
+      const svelteDoc = await serialize(FontsSvelte);
+      const reactDoc = serializeReact(<FontsReact />);
+      expect(svelteDoc).toEqual(reactDoc);
+      // Document fonts win the family:weight:italic conflict with globals.
+      const inter = svelteDoc.fonts!.find(f => f.family === 'Inter' && f.weight === 400);
+      expect(inter!.src).toBe('fonts/Inter-Regular.ttf');
+      // Byte sources survive the markup round-trip as real byte arrays.
+      const bytes = svelteDoc.fonts!.find(f => f.family === 'Bytes');
+      expect(bytes!.src).toBeInstanceOf(Uint8Array);
+    } finally {
+      Font.clear();
+    }
+  });
+
+  it('fonts with default props (no globals registered)', async () => {
+    const svelteDoc = await serialize(FontsSvelte);
+    const reactDoc = serializeReact(<FontsReact />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('tailwind: templates styled entirely with tw() classes', async () => {
+    const svelteDoc = await serialize(TailwindSvelte, { props: { total: '$99.00' } });
+    const reactDoc = serializeReact(<TailwindReact total="$99.00" />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('tailwind with default props', async () => {
+    const svelteDoc = await serialize(TailwindSvelte);
+    const reactDoc = serializeReact(<TailwindReact />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 });

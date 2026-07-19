@@ -27,6 +27,11 @@ export { default as RadioButton } from './components/RadioButton.svelte';
 // Page-number placeholders
 export { PAGE_NUMBER, TOTAL_PAGES } from './constants.js';
 
+// Font registration (the shared store singleton - registrations are
+// visible to every adapter in the process)
+export { Font } from '@formepdf/shared';
+export type { FontRegistration } from '@formepdf/shared';
+
 // Serialization
 export { serialize, render, renderToObject } from './serialize.js';
 export type { SerializeOptions } from './serialize.js';
