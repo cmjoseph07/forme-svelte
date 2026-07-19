@@ -3,7 +3,7 @@
  *
  * Each Forme Svelte component renders one placeholder tag whose
  * `props` attribute carries the component's props as JSON (part of
- * the internal emitter/parser contract — see `parser.ts`). Values
+ * the internal emitter/parser contract - see `parser.ts`). Values
  * that cannot survive the JSON round-trip fail loudly here, naming
  * the component and prop, rather than silently producing a wrong PDF.
  */

@@ -5,7 +5,7 @@
   interface Props {
     /** Image source: a `data:image/...;base64,...` URI, a path relative
      *  to the template file, or an absolute file path. Passed through
-     *  unresolved — resolution happens at render time. */
+     *  unresolved - resolution happens at render time. */
     src: string;
     /** Display width in points. If only one dimension is given, the
      *  other is computed from the image's aspect ratio. */
@@ -13,7 +13,7 @@
     /** Display height in points. */
     height?: number;
     style?: Style;
-    /** Optional hyperlink URL — makes the image clickable. */
+    /** Optional hyperlink URL - makes the image clickable. */
     href?: string;
     /** Alt text for accessibility. */
     alt?: string;

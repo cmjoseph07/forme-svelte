@@ -100,7 +100,7 @@ forme/
 Shared render pipeline extracted from the CLI dev server so that VS Code (and future integrations) reuse the same bundling, font/image resolution, and WASM rendering code. Key exports: `bundle()` (esbuild TSX → JS), `resolveFonts()` / `resolveImages()` (file paths → base64), `renderPdf()` / `renderLayout()` (JS → WASM → bytes/JSON). The preview HTML (`src/preview/index.html`) supports dual mode: standalone for CLI dev server, and VS Code webview (receives messages instead of fetching endpoints). Build order: `shared` → `react` → `core` → `renderer` → `cli` / `vscode`.
 
 ### VS Code Extension (`forme-pdf`)
-Live PDF preview inside VS Code. Architecture: `LayoutStore` is the central event-emitting store — preview panel, component tree, and inspector all subscribe to it, staying decoupled from each other. The preview panel uses the same `index.html` from `@formepdf/renderer` (VS Code mode). Component tree (`TreeView` sidebar) shows the element hierarchy with hover-to-highlight. Inspector (`WebviewView` sidebar) shows box model visualization, computed styles, "Open in Editor" (maps element source locations to editor), and "Copy Style". The extension watches `.tsx` files and re-renders on save.
+Live PDF preview inside VS Code. Architecture: `LayoutStore` is the central event-emitting store - preview panel, component tree, and inspector all subscribe to it, staying decoupled from each other. The preview panel uses the same `index.html` from `@formepdf/renderer` (VS Code mode). Component tree (`TreeView` sidebar) shows the element hierarchy with hover-to-highlight. Inspector (`WebviewView` sidebar) shows box model visualization, computed styles, "Open in Editor" (maps element source locations to editor), and "Copy Style". The extension watches `.tsx` files and re-renders on save.
 
 ## Pre-Commit Rules
 
@@ -127,7 +127,7 @@ cd packages/react && npm test
 
 Do not commit if any command produces warnings or errors.
 
-**Important**: After running `cargo fmt`, always verify the formatted files are staged and committed. CI runs `cargo fmt --check` and will fail if formatting diffs remain. The local `cargo fmt` modifies files in-place but doesn't stage them — easy to miss.
+**Important**: After running `cargo fmt`, always verify the formatted files are staged and committed. CI runs `cargo fmt --check` and will fail if formatting diffs remain. The local `cargo fmt` modifies files in-place but doesn't stage them - easy to miss.
 
 **CI note**: Integration tests that depend on macOS system fonts (e.g., Arial Unicode) must gracefully skip when the font file is absent. CI runs on Linux and doesn't have `/System/Library/Fonts/`.
 
@@ -176,7 +176,7 @@ JSON / API input
 ### Page-Native Layout (THE DIFFERENTIATOR)
 The layout engine uses a `PageCursor` that tracks the current Y position on the current page. Before placing any node, it checks: "does this fit in the remaining space?" If not, it either moves the node to a new page (unbreakable) or splits it (breakable). For tables, header rows are automatically re-drawn on continuation pages.
 
-**This is different from react-pdf**, which lays out everything on an infinite canvas and slices. That's why react-pdf's flex breaks on page boundaries — flex runs once on the full container, then gets sliced, making both halves wrong.
+**This is different from react-pdf**, which lays out everything on an infinite canvas and slices. That's why react-pdf's flex breaks on page boundaries - flex runs once on the full container, then gets sliced, making both halves wrong.
 
 ### Flex After Split
 When a breakable flex container splits across pages, children are laid out individually into available space. This means flex calculations reflect actual page-constrained dimensions, not pre-split infinite-canvas dimensions.
@@ -208,7 +208,7 @@ Transform in pdf serializer: `pdf_y = page_height - layout_y - element_height`
 
 When `flex-grow` expands a child's height, `reapply_justify_content()` redistributes that child's children vertically. This enables patterns like a cover page where a `flex: 1` container with `justifyContent: 'center'` vertically centers its content.
 
-**Cross-axis stretch propagation**: When a flex row stretches a child via `alignItems: stretch` (default), the child's style still has `height: Auto`. `layout_node` accepts an optional `cross_axis_height: Option<f64>` parameter — when present and the node's height is `Auto`, it overrides to `Fixed(h)`. This makes justify-content, flex-grow, and other height-dependent logic work inside stretched items. In `layout_flex_row`, when stretch applies, `Some(line_height - margin.vertical())` is passed; all other call sites pass `None`.
+**Cross-axis stretch propagation**: When a flex row stretches a child via `alignItems: stretch` (default), the child's style still has `height: Auto`. `layout_node` accepts an optional `cross_axis_height: Option<f64>` parameter - when present and the node's height is `Auto`, it overrides to `Fixed(h)`. This makes justify-content, flex-grow, and other height-dependent logic work inside stretched items. In `layout_flex_row`, when stretch applies, `Some(line_height - margin.vertical())` is passed; all other call sites pass `None`.
 
 For `align-items: center/flex-end`, percentage-width children (e.g., `width: '80%'`) are passed `available_width` to `layout_node` so the percentage resolves correctly against the parent, not the already-resolved child width. Auto-width children receive their intrinsic width instead, preventing them from stretching. `measure_intrinsic_width` for Images accounts for height constraints via aspect ratio, matching `layout_image` behavior.
 
@@ -224,7 +224,7 @@ In multi-style text (`TextRun`), decorations like `line-through` and `underline`
 ### Custom Font Registration
 Users register custom TrueType fonts via `Font.register()` (global, react-pdf compatible) or the `<Document fonts={[...]}>` prop (per-document). The data flow:
 
-1. **React layer** (`font.ts` + `serialize.ts`): `Font.register()` stores registrations globally. `serialize()` merges global + document fonts into a `fonts[]` array on the JSON output. Font sources (`src`) pass through unresolved — file paths, data URIs, or `Uint8Array`.
+1. **React layer** (`font.ts` + `serialize.ts`): `Font.register()` stores registrations globally. `serialize()` merges global + document fonts into a `fonts[]` array on the JSON output. Font sources (`src`) pass through unresolved - file paths, data URIs, or `Uint8Array`.
 2. **Rendering layer** (`core/index.ts` or `cli/dev.ts`): Resolves font sources to base64 before passing JSON to WASM. File paths are read from disk; `Uint8Array` is base64-encoded; data URIs pass through as-is. In the CLI dev server, file paths resolve relative to the template directory.
 3. **Engine** (`lib.rs`): `register_document_fonts()` decodes base64 from each `FontEntry` and calls `FontContext.registry_mut().register()` before layout. The existing `FontRegistry`, `CustomFontMetrics`, and PDF subsetting handle everything from there.
 
@@ -244,7 +244,7 @@ Templates enable a hosted API workflow: store template JSON + dynamic data → p
 Key files: `engine/src/template.rs`, `engine/src/lib.rs` (render_template), `engine/src/wasm.rs` (render_template_pdf), `packages/react/src/template-proxy.ts`, `packages/react/src/expr.ts`, `packages/react/src/serialize.ts` (serializeTemplate), `packages/core/src/index.ts` (renderTemplate), `packages/cli/src/template-build.ts` (buildTemplate), `packages/cli/src/index.ts` (--template flag).
 
 ### CSS String Shorthands (TypeScript layer only)
-Parsed in `mapStyle()` in `packages/shared/src/style.ts` — no engine changes needed. Three capabilities:
+Parsed in `mapStyle()` in `packages/shared/src/style.ts` - no engine changes needed. Three capabilities:
 
 1. **Border shorthand**: `border: "1px solid #000"` → parses into `borderWidth` + `borderColor`. Per-side variants: `borderTop: "2px solid #f00"` or `borderBottom: 3` (number = width only). `parseBorderString()` tokenizes by whitespace, recognizes CSS border-style keywords (ignored), numeric tokens (width), and color tokens.
 2. **Edge strings**: `padding: "8 16"` or `margin: "8 16 24 32"` → CSS 1-4 value shorthand. Optional `px` suffix stripped. `parseCSSEdges()` handles the parsing.
@@ -255,17 +255,17 @@ Cascade priority (highest wins): `borderTopWidth` > `borderWidth` > `borderTop: 
 Also widened `<Page margin>` to accept strings and arrays: `<Page margin="36 72">`.
 
 ### QR Codes
-`<QrCode data="..." size={100} />` renders a vector-based QR code. The engine module `qrcode.rs` uses the `qrcode` crate to generate a `QrMatrix` (bool grid). `NodeKind::QrCode { data, size }` is laid out by `layout_qrcode()` (follows the `layout_image` pattern — compute display size, check page fit, push element). PDF rendering emits filled rectangles (`re f`) for each dark module in the content stream — native vector, not raster. The `DrawCommand::QrCode { modules, module_size, color }` variant carries the matrix data.
+`<QrCode data="..." size={100} />` renders a vector-based QR code. The engine module `qrcode.rs` uses the `qrcode` crate to generate a `QrMatrix` (bool grid). `NodeKind::QrCode { data, size }` is laid out by `layout_qrcode()` (follows the `layout_image` pattern - compute display size, check page fit, push element). PDF rendering emits filled rectangles (`re f`) for each dark module in the content stream - native vector, not raster. The `DrawCommand::QrCode { modules, module_size, color }` variant carries the matrix data.
 
 Key files: `engine/src/qrcode.rs`, `engine/src/model/mod.rs` (NodeKind::QrCode), `engine/src/layout/mod.rs` (layout_qrcode), `engine/src/pdf/mod.rs` (QrCode rendering), `packages/react/src/components.tsx` (QrCode), `packages/react/src/serialize.ts` (serializeQrCode).
 
 ### Barcodes
-`<Barcode data="ABC-123" format="Code128" width={200} height={50} />` renders a 1D barcode as vector rectangles. The engine module `barcode.rs` uses the `barcoders` crate to generate bar patterns (`Vec<u8>` of 0/1 values). Supported formats: Code128 (auto-prepends Set B start character), Code39, EAN13, EAN8, Codabar. `NodeKind::Barcode { data, format, width, height }` is laid out by `layout_barcode()` (follows the `layout_qrcode` pattern — compute display size, generate bars, check page fit, push element). PDF rendering emits a filled rectangle for each `1` value. The `DrawCommand::Barcode { bars, bar_width, height, color }` variant carries the pattern data.
+`<Barcode data="ABC-123" format="Code128" width={200} height={50} />` renders a 1D barcode as vector rectangles. The engine module `barcode.rs` uses the `barcoders` crate to generate bar patterns (`Vec<u8>` of 0/1 values). Supported formats: Code128 (auto-prepends Set B start character), Code39, EAN13, EAN8, Codabar. `NodeKind::Barcode { data, format, width, height }` is laid out by `layout_barcode()` (follows the `layout_qrcode` pattern - compute display size, generate bars, check page fit, push element). PDF rendering emits a filled rectangle for each `1` value. The `DrawCommand::Barcode { bars, bar_width, height, color }` variant carries the pattern data.
 
 Key files: `engine/src/barcode.rs`, `engine/src/model/mod.rs` (NodeKind::Barcode), `engine/src/layout/mod.rs` (layout_barcode), `engine/src/pdf/mod.rs` (Barcode rendering), `packages/react/src/components.tsx` (Barcode), `packages/react/src/serialize.ts` (serializeBarcode).
 
 ### Text Overflow (Ellipsis/Clip)
-`textOverflow: 'ellipsis'` truncates single-line text with "..." (U+2026) when it exceeds available width. `textOverflow: 'clip'` truncates without an indicator. `TextOverflow` enum in `style/mod.rs` with variants `Wrap` (default), `Ellipsis`, `Clip`. When not `Wrap`, `layout_text` and `layout_text_runs` take only the first line from line breaking, then call truncation methods on `TextLayout` (`truncate_with_ellipsis`, `truncate_clip`, `truncate_runs_with_ellipsis`, `truncate_runs_clip`) to fit within `available_width`. No PDF changes needed — text is already truncated before serialization.
+`textOverflow: 'ellipsis'` truncates single-line text with "..." (U+2026) when it exceeds available width. `textOverflow: 'clip'` truncates without an indicator. `TextOverflow` enum in `style/mod.rs` with variants `Wrap` (default), `Ellipsis`, `Clip`. When not `Wrap`, `layout_text` and `layout_text_runs` take only the first line from line breaking, then call truncation methods on `TextLayout` (`truncate_with_ellipsis`, `truncate_clip`, `truncate_runs_with_ellipsis`, `truncate_runs_clip`) to fit within `available_width`. No PDF changes needed - text is already truncated before serialization.
 
 ### Font Fallback Chains
 `fontFamily: "Inter, Helvetica"` tries each comma-separated family in order. `FontRegistry::resolve()` splits on commas, strips quotes, and tries each family in this order:
@@ -281,31 +281,31 @@ Backward-compatible: a single family name (no comma) behaves identically to the 
 `measure_intrinsic_width()` and `measure_min_content_width()` apply `apply_text_transform()` before measuring text. Without this, containers sized via intrinsic measurement (e.g., auto-width children inside `align-items: center`) would be too narrow when `textTransform: 'uppercase'` is set, because uppercase glyphs are wider than their lowercase counterparts. The same transform is applied in `measure_min_content_width()` for flex shrink min-content calculations. QR codes also report their explicit `size` as intrinsic width (falls back to 0 when unset), fixing centering via `align-items: center`.
 
 ### WinAnsi Width Mapping
-Standard font `char_width()` in `font/metrics.rs` maps Unicode codepoints through `unicode_to_winansi()` before looking up glyph widths. Characters like em-dash (U+2014), en-dash (U+2013), smart quotes, ellipsis, etc. have Unicode code points above 255 but their widths are stored at WinAnsi positions (0x80–0x9F). The shared `unicode_to_winansi()` function in `font/metrics.rs` is also used by `PdfSerializer` for PDF text encoding — single source of truth for the Windows-1252 mapping.
+Standard font `char_width()` in `font/metrics.rs` maps Unicode codepoints through `unicode_to_winansi()` before looking up glyph widths. Characters like em-dash (U+2014), en-dash (U+2013), smart quotes, ellipsis, etc. have Unicode code points above 255 but their widths are stored at WinAnsi positions (0x80–0x9F). The shared `unicode_to_winansi()` function in `font/metrics.rs` is also used by `PdfSerializer` for PDF text encoding - single source of truth for the Windows-1252 mapping.
 
 ### Grid repeat() Syntax
 TypeScript-layer only. `expandRepeat()` in `packages/shared/src/style.ts` pre-processes grid template strings, expanding `repeat(N, tracks)` before the existing split-on-whitespace logic. Example: `repeat(3, 1fr)` → `1fr 1fr 1fr`. Supports mixed: `200 repeat(2, 1fr) 200` → `200 1fr 1fr 200`.
 
 ### Alt Text, Document Language, Clickable Images/SVGs
-- **Alt text**: `alt` prop on `<Image>` and `<Svg>` flows through `Node.alt` → `LayoutElement.alt`. Carried through the data model for future tagged PDF support (actual `/Alt` emission requires structure elements — follow-up scope).
+- **Alt text**: `alt` prop on `<Image>` and `<Svg>` flows through `Node.alt` → `LayoutElement.alt`. Carried through the data model for future tagged PDF support (actual `/Alt` emission requires structure elements - follow-up scope).
 - **Document language**: `<Document lang="en-US">` → `Metadata.lang` → emitted as `/Lang (en-US)` in the PDF Catalog dictionary.
-- **Clickable images/SVGs**: `href` prop on `<Image>` and `<Svg>` passes through to layout via `node.href.clone()`. The PDF serializer already handles `href` on any `LayoutElement` — no PDF-side changes were needed.
+- **Clickable images/SVGs**: `href` prop on `<Image>` and `<Svg>` passes through to layout via `node.href.clone()`. The PDF serializer already handles `href` on any `LayoutElement` - no PDF-side changes were needed.
 
 ### Per-Character Font Fallback
 `fontFamily: "Inter, NotoSansArabic, NotoSansSC"` now resolves fonts per-character, not per-block. Fast path: `!families.contains(',')` skips all per-char logic for single-font documents (zero regression). `FontData::has_char(ch)` checks glyph coverage. `FontRegistry::resolve_for_char()` walks comma-separated families per character. `fallback::segment_by_font()` groups consecutive same-font chars into `FontRun` segments. Integrated with BiDi: font segmentation happens within each BiDi run, not across runs. Key files: `engine/src/font/fallback.rs` (new), `engine/src/font/mod.rs` (has_char, resolve_for_char), `engine/src/text/mod.rs` (measure_chars), `engine/src/layout/mod.rs` (build_positioned_glyphs).
 
 ### Overflow Hidden
-`overflow: 'hidden'` clips children to parent bounds via PDF clip path operators. Visual-only — layout is unaffected. PDF pattern: `q / x y w h re W n / (children) / Q`. Nested `overflow: hidden` composes correctly via the graphics state stack. `Overflow` enum in `style/mod.rs` with `Visible` (default) and `Hidden` variants. Field propagated to `LayoutElement` and set at all construction sites.
+`overflow: 'hidden'` clips children to parent bounds via PDF clip path operators. Visual-only - layout is unaffected. PDF pattern: `q / x y w h re W n / (children) / Q`. Nested `overflow: hidden` composes correctly via the graphics state stack. `Overflow` enum in `style/mod.rs` with `Visible` (default) and `Hidden` variants. Field propagated to `LayoutElement` and set at all construction sites.
 
 ### Canvas Drawing Primitive
-`<Canvas width={w} height={h} draw={(ctx) => { ... }} />` renders arbitrary vector graphics. `CanvasOp` enum (20 variants) in `model/mod.rs`. Layout follows `layout_svg` pattern (fixed-size leaf, page break check). Operations convert to `SvgCommand` via `canvas_ops_to_svg_commands()`, reusing the existing `DrawCommand::Svg` + `write_svg_commands()` PDF pipeline — no new PDF rendering code. React layer: recording `CanvasContext` executes `draw` callback during serialization, producing `CanvasOp[]` JSON. **Color convention**: Canvas API uses 0-255 RGB (`setFillColor(59, 130, 246)`); `canvas_ops_to_svg_commands` divides by 255.0 to convert to the 0-1 range expected by the PDF/SVG pipeline. **Arc direction**: `CanvasOp::Arc` supports the full HTML Canvas `arc()` signature including `counterclockwise` (default `false`). When `!counterclockwise && sweep < 0`, 2π is added; when `counterclockwise && sweep > 0`, 2π is subtracted. **Clipping**: Canvas content is clipped to its bounds via `DrawCommand::Svg { clip: true }`. The PDF serializer emits `0 0 w h re W n` after coordinate transforms but before `write_svg_commands()`. SVG elements use `clip: false` (no clipping). Key files: `engine/src/model/mod.rs` (CanvasOp, NodeKind::Canvas), `engine/src/layout/mod.rs` (canvas_ops_to_svg_commands, layout_canvas), `engine/src/pdf/mod.rs` (clip rect emission), `packages/react/src/serialize.ts` (serializeCanvas).
+`<Canvas width={w} height={h} draw={(ctx) => { ... }} />` renders arbitrary vector graphics. `CanvasOp` enum (20 variants) in `model/mod.rs`. Layout follows `layout_svg` pattern (fixed-size leaf, page break check). Operations convert to `SvgCommand` via `canvas_ops_to_svg_commands()`, reusing the existing `DrawCommand::Svg` + `write_svg_commands()` PDF pipeline - no new PDF rendering code. React layer: recording `CanvasContext` executes `draw` callback during serialization, producing `CanvasOp[]` JSON. **Color convention**: Canvas API uses 0-255 RGB (`setFillColor(59, 130, 246)`); `canvas_ops_to_svg_commands` divides by 255.0 to convert to the 0-1 range expected by the PDF/SVG pipeline. **Arc direction**: `CanvasOp::Arc` supports the full HTML Canvas `arc()` signature including `counterclockwise` (default `false`). When `!counterclockwise && sweep < 0`, 2π is added; when `counterclockwise && sweep > 0`, 2π is subtracted. **Clipping**: Canvas content is clipped to its bounds via `DrawCommand::Svg { clip: true }`. The PDF serializer emits `0 0 w h re W n` after coordinate transforms but before `write_svg_commands()`. SVG elements use `clip: false` (no clipping). Key files: `engine/src/model/mod.rs` (CanvasOp, NodeKind::Canvas), `engine/src/layout/mod.rs` (canvas_ops_to_svg_commands, layout_canvas), `engine/src/pdf/mod.rs` (clip rect emission), `packages/react/src/serialize.ts` (serializeCanvas).
 
 ### Chart Components (BarChart, LineChart, PieChart, AreaChart, DotPlot)
 Engine-native chart rendering. Five `NodeKind` variants produce a flat `Vec<ChartPrimitive>` list (rects, lines, polylines, filled paths, circles, arc sectors, labels) rendered directly to PDF content streams via `DrawCommand::Chart`.
 
 **Architecture**: Each chart type has a builder in `engine/src/chart/{bar,line,pie,area,dot}.rs`. Builders compute plot area, scale data, and emit primitives in paint order (grid → axes → data → labels → title → legend). The PDF renderer iterates primitives inside a Y-flip transform (`1 0 0 -1 x (page_h - y) cm`) so chart code uses top-left origin. Labels use Helvetica (always registered) with `StandardFontMetrics::measure_string()` for width measurement.
 
-**React layer**: Chart components (`BarChart`, `LineChart`, etc.) are intrinsic elements that return `null` — serialized by dedicated functions in `serialize.ts` that map camelCase React props to snake_case engine JSON. Old SVG-based implementations preserved as `LegacyBarChart`, `LegacyLineChart`, `LegacyPieChart` in `charts.tsx`.
+**React layer**: Chart components (`BarChart`, `LineChart`, etc.) are intrinsic elements that return `null` - serialized by dedicated functions in `serialize.ts` that map camelCase React props to snake_case engine JSON. Old SVG-based implementations preserved as `LegacyBarChart`, `LegacyLineChart`, `LegacyPieChart` in `charts.tsx`.
 
 **Shared types**: `ChartPrimitive` enum (Rect, Line, Polyline, FilledPath, Circle, ArcSector, Label), `TextAnchor` enum (Left, Center, Right). Constants: `Y_AXIS_WIDTH=28`, `X_AXIS_HEIGHT=20`, `AXIS_LABEL_FONT=8`, `TITLE_FONT=11`. Helpers: `nice_number()`, `format_number()`, `lighten_color()`, `parse_hex_color()`, `measure_label()`.
 
@@ -339,10 +339,10 @@ Extraction: `extractData()` in `packages/core/src/extract.ts` scans PDF bytes fo
 Key files: `packages/core/src/index.ts` (RenderDocumentOptions.embedData), `packages/core/src/extract.ts` (extractData), `engine/src/model/mod.rs` (Document.embedded_data), `engine/src/pdf/mod.rs` (EmbeddedFile stream + Names tree), `engine/src/lib.rs` (passes embedded_data to serializer).
 
 ### Browser Entry Point (`@formepdf/core/browser`)
-`packages/core/src/browser.ts` provides the same API as the Node entry point but with zero Node dependencies. WASM loading uses wasm-pack's `fetch()`-based loader (auto-resolves via `import.meta.url` with bundlers). `init(module?)` allows pre-loading or passing a custom WASM URL/bytes. Font resolution uses `fetch()` for URL-based fonts instead of `node:fs`. Base64 encoding uses `btoa()` instead of `Buffer.from()`. `extractData()` uses the browser-native `DecompressionStream` API instead of `node:zlib`. The WASM module itself is pure compute with no Node APIs — the browser entry is just a Node-free JS wrapper around the same `pkg/forme.js` glue code.
+`packages/core/src/browser.ts` provides the same API as the Node entry point but with zero Node dependencies. WASM loading uses wasm-pack's `fetch()`-based loader (auto-resolves via `import.meta.url` with bundlers). `init(module?)` allows pre-loading or passing a custom WASM URL/bytes. Font resolution uses `fetch()` for URL-based fonts instead of `node:fs`. Base64 encoding uses `btoa()` instead of `Buffer.from()`. `extractData()` uses the browser-native `DecompressionStream` API instead of `node:zlib`. The WASM module itself is pure compute with no Node APIs - the browser entry is just a Node-free JS wrapper around the same `pkg/forme.js` glue code.
 
 ### AcroForms (Fillable PDF Forms)
-`<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>` — AcroForm components for creating interactive fillable PDFs. Form fields render as native PDF AcroForm widgets. `flattenForms` render option converts filled fields to static content. Known limitation: form field text uses Helvetica only (Latin characters). Key files: `packages/react/src/components.tsx` (form components), `packages/react/src/serialize.ts` (form serialization), `engine/src/model/mod.rs` (NodeKind variants), `engine/src/layout/mod.rs` (form layout), `engine/src/pdf/mod.rs` (AcroForm widget rendering).
+`<TextField>`, `<Checkbox>`, `<Dropdown>`, `<RadioButton>` - AcroForm components for creating interactive fillable PDFs. Form fields render as native PDF AcroForm widgets. `flattenForms` render option converts filled fields to static content. Known limitation: form field text uses Helvetica only (Latin characters). Key files: `packages/react/src/components.tsx` (form components), `packages/react/src/serialize.ts` (form serialization), `engine/src/model/mod.rs` (NodeKind variants), `engine/src/layout/mod.rs` (form layout), `engine/src/pdf/mod.rs` (AcroForm widget rendering).
 
 ### PDF/UA Accessibility
 `<Document pdfUa>` enables PDF/UA-1 compliance. Forme automatically generates: structure tree (StructTreeRoot), tab order (/S on each page), role map, artifact tagging for headers/footers, and XMP metadata with `pdfuaid:part=1`. `alt` prop on `<Image>` and `<Svg>` flows to `/Alt` entries in structure elements. Reading order follows layout order. Key files: `engine/src/pdf/tagged.rs` (structure tree generation), `engine/src/pdf/xmp.rs` (XMP metadata), `engine/src/pdf/mod.rs` (tagged PDF emission).
@@ -357,10 +357,10 @@ Key files: `packages/core/src/index.ts` (RenderDocumentOptions.embedData), `pack
 The `Document` component sets `__formeType: 'Document'` on the returned element for version-independent identity checking. This allows `serialize()` to detect a Forme document element without relying on React component reference equality (which breaks across package versions or duplicate installs).
 
 ### Go SDK
-`github.com/formepdf/forme-go` — Go SDK for the Forme hosted API. Wraps render, async render, job polling, S3 upload, and data extraction endpoints.
+`github.com/formepdf/forme-go` - Go SDK for the Forme hosted API. Wraps render, async render, job polling, S3 upload, and data extraction endpoints.
 
 ### Rust Crate
-`forme-pdf` on crates.io — the Rust engine as a standalone crate. `cargo add forme-pdf`. Exports `render()`, `render_json()`, `render_with_layout()`, `render_template()`.
+`forme-pdf` on crates.io - the Rust engine as a standalone crate. `cargo add forme-pdf`. Exports `render()`, `render_json()`, `render_with_layout()`, `render_template()`.
 
 ## Known Issues & Limitations (Current State)
 
@@ -377,7 +377,7 @@ The `Document` component sets `__formeType: 'Document'` on the returned element 
 The enum variant exists in `style/mod.rs` and the match arm exists in layout but returns 0.0. Needs: measure each flex child's first text baseline (distance from top of child to the alphabetic baseline of its first line of text), find the max, and offset each child so baselines align. Affects `layout_flex_row` cross-axis positioning. Would require a `measure_baseline()` helper that walks into a node's children to find the first text node and returns its ascender-based offset.
 
 **`grid-template-areas`** (Medium effort, productivity win)
-Named grid areas like `gridTemplateAreas: '"header header" "sidebar main"'`. Needs: parse the area string into a 2D grid of names, map each child's `gridArea` name to its row/column span. Most of the grid track sizing and placement machinery in `layout/grid.rs` already works — this is primarily a parsing + name-to-span resolution layer on top.
+Named grid areas like `gridTemplateAreas: '"header header" "sidebar main"'`. Needs: parse the area string into a 2D grid of names, map each child's `gridArea` name to its row/column span. Most of the grid track sizing and placement machinery in `layout/grid.rs` already works - this is primarily a parsing + name-to-span resolution layer on top.
 
 **`grid-auto-flow: dense`** (Low effort, niche)
 Auto-placement currently uses row-major order and never backtracks. Dense packing would scan for earlier gaps that fit the item. Small change to the placement loop in `grid.rs`.
@@ -396,13 +396,13 @@ PDF natively supports CMYK via `/DeviceCMYK` color space. Would need a `Color::C
 
 ### Platform / Ecosystem
 
-**Serverless PDF API** — A hosted endpoint where users POST template JSON + data and get back PDF bytes. Would use the existing template expression system (`engine/src/template.rs`). No JS runtime needed server-side.
+**Serverless PDF API** - A hosted endpoint where users POST template JSON + data and get back PDF bytes. Would use the existing template expression system (`engine/src/template.rs`). No JS runtime needed server-side.
 
-**Figma/design tool importer** — Convert Figma frames to Forme document trees. Figma's auto-layout maps well to Forme's flex model. Would be a separate package that produces `@formepdf/react` JSX or raw JSON.
+**Figma/design tool importer** - Convert Figma frames to Forme document trees. Figma's auto-layout maps well to Forme's flex model. Would be a separate package that produces `@formepdf/react` JSX or raw JSON.
 
-**More framework integrations** — Express/Fastify middleware, Remix loader, SvelteKit endpoint. Same pattern as `@formepdf/hono` and `@formepdf/next`.
+**More framework integrations** - Express/Fastify middleware, Remix loader, SvelteKit endpoint. Same pattern as `@formepdf/hono` and `@formepdf/next`.
 
-**Performance benchmarks** — Automated benchmarks for layout + PDF serialization speed. Track regressions across releases. Useful for marketing ("renders 100-page document in Xms").
+**Performance benchmarks** - Automated benchmarks for layout + PDF serialization speed. Track regressions across releases. Useful for marketing ("renders 100-page document in Xms").
 
 ## How the Layout Engine Works (for making changes)
 
