@@ -3,6 +3,10 @@ export { default as Document } from './components/Document.svelte';
 export { default as Page } from './components/Page.svelte';
 export { default as View } from './components/View.svelte';
 export { default as Text } from './components/Text.svelte';
+export { default as Fixed } from './components/Fixed.svelte';
+
+// Page-number placeholders
+export { PAGE_NUMBER, TOTAL_PAGES } from './constants.js';
 
 // Serialization
 export { serialize, render, renderToObject } from './serialize.js';
@@ -16,6 +20,7 @@ export { StyleSheet } from './stylesheet.js';
 export type {
   // Developer-facing
   Style,
+  TextRun,
   GridTrackSize,
   Edges,
   Corners,
