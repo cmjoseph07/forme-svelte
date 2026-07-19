@@ -37,6 +37,10 @@ export { serialize, render, renderToObject } from './serialize.js';
 export type { SerializeOptions } from './serialize.js';
 export { mapStyle, mapDimension, parseColor, expandEdges, expandCorners } from '@formepdf/shared';
 
+// One-call PDF rendering (requires the optional @formepdf/core peer)
+export { renderDocument, renderDocumentWithLayout } from './render-document.js';
+export type { RenderDocumentOptions } from './render-document.js';
+
 // StyleSheet
 export { StyleSheet } from './stylesheet.js';
 

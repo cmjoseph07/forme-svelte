@@ -3,11 +3,11 @@
  * bytes through @formepdf/core (devDependency - the adapter itself
  * never depends on WASM).
  */
-import { inflateSync } from 'node:zlib';
 import { readFile } from 'node:fs/promises';
 import { describe, it, expect } from 'vitest';
 import { renderPdf } from '@formepdf/core';
 import { render, Font } from '../src/index.js';
+import { decompressedStreams } from './pdf-streams.js';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorld from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -24,35 +24,6 @@ import ChartsFixture from './fixtures/charts.svelte';
 import FormFieldsFixture from './fixtures/form-fields.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import FontsFixture from './fixtures/fonts.svelte';
-
-/**
- * Concatenate every stream object in the PDF, inflating the
- * FlateDecode-compressed ones, so text-showing operators like
- * `(Page 1 of 2) Tj` become searchable.
- */
-function decompressedStreams(pdf: Uint8Array): string {
-  const buf = Buffer.from(pdf);
-  let out = '';
-  let pos = 0;
-  for (;;) {
-    const start = buf.indexOf('stream', pos);
-    if (start === -1) break;
-    let dataStart = start + 'stream'.length;
-    if (buf[dataStart] === 0x0d) dataStart++;
-    if (buf[dataStart] === 0x0a) dataStart++;
-    let end = buf.indexOf('endstream', dataStart);
-    if (end === -1) break;
-    while (end > dataStart && (buf[end - 1] === 0x0a || buf[end - 1] === 0x0d)) end--;
-    const raw = buf.subarray(dataStart, end);
-    try {
-      out += inflateSync(raw).toString('latin1');
-    } catch {
-      out += raw.toString('latin1');
-    }
-    pos = end + 'endstream'.length;
-  }
-  return out;
-}
 
 describe('WASM smoke', () => {
   it('renders a serialized .svelte template to valid PDF bytes', async () => {
