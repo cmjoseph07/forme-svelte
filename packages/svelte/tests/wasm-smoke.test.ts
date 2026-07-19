@@ -13,6 +13,8 @@ import HelloWorld from './fixtures/hello-world.svelte';
 import FixedPageNumbers from './fixtures/fixed-page-numbers.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import TableFixture from './fixtures/table.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import MediaFixture from './fixtures/media.svelte';
 
 /**
  * Concatenate every stream object in the PDF, inflating the
@@ -71,6 +73,22 @@ describe('WASM smoke', () => {
     const text = decompressedStreams(pdf);
     const headerDraws = (text.match(/\(SKU\)/g) ?? []).length;
     expect(headerDraws).toBe(pageCount);
+  });
+
+  it('renders media leaves (Image, Svg, QrCode, Barcode) in one document', async () => {
+    const json = await render(MediaFixture, { props: { ticketId: 'TKT-0042' } });
+    const pdf = await renderPdf(json);
+
+    expect(pdf).toBeInstanceOf(Uint8Array);
+    const header = new TextDecoder().decode(pdf.slice(0, 5));
+    expect(header).toBe('%PDF-');
+    // QR modules and barcode bars are drawn as rectangle ops (`re`) in
+    // the content stream — a media-free page has nowhere near this
+    // many. The data-URI image becomes an XObject (`/Im0 Do`).
+    const text = decompressedStreams(pdf);
+    const rectOps = (text.match(/\bre\b/g) ?? []).length;
+    expect(rectOps).toBeGreaterThan(100);
+    expect(text).toMatch(/\/Im\d+ Do/);
   });
 
   it('substitutes PAGE_NUMBER / TOTAL_PAGES in a multi-page footer', async () => {

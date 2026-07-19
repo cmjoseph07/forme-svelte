@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { parseColor } from '@formepdf/shared';
 import { parseMarkup } from '../src/parser.js';
 
 /** Wrap markup in a document root and parse. */
@@ -485,6 +486,138 @@ describe('table', () => {
         children: [{ kind: { type: 'Text', content: 'badge' }, style: {}, children: [] }],
       },
     ]);
+  });
+});
+
+describe('image', () => {
+  it('parses a full image with dimensions, style, href, and alt', () => {
+    const doc = parseIn(
+      `<forme-image props='${attr({
+        src: 'data:image/png;base64,iVBORw0KGgo=',
+        width: 64,
+        height: 48,
+        style: { marginTop: 8 },
+        href: 'https://formepdf.com',
+        alt: 'Company logo',
+      })}'></forme-image>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({
+      type: 'Image',
+      src: 'data:image/png;base64,iVBORw0KGgo=',
+      width: 64,
+      height: 48,
+    });
+    expect(node.style.margin).toEqual({ top: 8, right: 0, bottom: 0, left: 0 });
+    expect(node.href).toBe('https://formepdf.com');
+    expect(node.alt).toBe('Company logo');
+  });
+
+  it('omits width/height when unset and keeps path srcs unresolved', () => {
+    const doc = parseIn(`<forme-image props='${attr({ src: './assets/photo.jpg' })}'></forme-image>`);
+    expect(doc.children[0]).toEqual({
+      kind: { type: 'Image', src: './assets/photo.jpg' },
+      style: {},
+      children: [],
+    });
+  });
+
+  it('passes src through byte-identical, including JSON- and HTML-hostile characters', () => {
+    const src = 'data:image/png;base64,AB+/cd==?"quoted"&<tag>\\backé';
+    const doc = parseIn(`<forme-image props='${attr({ src })}'></forme-image>`);
+    expect((doc.children[0].kind as { src: string }).src).toBe(src);
+  });
+});
+
+describe('svg', () => {
+  it('parses dimensions, view_box, style, href, and alt', () => {
+    const doc = parseIn(
+      `<forme-svg props='${attr({
+        width: 100,
+        height: 80,
+        viewBox: '0 0 100 80',
+        content: '<circle cx="50" cy="40" r="10"/>',
+        style: { marginBottom: 4 },
+        href: 'https://formepdf.com/svg',
+        alt: 'A circle',
+      })}'></forme-svg>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({
+      type: 'Svg',
+      width: 100,
+      height: 80,
+      view_box: '0 0 100 80',
+      content: '<circle cx="50" cy="40" r="10"/>',
+    });
+    expect(node.style.margin).toEqual({ top: 0, right: 0, bottom: 4, left: 0 });
+    expect(node.href).toBe('https://formepdf.com/svg');
+    expect(node.alt).toBe('A circle');
+  });
+
+  it('round-trips content with quotes, angle brackets, and ampersands intact', () => {
+    const content =
+      '<path d="M10 10 L90 90" stroke="#c00" stroke-width="2"/><text>a &amp; b < c > "d"</text>';
+    const doc = parseIn(`<forme-svg props='${attr({ width: 10, height: 10, content })}'></forme-svg>`);
+    expect((doc.children[0].kind as { content: string }).content).toBe(content);
+  });
+
+  it('defaults content to an empty string and omits view_box when unset', () => {
+    const doc = parseIn(`<forme-svg props='${attr({ width: 20, height: 20 })}'></forme-svg>`);
+    expect(doc.children[0].kind).toEqual({ type: 'Svg', width: 20, height: 20, content: '' });
+  });
+});
+
+describe('qrcode', () => {
+  it('parses data with optional size and maps color into style', () => {
+    const doc = parseIn(
+      `<forme-qrcode props='${attr({ data: 'https://formepdf.com', size: 96, color: '#1a365d' })}'></forme-qrcode>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({ type: 'QrCode', data: 'https://formepdf.com', size: 96 });
+    expect(node.style.color).toEqual(parseColor('#1a365d'));
+    expect(node.children).toEqual([]);
+  });
+
+  it('omits size and color when unset', () => {
+    const doc = parseIn(`<forme-qrcode props='${attr({ data: 'plain' })}'></forme-qrcode>`);
+    expect(doc.children[0]).toEqual({
+      kind: { type: 'QrCode', data: 'plain' },
+      style: {},
+      children: [],
+    });
+  });
+});
+
+describe('barcode', () => {
+  it('parses explicit format, dimensions, and color', () => {
+    const doc = parseIn(
+      `<forme-barcode props='${attr({
+        data: 'TKT-0042',
+        format: 'Code39',
+        width: 220,
+        height: 50,
+        color: '#333333',
+      })}'></forme-barcode>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({
+      type: 'Barcode',
+      data: 'TKT-0042',
+      format: 'Code39',
+      width: 220,
+      height: 50,
+    });
+    expect(node.style.color).toEqual(parseColor('#333333'));
+  });
+
+  it('defaults format to Code128 and height to 60, omitting width', () => {
+    const doc = parseIn(`<forme-barcode props='${attr({ data: 'ABC-123' })}'></forme-barcode>`);
+    expect(doc.children[0]).toEqual({
+      kind: { type: 'Barcode', data: 'ABC-123', format: 'Code128', height: 60 },
+      style: {},
+      children: [],
+    });
   });
 });
 
