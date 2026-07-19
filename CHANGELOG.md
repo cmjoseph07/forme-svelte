@@ -2,6 +2,12 @@
 
 All notable changes to the Forme monorepo are documented in this file.
 
+## [0.10.4] - 2026-07-19
+
+### Added
+- **`@formepdf/svelte`**: Svelte 5 adapter with the full component set (layout, tables, graphics, charts, form fields) authored as `.svelte` files - `renderDocument()` for one-call SvelteKit endpoints, a `formePreview()` route helper with layout overlays and click-to-inspect, `PAGE_NUMBER`/`TOTAL_PAGES` page-number constants, `Font`/`StyleSheet` parity, and `tw()` support. Compiled templates remain TSX-only
+- **`@formepdf/shared`**: framework-neutral serialization core (document-model types, style mapping and CSS shorthand parsing, the `Font` registration store, the `Canvas` recorder) extracted from `@formepdf/react`, which re-exports it with a byte-compatible public API
+
 ## [0.9.2] - 2026-04-28
 
 ### Fixed
