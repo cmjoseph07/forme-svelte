@@ -122,7 +122,14 @@ export function formePreview<Props extends Record<string, any>>(
     try {
       result = await renderOnce();
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
+      // The error message IS the dev UX (the preview page shows template
+      // errors in the browser), but in production a mounted preview route
+      // must not leak render internals.
+      const message = isProduction
+        ? 'PDF render failed'
+        : err instanceof Error
+          ? err.message
+          : String(err);
       return previewResponse(message, 'text/plain; charset=utf-8', 503);
     }
 

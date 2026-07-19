@@ -1,11 +1,13 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import type { Edges } from '@formepdf/shared';
+  import type { Edges, Style } from '@formepdf/shared';
   import { encodeProps } from '../encode.js';
 
   interface Props {
     size?: 'A4' | 'A3' | 'A5' | 'Letter' | 'Legal' | 'Tabloid' | { width: number; height: number };
     margin?: number | string | number[] | Edges;
+    /** Style applied to the page's content area (background, padding, default text styles). */
+    style?: Style;
     /** Optional background image painted behind the page's content. URL,
      *  file path, or `data:image/...;base64,` URI. */
     backgroundImage?: string;

@@ -86,6 +86,9 @@ export function encodeProps(component: string, props: object): string {
       const reason = err instanceof Error ? err.message : String(err);
       throw new Error(`[Forme] <${component}>: prop "${key}" is not serializable: ${reason}`);
     }
+    // JSON.stringify returns undefined (without throwing) for values
+    // with no JSON representation at the top level, e.g. functions -
+    // drop such props rather than emitting invalid JSON.
     if (json === undefined) continue;
     parts.push(`${JSON.stringify(key)}:${json}`);
   }
