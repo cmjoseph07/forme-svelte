@@ -8,10 +8,16 @@ import { serialize as serializeReact } from '@formepdf/react';
 import { serialize } from '../src/index.js';
 import HelloWorldReact from './fixtures/hello-world';
 import KitchenSinkReact from './fixtures/kitchen-sink';
+import TextRunsReact from './fixtures/text-runs';
+import FixedPageNumbersReact from './fixtures/fixed-page-numbers';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import KitchenSinkSvelte from './fixtures/kitchen-sink.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import TextRunsSvelte from './fixtures/text-runs.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import FixedPageNumbersSvelte from './fixtures/fixed-page-numbers.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -30,6 +36,18 @@ describe('cross-adapter parity', () => {
   it('kitchen-sink: document props, CSS shorthands, multi-line text', async () => {
     const svelteDoc = await serialize(KitchenSinkSvelte, { props: { discount: 25 } });
     const reactDoc = serializeReact(<KitchenSinkReact discount={25} />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('text-runs: nested spans, run styles, boundary whitespace', async () => {
+    const svelteDoc = await serialize(TextRunsSvelte, { props: { price: 42 } });
+    const reactDoc = serializeReact(<TextRunsReact price={42} />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('fixed-page-numbers: header/footer, placeholder constants', async () => {
+    const svelteDoc = await serialize(FixedPageNumbersSvelte, { props: { paragraphs: 5 } });
+    const reactDoc = serializeReact(<FixedPageNumbersReact paragraphs={5} />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 });

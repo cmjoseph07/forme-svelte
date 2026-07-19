@@ -39,6 +39,7 @@ import type {
   FormePageConfig,
   FormePageSize,
   Style,
+  TextRun,
 } from '@formepdf/shared';
 
 type P5Node = DefaultTreeAdapterMap['childNode'];
@@ -173,6 +174,8 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseView(element);
     case 'forme-text':
       return parseText(element);
+    case 'forme-fixed':
+      return parseFixed(element);
     case 'forme-page':
       validateNesting('Page', parent);
       return parsePage(element);
@@ -304,7 +307,13 @@ interface TextProps {
 function parseText(element: P5Element): FormeNode {
   const props = decodeProps(element, 'Text') as TextProps;
 
-  const kind: FormeNode['kind'] = { type: 'Text', content: textContentOf(element.childNodes) };
+  const kind: FormeNode['kind'] = { type: 'Text', content: '' };
+  const runs = textRunsOf(element.childNodes);
+  if (runs) {
+    kind.runs = runs;
+  } else {
+    kind.content = textContentOf(element.childNodes);
+  }
   if (props.href) kind.href = props.href;
 
   const node: FormeNode = {
@@ -318,17 +327,90 @@ function parseText(element: P5Element): FormeNode {
 }
 
 /**
- * Extract the text content of a Text element's children. Comments
- * (Svelte SSR block anchors) vanish and the text around them is
- * treated as one contiguous chunk, so `{#if}`/`{#each}` boundaries
- * inside a `<Text>` never introduce breaks.
+ * Build styled text runs from a Text element's children, mirroring the
+ * react adapter: only used when at least one direct child is a nested
+ * `<Text>` (returns null otherwise). Plain text chunks become unstyled
+ * runs; each nested `<Text>` becomes one run carrying its own
+ * style/href with all its descendant text merged (deeper nesting
+ * flattens — a run has exactly one style). Elements other than
+ * `<Text>` are skipped but still split the surrounding text into
+ * separate runs, as react's per-child loop does.
+ */
+function textRunsOf(nodes: P5Node[]): TextRun[] | null {
+  if (!nodes.some(n => isElement(n) && n.tagName === 'forme-text')) return null;
+
+  const runs: TextRun[] = [];
+  let buffer = '';
+  const flush = () => {
+    const content = cleanJsxText(buffer);
+    buffer = '';
+    // JSX drops whitespace-only literals spanning lines but keeps
+    // same-line spaces between spans; cleanJsxText reproduces that,
+    // leaving only genuinely empty chunks to discard.
+    if (content !== '') runs.push({ content });
+  };
+
+  for (const node of nodes) {
+    if (isText(node)) {
+      buffer += node.value;
+    } else if (isElement(node)) {
+      flush();
+      if (node.tagName !== 'forme-text') continue;
+      const props = decodeProps(node, 'Text') as TextProps;
+      const run: TextRun = { content: textContentOf(node.childNodes) };
+      if (props.style) run.style = mapStyle(props.style);
+      if (props.href) run.href = props.href;
+      runs.push(run);
+    }
+    // Comments (SSR block anchors) fall through: the text around them
+    // stays one contiguous chunk.
+  }
+  flush();
+  return runs;
+}
+
+/**
+ * Extract the merged text content of a Text element's children.
+ * Comments (Svelte SSR block anchors) vanish and the text around them
+ * is treated as one contiguous chunk, so `{#if}`/`{#each}` boundaries
+ * inside a `<Text>` never introduce breaks. Element children
+ * contribute their own descendant text (react's flattenTextContent
+ * recurses the same way).
  */
 function textContentOf(nodes: P5Node[]): string {
+  return cleanJsxText(rawTextOf(nodes));
+}
+
+function rawTextOf(nodes: P5Node[]): string {
   let merged = '';
   for (const node of nodes) {
     if (isText(node)) merged += node.value;
+    else if (isElement(node)) merged += rawTextOf(node.childNodes);
   }
-  return cleanJsxText(merged);
+  return merged;
+}
+
+// ─── Fixed ───────────────────────────────────────────────────────────
+
+interface FixedProps {
+  position?: 'header' | 'footer';
+  style?: Style;
+  bookmark?: string;
+}
+
+function parseFixed(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Fixed') as FixedProps;
+  // Mirrors react: anything other than 'header' falls back to Footer.
+  const position = props.position === 'header' ? ('Header' as const) : ('Footer' as const);
+
+  const node: FormeNode = {
+    kind: { type: 'Fixed', position },
+    style: mapStyle(props.style),
+    children: parseChildren(element.childNodes, 'Fixed'),
+  };
+  if (props.bookmark) node.bookmark = props.bookmark;
+
+  return node;
 }
 
 // ─── Whitespace normalization ────────────────────────────────────────

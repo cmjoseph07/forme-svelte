@@ -208,6 +208,105 @@ describe('text node', () => {
   });
 });
 
+describe('text runs', () => {
+  function textKind(inner: string) {
+    const doc = parseIn(`<forme-text props="{}">${inner}</forme-text>`);
+    const kind = doc.children[0].kind;
+    if (kind.type !== 'Text') throw new Error('expected Text node');
+    return kind;
+  }
+
+  it('leaves runs absent for plain text content', () => {
+    expect(textKind('hello').runs).toBeUndefined();
+  });
+
+  it('builds runs from nested Text spans, content stays empty', () => {
+    const styled = attr({ style: { textDecoration: 'line-through' } });
+    expect(textKind(`Was <forme-text props='${styled}'>$56.00</forme-text> due now`)).toEqual({
+      type: 'Text',
+      content: '',
+      runs: [
+        { content: 'Was ' },
+        { content: '$56.00', style: { textDecoration: 'LineThrough' } },
+        { content: ' due now' },
+      ],
+    });
+  });
+
+  it('omits style on unstyled runs and passes href per run', () => {
+    const linked = attr({ href: 'https://x.dev' });
+    expect(
+      textKind(`See <forme-text props="{}">plain</forme-text> or <forme-text props='${linked}'>link</forme-text>`).runs
+    ).toEqual([
+      { content: 'See ' },
+      { content: 'plain' },
+      { content: ' or ' },
+      { content: 'link', href: 'https://x.dev' },
+    ]);
+  });
+
+  it('keeps a same-line space between two spans as its own run', () => {
+    expect(
+      textKind(`<forme-text props="{}">a</forme-text> <forme-text props="{}">b</forme-text>`).runs
+    ).toEqual([{ content: 'a' }, { content: ' ' }, { content: 'b' }]);
+  });
+
+  it('drops whitespace-only chunks that span lines (JSX semantics)', () => {
+    expect(
+      textKind(`<forme-text props="{}">a</forme-text>\n  <forme-text props="{}">b</forme-text>`).runs
+    ).toEqual([{ content: 'a' }, { content: 'b' }]);
+  });
+
+  it('flattens deeper nesting into the run of the outermost span', () => {
+    expect(
+      textKind(
+        `x <forme-text props="{}">a<forme-text props="{}">b</forme-text>c</forme-text>`
+      ).runs
+    ).toEqual([{ content: 'x ' }, { content: 'abc' }]);
+  });
+
+  it('merges text across SSR block anchor comments within a chunk', () => {
+    expect(
+      textKind(`Total<!--[--> due<!--]-->: <forme-text props="{}">now</forme-text>`).runs
+    ).toEqual([{ content: 'Total due: ' }, { content: 'now' }]);
+  });
+});
+
+describe('fixed', () => {
+  it('maps header and footer positions', () => {
+    const header = parseIn(`<forme-fixed props='${attr({ position: 'header' })}'></forme-fixed>`);
+    expect(header.children[0].kind).toEqual({ type: 'Fixed', position: 'Header' });
+
+    const footer = parseIn(`<forme-fixed props='${attr({ position: 'footer' })}'></forme-fixed>`);
+    expect(footer.children[0].kind).toEqual({ type: 'Fixed', position: 'Footer' });
+  });
+
+  it('defaults to footer when position is missing', () => {
+    const doc = parseIn('<forme-fixed props="{}"></forme-fixed>');
+    expect(doc.children[0].kind).toEqual({ type: 'Fixed', position: 'Footer' });
+  });
+
+  it('carries style, bookmark, and children', () => {
+    const doc = parseIn(
+      `<forme-fixed props='${attr({ position: 'footer', style: { paddingTop: 8 }, bookmark: 'F' })}'>` +
+        `<forme-text props="{}">Page {{pageNumber}} of {{totalPages}}</forme-text>` +
+        `</forme-fixed>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: { type: 'Fixed', position: 'Footer' },
+      style: { padding: { top: 8, right: 0, bottom: 0, left: 0 } },
+      children: [
+        {
+          kind: { type: 'Text', content: 'Page {{pageNumber}} of {{totalPages}}' },
+          style: {},
+          children: [],
+        },
+      ],
+      bookmark: 'F',
+    });
+  });
+});
+
 describe('element-context text', () => {
   it('wraps loose text in an anonymous Text node', () => {
     const doc = parseIn('<forme-view props="{}">loose text</forme-view>');
