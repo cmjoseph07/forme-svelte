@@ -17,6 +17,8 @@ import TableFixture from './fixtures/table.svelte';
 import MediaFixture from './fixtures/media.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import VectorExtras from './fixtures/vector-extras.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import ChartsFixture from './fixtures/charts.svelte';
 
 /**
  * Concatenate every stream object in the PDF, inflating the
@@ -112,6 +114,29 @@ describe('WASM smoke', () => {
     expect((text.match(/<434F4E464944454E5449414C> Tj/g) ?? []).length).toBe(2);
     expect(text).toContain(' c\n');
     expect(text).toContain('(Second page)');
+  });
+
+  it('renders a dashboard with all five chart types', async () => {
+    const json = await render(ChartsFixture);
+    const pdf = await renderPdf(json);
+
+    expect(pdf).toBeInstanceOf(Uint8Array);
+    const header = new TextDecoder().decode(pdf.slice(0, 5));
+    expect(header).toBe('%PDF-');
+    const text = decompressedStreams(pdf);
+    // Axis/legend labels and titles are drawn as literal text with the
+    // built-in Helvetica: one recognizable string per chart type.
+    expect(text).toContain('(Revenue by quarter)');
+    expect(text).toContain('(Traffic sources)');
+    expect(text).toContain('(Monthly actives)');
+    expect(text).toContain('(Server load)');
+    // The dot plot draws its x-axis label (the engine currently never
+    // draws y_label, though it round-trips through serialization).
+    expect(text).toContain('(Dose)');
+    // Chart geometry lands as vector ops: bars as rect fills, pie
+    // sectors as bezier curves.
+    expect((text.match(/\bre\b/g) ?? []).length).toBeGreaterThan(5);
+    expect(text).toContain(' c\n');
   });
 
   it('substitutes PAGE_NUMBER / TOTAL_PAGES in a multi-page footer', async () => {

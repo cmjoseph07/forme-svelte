@@ -14,6 +14,11 @@ export { default as Barcode } from './components/Barcode.svelte';
 export { default as Canvas } from './components/Canvas.svelte';
 export { default as Watermark } from './components/Watermark.svelte';
 export { default as PageBreak } from './components/PageBreak.svelte';
+export { default as BarChart } from './components/BarChart.svelte';
+export { default as LineChart } from './components/LineChart.svelte';
+export { default as PieChart } from './components/PieChart.svelte';
+export { default as AreaChart } from './components/AreaChart.svelte';
+export { default as DotPlot } from './components/DotPlot.svelte';
 
 // Page-number placeholders
 export { PAGE_NUMBER, TOTAL_PAGES } from './constants.js';
@@ -33,6 +38,14 @@ export type {
   TextRun,
   ColumnDef,
   BarcodeFormat,
+  ChartDataPoint,
+  ChartSeries,
+  DotPlotGroup,
+  BarChartProps,
+  LineChartProps,
+  PieChartProps,
+  AreaChartProps,
+  DotPlotProps,
   CanvasContext,
   CanvasOp,
   GridTrackSize,

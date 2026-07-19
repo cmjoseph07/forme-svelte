@@ -13,6 +13,7 @@ import FixedPageNumbersReact from './fixtures/fixed-page-numbers';
 import TableReact from './fixtures/table';
 import MediaReact from './fixtures/media';
 import VectorExtrasReact from './fixtures/vector-extras';
+import ChartsReact from './fixtures/charts';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -27,6 +28,8 @@ import TableSvelte from './fixtures/table.svelte';
 import MediaSvelte from './fixtures/media.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import VectorExtrasSvelte from './fixtures/vector-extras.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import ChartsSvelte from './fixtures/charts.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -82,6 +85,19 @@ describe('cross-adapter parity', () => {
   it('vector-extras with default props', async () => {
     const svelteDoc = await serialize(VectorExtrasSvelte);
     const reactDoc = serializeReact(<VectorExtrasReact />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('charts: all five types, multi-series, groups, per-datum color overrides', async () => {
+    const props = { highlight: '#dc2626' };
+    const svelteDoc = await serialize(ChartsSvelte, { props });
+    const reactDoc = serializeReact(<ChartsReact {...props} />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('charts with default props (defaulted chart options included)', async () => {
+    const svelteDoc = await serialize(ChartsSvelte);
+    const reactDoc = serializeReact(<ChartsReact />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 
