@@ -29,7 +29,17 @@
 
 import { parseFragment } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
-import { expandEdges, mapColumnWidth, mapStyle, parseColor } from '@formepdf/shared';
+import {
+  buildAreaChartKind,
+  buildBarChartKind,
+  buildDotPlotKind,
+  buildLineChartKind,
+  buildPieChartKind,
+  expandEdges,
+  mapColumnWidth,
+  mapStyle,
+  parseColor,
+} from '@formepdf/shared';
 import type {
   BarcodeFormat,
   CanvasOp,
@@ -46,6 +56,13 @@ import type {
   Style,
   TextRun,
 } from '@formepdf/shared';
+
+/** The slice of a chart placeholder's props the parser handles itself:
+ *  every chart carries an optional style; the rest is chart-specific
+ *  and typed by its shared kind builder. */
+interface ChartPlaceholderProps {
+  style?: Style;
+}
 
 type P5Node = DefaultTreeAdapterMap['childNode'];
 type P5Element = DefaultTreeAdapterMap['element'];
@@ -201,6 +218,16 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseCanvas(element);
     case 'forme-watermark':
       return parseWatermark(element);
+    case 'forme-bar-chart':
+      return parseChart(element, 'BarChart', buildBarChartKind);
+    case 'forme-line-chart':
+      return parseChart(element, 'LineChart', buildLineChartKind);
+    case 'forme-pie-chart':
+      return parseChart(element, 'PieChart', buildPieChartKind);
+    case 'forme-area-chart':
+      return parseChart(element, 'AreaChart', buildAreaChartKind);
+    case 'forme-dot-plot':
+      return parseChart(element, 'DotPlot', buildDotPlotKind);
     case 'forme-page-break':
       return { kind: { type: 'PageBreak' }, style: {}, children: [] };
     case 'forme-page':
@@ -649,6 +676,28 @@ function parseWatermark(element: P5Element): FormeNode {
   return {
     kind: { type: 'Watermark', text: props.text, font_size: fontSize, angle },
     style,
+    children: [],
+  };
+}
+
+// ─── Charts ──────────────────────────────────────────────────────────
+
+/**
+ * Parse one chart placeholder. The camelCase-to-snake_case prop
+ * mapping (and its defaults) lives in the shared kind builders, the
+ * same functions the react adapter serializes with, so the two
+ * adapters cannot drift.
+ */
+function parseChart<P extends ChartPlaceholderProps>(
+  element: P5Element,
+  component: string,
+  buildKind: (props: P) => FormeNodeKind
+): FormeNode {
+  const props = decodeProps(element, component) as P;
+
+  return {
+    kind: buildKind(props),
+    style: mapStyle(props.style),
     children: [],
   };
 }

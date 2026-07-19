@@ -696,6 +696,246 @@ describe('page break', () => {
   });
 });
 
+describe('charts', () => {
+  it('maps bar chart props to snake_case, keeping per-datum colors', () => {
+    const doc = parseIn(
+      `<forme-bar-chart props='${attr({
+        width: 300,
+        height: 180,
+        data: [
+          { label: 'Q1', value: 120 },
+          { label: 'Q2', value: 80, color: '#ef4444' },
+        ],
+        color: '#1a365d',
+        showValues: true,
+        showGrid: true,
+        title: 'Revenue',
+        style: { marginBottom: 12 },
+      })}'></forme-bar-chart>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({
+      type: 'BarChart',
+      data: [
+        { label: 'Q1', value: 120 },
+        { label: 'Q2', value: 80, color: '#ef4444' },
+      ],
+      width: 300,
+      height: 180,
+      show_labels: true,
+      show_values: true,
+      show_grid: true,
+      color: '#1a365d',
+      title: 'Revenue',
+    });
+    expect(node.style.margin).toEqual({ top: 0, right: 0, bottom: 12, left: 0 });
+    expect(node.children).toEqual([]);
+  });
+
+  it('applies bar chart defaults and omits absent optionals', () => {
+    const doc = parseIn(
+      `<forme-bar-chart props='${attr({
+        width: 200,
+        height: 100,
+        data: [{ label: 'A', value: 1 }],
+      })}'></forme-bar-chart>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: {
+        type: 'BarChart',
+        data: [{ label: 'A', value: 1 }],
+        width: 200,
+        height: 100,
+        show_labels: true,
+        show_values: false,
+        show_grid: false,
+      },
+      style: {},
+      children: [],
+    });
+  });
+
+  it('maps a multi-series line chart with labels and defaults', () => {
+    const doc = parseIn(
+      `<forme-line-chart props='${attr({
+        width: 400,
+        height: 200,
+        series: [
+          { name: '2025', data: [10, 20, 30] },
+          { name: '2026', data: [15, 25, 35], color: '#10b981' },
+        ],
+        labels: ['Jan', 'Feb', 'Mar'],
+        showPoints: true,
+      })}'></forme-line-chart>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'LineChart',
+      series: [
+        { name: '2025', data: [10, 20, 30] },
+        { name: '2026', data: [15, 25, 35], color: '#10b981' },
+      ],
+      labels: ['Jan', 'Feb', 'Mar'],
+      width: 400,
+      height: 200,
+      show_points: true,
+      show_grid: false,
+    });
+  });
+
+  it('applies line chart defaults (show_points, show_grid) and omits title', () => {
+    const doc = parseIn(
+      `<forme-line-chart props='${attr({
+        width: 200,
+        height: 100,
+        series: [{ name: 'S', data: [1, 2] }],
+        labels: ['a', 'b'],
+      })}'></forme-line-chart>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: {
+        type: 'LineChart',
+        series: [{ name: 'S', data: [1, 2] }],
+        labels: ['a', 'b'],
+        width: 200,
+        height: 100,
+        show_points: false,
+        show_grid: false,
+      },
+      style: {},
+      children: [],
+    });
+  });
+
+  it('maps a donut pie chart with legend and title', () => {
+    const doc = parseIn(
+      `<forme-pie-chart props='${attr({
+        width: 220,
+        height: 220,
+        data: [
+          { label: 'Direct', value: 55, color: '#1a365d' },
+          { label: 'Referral', value: 45, color: '#f59e0b' },
+        ],
+        donut: true,
+        showLegend: true,
+        title: 'Traffic',
+      })}'></forme-pie-chart>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'PieChart',
+      data: [
+        { label: 'Direct', value: 55, color: '#1a365d' },
+        { label: 'Referral', value: 45, color: '#f59e0b' },
+      ],
+      width: 220,
+      height: 220,
+      donut: true,
+      show_legend: true,
+      title: 'Traffic',
+    });
+  });
+
+  it('applies pie chart defaults (donut, show_legend) and omits title', () => {
+    const doc = parseIn(
+      `<forme-pie-chart props='${attr({
+        width: 120,
+        height: 120,
+        data: [{ label: 'A', value: 1 }],
+      })}'></forme-pie-chart>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: {
+        type: 'PieChart',
+        data: [{ label: 'A', value: 1 }],
+        width: 120,
+        height: 120,
+        donut: false,
+        show_legend: false,
+      },
+      style: {},
+      children: [],
+    });
+  });
+
+  it('maps a multi-series area chart and defaults show_grid', () => {
+    const doc = parseIn(
+      `<forme-area-chart props='${attr({
+        width: 400,
+        height: 160,
+        series: [{ name: 'Load', data: [1, 4, 2, 8] }],
+        labels: ['a', 'b', 'c', 'd'],
+      })}'></forme-area-chart>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'AreaChart',
+      series: [{ name: 'Load', data: [1, 4, 2, 8] }],
+      labels: ['a', 'b', 'c', 'd'],
+      width: 400,
+      height: 160,
+      show_grid: false,
+    });
+  });
+
+  it('maps grouped dot plot data with axis bounds and labels', () => {
+    const doc = parseIn(
+      `<forme-dot-plot props='${attr({
+        width: 300,
+        height: 240,
+        groups: [
+          { name: 'Control', data: [[1, 2], [3, 4]] },
+          { name: 'Variant', color: '#ef4444', data: [[2, 3]] },
+        ],
+        xMin: 0,
+        xMax: 10,
+        yMin: 0,
+        yMax: 20,
+        xLabel: 'Dose',
+        yLabel: 'Response',
+        showLegend: true,
+        dotSize: 6,
+      })}'></forme-dot-plot>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'DotPlot',
+      groups: [
+        { name: 'Control', data: [[1, 2], [3, 4]] },
+        { name: 'Variant', color: '#ef4444', data: [[2, 3]] },
+      ],
+      width: 300,
+      height: 240,
+      show_legend: true,
+      dot_size: 6,
+      x_min: 0,
+      x_max: 10,
+      y_min: 0,
+      y_max: 20,
+      x_label: 'Dose',
+      y_label: 'Response',
+    });
+  });
+
+  it('applies dot plot defaults and omits absent bounds', () => {
+    const doc = parseIn(
+      `<forme-dot-plot props='${attr({
+        width: 100,
+        height: 100,
+        groups: [{ name: 'G', data: [[0, 0]] }],
+      })}'></forme-dot-plot>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: {
+        type: 'DotPlot',
+        groups: [{ name: 'G', data: [[0, 0]] }],
+        width: 100,
+        height: 100,
+        show_legend: false,
+        dot_size: 4,
+      },
+      style: {},
+      children: [],
+    });
+  });
+});
+
 describe('errors', () => {
   it('rejects a Page nested outside Document', () => {
     expect(() =>

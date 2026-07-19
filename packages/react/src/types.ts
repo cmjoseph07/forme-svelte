@@ -5,9 +5,6 @@ import type {
   Edges,
   ColumnDef,
   BarcodeFormat,
-  ChartDataPoint,
-  ChartSeries,
-  DotPlotGroup,
   CanvasContext,
   CertificationConfig,
 } from '@formepdf/shared';
@@ -28,6 +25,11 @@ export type {
   PieDataPoint,
   ChartSeries,
   DotPlotGroup,
+  BarChartProps,
+  LineChartProps,
+  PieChartProps,
+  AreaChartProps,
+  DotPlotProps,
   CanvasContext,
   CanvasOp,
   TextRun,
@@ -182,90 +184,6 @@ export interface BarcodeProps {
   height?: number;
   /** Bar color. Default: black. */
   color?: string;
-  style?: Style;
-}
-
-export interface BarChartProps {
-  width: number;
-  height: number;
-  data: ChartDataPoint[];
-  /** Bar color. Default: "#1a365d". */
-  color?: string;
-  /** Show X-axis labels below bars. Default: true. */
-  showLabels?: boolean;
-  /** Show horizontal grid lines. Default: false. */
-  showGrid?: boolean;
-  /** Show value labels above bars. Default: false. */
-  showValues?: boolean;
-  /** Chart title. */
-  title?: string;
-  style?: Style;
-}
-
-export interface LineChartProps {
-  width: number;
-  height: number;
-  /** Multi-series data. */
-  series: ChartSeries[];
-  /** X-axis labels. */
-  labels: string[];
-  /** Show dots at data points. Default: false. */
-  showPoints?: boolean;
-  /** Show horizontal grid lines. Default: false. */
-  showGrid?: boolean;
-  /** Chart title. */
-  title?: string;
-  style?: Style;
-}
-
-export interface PieChartProps {
-  width: number;
-  height: number;
-  data: ChartDataPoint[];
-  /** Render as donut chart. Default: false. */
-  donut?: boolean;
-  /** Show legend. Default: false. */
-  showLegend?: boolean;
-  /** Chart title. */
-  title?: string;
-  style?: Style;
-}
-
-export interface AreaChartProps {
-  width: number;
-  height: number;
-  /** Multi-series data. */
-  series: ChartSeries[];
-  /** X-axis labels. */
-  labels: string[];
-  /** Show horizontal grid lines. Default: false. */
-  showGrid?: boolean;
-  /** Chart title. */
-  title?: string;
-  style?: Style;
-}
-
-export interface DotPlotProps {
-  width: number;
-  height: number;
-  /** Groups of (x, y) data points. */
-  groups: DotPlotGroup[];
-  /** Minimum X value. Auto-computed if omitted. */
-  xMin?: number;
-  /** Maximum X value. Auto-computed if omitted. */
-  xMax?: number;
-  /** Minimum Y value. Auto-computed if omitted. */
-  yMin?: number;
-  /** Maximum Y value. Auto-computed if omitted. */
-  yMax?: number;
-  /** X-axis label. */
-  xLabel?: string;
-  /** Y-axis label. */
-  yLabel?: string;
-  /** Show legend. Default: false. */
-  showLegend?: boolean;
-  /** Dot radius in points. Default: 4. */
-  dotSize?: number;
   style?: Style;
 }
 
