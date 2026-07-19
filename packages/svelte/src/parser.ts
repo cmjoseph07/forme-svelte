@@ -36,8 +36,10 @@ import {
   buildLineChartKind,
   buildPieChartKind,
   expandEdges,
+  Font,
   mapColumnWidth,
   mapStyle,
+  mergeFonts,
   parseColor,
 } from '@formepdf/shared';
 import type {
@@ -46,6 +48,7 @@ import type {
   CertificationConfig,
   ColumnDef,
   Edges,
+  FontRegistration,
   FormeColumnDef,
   FormeDocument,
   FormeEdges,
@@ -56,6 +59,7 @@ import type {
   Style,
   TextRun,
 } from '@formepdf/shared';
+import { reviveBytesMarker } from './encode.js';
 
 /** The slice of a chart placeholder's props the parser handles itself:
  *  every chart carries an optional style; the rest is chart-specific
@@ -95,6 +99,7 @@ interface DocumentProps {
   certification?: CertificationConfig;
   /** @deprecated Use certification */
   signature?: CertificationConfig;
+  fonts?: FontRegistration[];
 }
 
 export function parseMarkup(markup: string): FormeDocument {
@@ -135,6 +140,9 @@ export function parseMarkup(markup: string): FormeDocument {
   if (props.creator !== undefined) metadata.creator = props.creator;
   if (props.lang !== undefined) metadata.lang = props.lang;
 
+  // Merge global + document fonts (document fonts override on conflict)
+  const mergedFonts = mergeFonts(Font.getRegistered(), props.fonts);
+
   const result: FormeDocument = {
     children,
     metadata,
@@ -155,6 +163,10 @@ export function parseMarkup(markup: string): FormeDocument {
       console.warn('[Forme] The `signature` prop is deprecated. Use `certification` instead.');
     }
     result.certification = cert;
+  }
+
+  if (mergedFonts.length > 0) {
+    result.fonts = mergedFonts;
   }
 
   return result;
@@ -879,7 +891,7 @@ function decodeProps(element: P5Element, component: string): unknown {
   const attr = element.attrs.find(a => a.name === 'props');
   if (attr === undefined) return {};
   try {
-    return JSON.parse(attr.value) as unknown;
+    return JSON.parse(attr.value, reviveBytesMarker) as unknown;
   } catch (err) {
     throw new Error(
       `[Forme] <${component}>: failed to decode props attribute: ${err instanceof Error ? err.message : String(err)}`

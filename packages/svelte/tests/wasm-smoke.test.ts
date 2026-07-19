@@ -4,9 +4,10 @@
  * never depends on WASM).
  */
 import { inflateSync } from 'node:zlib';
+import { readFile } from 'node:fs/promises';
 import { describe, it, expect } from 'vitest';
 import { renderPdf } from '@formepdf/core';
-import { render } from '../src/index.js';
+import { render, Font } from '../src/index.js';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorld from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -21,6 +22,8 @@ import VectorExtras from './fixtures/vector-extras.svelte';
 import ChartsFixture from './fixtures/charts.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import FormFieldsFixture from './fixtures/form-fields.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import FontsFixture from './fixtures/fonts.svelte';
 
 /**
  * Concatenate every stream object in the PDF, inflating the
@@ -164,6 +167,29 @@ describe('WASM smoke', () => {
     expect(raw).toContain('/free');
     expect(raw).toContain('/pro');
     expect(raw).toContain('/team');
+  });
+
+  it('renders with a registered custom TrueType font embedded', async () => {
+    // NotoSans ships in the repo (engine/fonts), so this never depends
+    // on system fonts and runs the same on CI.
+    const ttf = await readFile(new URL('../../../engine/fonts/NotoSans-Regular.ttf', import.meta.url));
+    Font.register({ family: 'NotoSans', src: `data:font/ttf;base64,${ttf.toString('base64')}` });
+    try {
+      const json = await render(FontsFixture, {
+        props: { fonts: [], bodyFamily: 'NotoSans' },
+      });
+      const pdf = await renderPdf(json);
+
+      const header = new TextDecoder().decode(pdf.slice(0, 5));
+      expect(header).toBe('%PDF-');
+      // The custom font is embedded, not substituted: its BaseFont name
+      // and a TrueType font program appear in the PDF.
+      const raw = Buffer.from(pdf).toString('latin1');
+      expect(raw).toContain('NotoSans');
+      expect(raw).toContain('/FontFile2');
+    } finally {
+      Font.clear();
+    }
   });
 
   it('substitutes PAGE_NUMBER / TOTAL_PAGES in a multi-page footer', async () => {
