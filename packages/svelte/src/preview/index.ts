@@ -89,9 +89,7 @@ export function formePreview<Props extends Record<string, any>>(
       inFlight = renderDocumentWithLayout(template, { props: options.props })
         .then((result) => {
           cache = {
-            // The WASM bridge always returns an ArrayBuffer-backed
-            // view, never a SharedArrayBuffer one.
-            pdf: result.pdf as Uint8Array<ArrayBuffer>,
+            pdf: result.pdf,
             layout: result.layout,
             version: hashBytes(result.pdf),
           };

@@ -52,7 +52,7 @@ export { mapStyle, mapDimension, parseColor, expandEdges, expandCorners } from '
 
 // One-call PDF rendering (requires the optional @formepdf/core peer)
 export { renderDocument, renderDocumentWithLayout } from './render-document.js';
-export type { RenderDocumentOptions } from './render-document.js';
+export type { RenderDocumentOptions, RenderDocumentWithLayoutResult } from './render-document.js';
 
 // StyleSheet
 export { StyleSheet } from './stylesheet.js';

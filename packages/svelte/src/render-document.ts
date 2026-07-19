@@ -24,6 +24,15 @@ import type { SerializeOptions } from './serialize.js';
 export type RenderDocumentOptions<Props extends Record<string, any>> = SerializeOptions<Props> &
   CoreRenderDocumentOptions;
 
+/**
+ * `renderDocumentWithLayout` result with the PDF bytes narrowed to an
+ * `ArrayBuffer`-backed view, so `new Response(result.pdf)` typechecks
+ * against the DOM `BodyInit` in SvelteKit endpoints.
+ */
+export type RenderDocumentWithLayoutResult = Omit<RenderWithLayoutResult, 'pdf'> & {
+  pdf: Uint8Array<ArrayBuffer>;
+};
+
 async function importCore(): Promise<typeof import('@formepdf/core')> {
   try {
     return await import('@formepdf/core');
@@ -43,11 +52,14 @@ async function importCore(): Promise<typeof import('@formepdf/core')> {
 export async function renderDocument<Props extends Record<string, any>>(
   template: Component<Props>,
   options?: RenderDocumentOptions<Props>,
-): Promise<Uint8Array> {
+): Promise<Uint8Array<ArrayBuffer>> {
   const { props, ...renderOptions } = options ?? ({} as RenderDocumentOptions<Props>);
   const doc = await serialize(template, { props });
   const core = await importCore();
-  return core.renderSerializedDoc(doc as unknown as Record<string, unknown>, renderOptions);
+  const pdf = await core.renderSerializedDoc(doc as unknown as Record<string, unknown>, renderOptions);
+  // The WASM bridge always returns an ArrayBuffer-backed view, never a
+  // SharedArrayBuffer one - narrow so `new Response(pdf)` typechecks.
+  return pdf as Uint8Array<ArrayBuffer>;
 }
 
 /**
@@ -57,12 +69,13 @@ export async function renderDocument<Props extends Record<string, any>>(
 export async function renderDocumentWithLayout<Props extends Record<string, any>>(
   template: Component<Props>,
   options?: RenderDocumentOptions<Props>,
-): Promise<RenderWithLayoutResult> {
+): Promise<RenderDocumentWithLayoutResult> {
   const { props, ...renderOptions } = options ?? ({} as RenderDocumentOptions<Props>);
   const doc = await serialize(template, { props });
   const core = await importCore();
-  return core.renderSerializedDocWithLayout(
+  const result = await core.renderSerializedDocWithLayout(
     doc as unknown as Record<string, unknown>,
     renderOptions,
   );
+  return result as RenderDocumentWithLayoutResult;
 }
