@@ -406,11 +406,106 @@ describe('document-level props', () => {
   });
 });
 
+describe('table', () => {
+  it('maps fraction, fixed, and auto column widths', () => {
+    const doc = parseIn(
+      `<forme-table props='${attr({
+        columns: [{ width: { fraction: 0.5 } }, { width: { fixed: 120 } }, { width: 'auto' }],
+      })}'></forme-table>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'Table',
+      columns: [{ width: { Fraction: 0.5 } }, { width: { Fixed: 120 } }, { width: 'Auto' }],
+    });
+  });
+
+  it('defaults to no columns', () => {
+    const doc = parseIn('<forme-table props="{}"></forme-table>');
+    expect(doc.children[0].kind).toEqual({ type: 'Table', columns: [] });
+  });
+
+  it('maps the Row header flag, defaulting to false', () => {
+    const doc = parseIn(
+      `<forme-table props="{}">` +
+        `<forme-row props='${attr({ header: true })}'></forme-row>` +
+        `<forme-row props="{}"></forme-row>` +
+        `</forme-table>`
+    );
+    expect(doc.children[0].children.map(r => r.kind)).toEqual([
+      { type: 'TableRow', is_header: true },
+      { type: 'TableRow', is_header: false },
+    ]);
+  });
+
+  it('maps Cell spans, defaulting to 1', () => {
+    const doc = parseIn(
+      `<forme-table props="{}"><forme-row props="{}">` +
+        `<forme-cell props='${attr({ colSpan: 3, rowSpan: 2 })}'></forme-cell>` +
+        `<forme-cell props="{}"></forme-cell>` +
+        `</forme-row></forme-table>`
+    );
+    expect(doc.children[0].children[0].children.map(c => c.kind)).toEqual([
+      { type: 'TableCell', col_span: 3, row_span: 2 },
+      { type: 'TableCell', col_span: 1, row_span: 1 },
+    ]);
+  });
+
+  it('carries table, row, and cell styles', () => {
+    const doc = parseIn(
+      `<forme-table props='${attr({ style: { marginTop: 12 } })}'>` +
+        `<forme-row props='${attr({ header: true, style: { backgroundColor: '#333' } })}'>` +
+        `<forme-cell props='${attr({ style: { padding: 4 } })}'></forme-cell>` +
+        `</forme-row></forme-table>`
+    );
+    const table = doc.children[0];
+    expect(table.style.margin).toEqual({ top: 12, right: 0, bottom: 0, left: 0 });
+    expect(table.children[0].style.backgroundColor).toEqual({ r: 0.2, g: 0.2, b: 0.2, a: 1 });
+    expect(table.children[0].children[0].style.padding).toEqual({
+      top: 4,
+      right: 4,
+      bottom: 4,
+      left: 4,
+    });
+  });
+
+  it('nests non-text cell content (views, nested text)', () => {
+    const doc = parseIn(
+      `<forme-table props="{}"><forme-row props="{}"><forme-cell props="{}">` +
+        `<forme-view props='${attr({ style: { flexDirection: 'row' } })}'>` +
+        `<forme-text props="{}">badge</forme-text>` +
+        `</forme-view>` +
+        `</forme-cell></forme-row></forme-table>`
+    );
+    const cell = doc.children[0].children[0].children[0];
+    expect(cell.kind).toEqual({ type: 'TableCell', col_span: 1, row_span: 1 });
+    expect(cell.children).toEqual([
+      {
+        kind: { type: 'View' },
+        style: { flexDirection: 'Row' },
+        children: [{ kind: { type: 'Text', content: 'badge' }, style: {}, children: [] }],
+      },
+    ]);
+  });
+});
+
 describe('errors', () => {
   it('rejects a Page nested outside Document', () => {
     expect(() =>
       parseIn('<forme-view props="{}"><forme-page props="{}"></forme-page></forme-view>')
     ).toThrow('Invalid nesting: <Page> found inside <View>. <Page> must be a direct child of <Document>.');
+  });
+
+  it('rejects a Row outside a Table and a Cell outside a Row', () => {
+    expect(() =>
+      parseIn('<forme-view props="{}"><forme-row props="{}"></forme-row></forme-view>')
+    ).toThrow(
+      'Invalid nesting: <Row> found inside <View>. <Row> must be inside a <Table>. Wrap it: <Table><Row>...</Row></Table>'
+    );
+    expect(() =>
+      parseIn('<forme-table props="{}"><forme-cell props="{}"></forme-cell></forme-table>')
+    ).toThrow(
+      'Invalid nesting: <Cell> found inside <Table>. <Cell> must be inside a <Row>. Wrap it: <Row><Cell>...</Cell></Row>'
+    );
   });
 
   it('suggests the Forme component for known HTML elements', () => {

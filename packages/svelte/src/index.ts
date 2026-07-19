@@ -3,6 +3,9 @@ export { default as Document } from './components/Document.svelte';
 export { default as Page } from './components/Page.svelte';
 export { default as View } from './components/View.svelte';
 export { default as Text } from './components/Text.svelte';
+export { default as Table } from './components/Table.svelte';
+export { default as Row } from './components/Row.svelte';
+export { default as Cell } from './components/Cell.svelte';
 export { default as Fixed } from './components/Fixed.svelte';
 
 // Page-number placeholders
@@ -21,6 +24,7 @@ export type {
   // Developer-facing
   Style,
   TextRun,
+  ColumnDef,
   GridTrackSize,
   Edges,
   Corners,
