@@ -936,6 +936,137 @@ describe('charts', () => {
   });
 });
 
+describe('form fields', () => {
+  it('parses a full text field, mapping camelCase props to snake_case', () => {
+    const doc = parseIn(
+      `<forme-text-field props='${attr({
+        name: 'bio',
+        value: 'Hello!',
+        placeholder: 'Tell us about yourself',
+        width: 400,
+        height: 80,
+        multiline: true,
+        password: false,
+        readOnly: true,
+        maxLength: 500,
+        fontSize: 10,
+        style: { marginBottom: 8 },
+      })}'></forme-text-field>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({
+      type: 'TextField',
+      name: 'bio',
+      value: 'Hello!',
+      placeholder: 'Tell us about yourself',
+      width: 400,
+      height: 80,
+      multiline: true,
+      password: false,
+      read_only: true,
+      max_length: 500,
+      font_size: 10,
+    });
+    expect(node.style).toEqual({ margin: { top: 0, right: 0, bottom: 8, left: 0 } });
+    expect(node.children).toEqual([]);
+  });
+
+  it('applies text field defaults and omits absent optionals', () => {
+    const doc = parseIn(
+      `<forme-text-field props='${attr({ name: 'full_name', width: 220 })}'></forme-text-field>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: {
+        type: 'TextField',
+        name: 'full_name',
+        width: 220,
+        height: 24,
+        multiline: false,
+        password: false,
+        read_only: false,
+        font_size: 12,
+      },
+      style: {},
+      children: [],
+    });
+  });
+
+  it('parses a checkbox with explicit props and applies defaults', () => {
+    const explicit = parseIn(
+      `<forme-checkbox props='${attr({
+        name: 'newsletter',
+        checked: true,
+        width: 18,
+        height: 18,
+        readOnly: true,
+      })}'></forme-checkbox>`
+    );
+    expect(explicit.children[0].kind).toEqual({
+      type: 'Checkbox',
+      name: 'newsletter',
+      checked: true,
+      width: 18,
+      height: 18,
+      read_only: true,
+    });
+
+    const defaulted = parseIn(`<forme-checkbox props='${attr({ name: 'agree' })}'></forme-checkbox>`);
+    expect(defaulted.children[0]).toEqual({
+      kind: { type: 'Checkbox', name: 'agree', checked: false, width: 14, height: 14, read_only: false },
+      style: {},
+      children: [],
+    });
+  });
+
+  it('parses dropdown options and applies defaults', () => {
+    const doc = parseIn(
+      `<forme-dropdown props='${attr({
+        name: 'country',
+        options: ['US', 'UK', 'CA'],
+        value: 'UK',
+        width: 200,
+        fontSize: 11,
+      })}'></forme-dropdown>`
+    );
+    expect(doc.children[0].kind).toEqual({
+      type: 'Dropdown',
+      name: 'country',
+      options: ['US', 'UK', 'CA'],
+      value: 'UK',
+      width: 200,
+      height: 24,
+      read_only: false,
+      font_size: 11,
+    });
+
+    const defaulted = parseIn(
+      `<forme-dropdown props='${attr({ name: 'plan', options: [], width: 160 })}'></forme-dropdown>`
+    );
+    expect(defaulted.children[0].kind).toEqual({
+      type: 'Dropdown',
+      name: 'plan',
+      options: [],
+      width: 160,
+      height: 24,
+      read_only: false,
+      font_size: 12,
+    });
+  });
+
+  it('parses a radio group sharing a name with one checked button', () => {
+    const doc = parseIn(
+      `<forme-radio-button props='${attr({ name: 'plan', value: 'free' })}'></forme-radio-button>` +
+        `<forme-radio-button props='${attr({ name: 'plan', value: 'pro', checked: true })}'></forme-radio-button>` +
+        `<forme-radio-button props='${attr({ name: 'plan', value: 'team', width: 16, height: 16 })}'></forme-radio-button>`
+    );
+    expect(doc.children.map(c => c.kind)).toEqual([
+      { type: 'RadioButton', name: 'plan', value: 'free', checked: false, width: 14, height: 14, read_only: false },
+      { type: 'RadioButton', name: 'plan', value: 'pro', checked: true, width: 14, height: 14, read_only: false },
+      { type: 'RadioButton', name: 'plan', value: 'team', checked: false, width: 16, height: 16, read_only: false },
+    ]);
+  });
+});
+
 describe('errors', () => {
   it('rejects a Page nested outside Document', () => {
     expect(() =>

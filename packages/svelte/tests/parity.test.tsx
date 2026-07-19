@@ -14,6 +14,7 @@ import TableReact from './fixtures/table';
 import MediaReact from './fixtures/media';
 import VectorExtrasReact from './fixtures/vector-extras';
 import ChartsReact from './fixtures/charts';
+import FormFieldsReact from './fixtures/form-fields';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -30,6 +31,8 @@ import MediaSvelte from './fixtures/media.svelte';
 import VectorExtrasSvelte from './fixtures/vector-extras.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import ChartsSvelte from './fixtures/charts.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import FormFieldsSvelte from './fixtures/form-fields.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -98,6 +101,18 @@ describe('cross-adapter parity', () => {
   it('charts with default props (defaulted chart options included)', async () => {
     const svelteDoc = await serialize(ChartsSvelte);
     const reactDoc = serializeReact(<ChartsReact />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('form-fields: TextField flags, Dropdown options, radio group', async () => {
+    const svelteDoc = await serialize(FormFieldsSvelte, { props: { plan: 'team' } });
+    const reactDoc = serializeReact(<FormFieldsReact plan="team" />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('form-fields with default props (radio group default selection)', async () => {
+    const svelteDoc = await serialize(FormFieldsSvelte);
+    const reactDoc = serializeReact(<FormFieldsReact />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 
