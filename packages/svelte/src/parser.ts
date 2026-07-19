@@ -32,6 +32,7 @@ import type { DefaultTreeAdapterMap } from 'parse5';
 import { expandEdges, mapColumnWidth, mapStyle, parseColor } from '@formepdf/shared';
 import type {
   BarcodeFormat,
+  CanvasOp,
   CertificationConfig,
   ColumnDef,
   Edges,
@@ -196,6 +197,12 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseQrCode(element);
     case 'forme-barcode':
       return parseBarcode(element);
+    case 'forme-canvas':
+      return parseCanvas(element);
+    case 'forme-watermark':
+      return parseWatermark(element);
+    case 'forme-page-break':
+      return { kind: { type: 'PageBreak' }, style: {}, children: [] };
     case 'forme-page':
       validateNesting('Page', parent);
       return parsePage(element);
@@ -594,6 +601,56 @@ function parseBarcode(element: P5Element): FormeNode {
   if (props.color) style.color = parseColor(props.color);
 
   return { kind, style, children: [] };
+}
+
+// ─── Vector extras ───────────────────────────────────────────────────
+
+interface CanvasProps {
+  width: number;
+  height: number;
+  /** Recorded by the emitting component, which executes the user's
+   *  `draw` callback at emit time (the callback itself cannot survive
+   *  the attribute round-trip). */
+  operations: CanvasOp[];
+  style?: Style;
+}
+
+function parseCanvas(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Canvas') as CanvasProps;
+
+  return {
+    kind: { type: 'Canvas', width: props.width, height: props.height, operations: props.operations },
+    style: mapStyle(props.style),
+    children: [],
+  };
+}
+
+interface WatermarkProps {
+  text: string;
+  fontSize?: number;
+  color?: string;
+  angle?: number;
+  style?: Style;
+}
+
+function parseWatermark(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Watermark') as WatermarkProps;
+  const fontSize = props.fontSize ?? 60;
+  const angle = props.angle ?? -45;
+
+  // Mirrors react: the color's alpha channel becomes opacity (multiplied
+  // with any style opacity); the stored color itself is fully opaque.
+  const parsed = parseColor(props.color ?? 'rgba(0,0,0,0.1)');
+  const style = mapStyle(props.style);
+  style.color = { r: parsed.r, g: parsed.g, b: parsed.b, a: 1 };
+  style.opacity = parsed.a * (style.opacity ?? 1);
+  style.fontSize = fontSize;
+
+  return {
+    kind: { type: 'Watermark', text: props.text, font_size: fontSize, angle },
+    style,
+    children: [],
+  };
 }
 
 // ─── Whitespace normalization ────────────────────────────────────────

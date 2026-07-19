@@ -621,6 +621,81 @@ describe('barcode', () => {
   });
 });
 
+describe('canvas', () => {
+  it('parses dimensions, the recorded operation list, and style', () => {
+    const operations = [
+      { op: 'SetFillColor', r: 59, g: 130, b: 246 },
+      { op: 'Rect', x: 10, y: 10, width: 80, height: 40 },
+      { op: 'Fill' },
+      { op: 'Arc', cx: 60, cy: 60, r: 25, start_angle: 0, end_angle: 4.71, counterclockwise: false },
+      { op: 'Stroke' },
+    ];
+    const doc = parseIn(
+      `<forme-canvas props='${attr({ width: 200, height: 110, operations, style: { marginBottom: 8 } })}'></forme-canvas>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({ type: 'Canvas', width: 200, height: 110, operations });
+    expect(node.style.margin).toEqual({ top: 0, right: 0, bottom: 8, left: 0 });
+    expect(node.children).toEqual([]);
+  });
+
+  it('keeps an empty operation list', () => {
+    const doc = parseIn(
+      `<forme-canvas props='${attr({ width: 50, height: 50, operations: [] })}'></forme-canvas>`
+    );
+    expect(doc.children[0]).toEqual({
+      kind: { type: 'Canvas', width: 50, height: 50, operations: [] },
+      style: {},
+      children: [],
+    });
+  });
+});
+
+describe('watermark', () => {
+  it('parses text with explicit fontSize, rgba color, and angle', () => {
+    const doc = parseIn(
+      `<forme-watermark props='${attr({
+        text: 'DRAFT',
+        fontSize: 72,
+        color: 'rgba(200,30,30,0.15)',
+        angle: -30,
+      })}'></forme-watermark>`
+    );
+    const node = doc.children[0];
+    expect(node.kind).toEqual({ type: 'Watermark', text: 'DRAFT', font_size: 72, angle: -30 });
+    expect(node.style.color).toEqual({ r: 200 / 255, g: 30 / 255, b: 30 / 255, a: 1 });
+    expect(node.style.opacity).toBeCloseTo(0.15);
+    expect(node.style.fontSize).toBe(72);
+  });
+
+  it('defaults fontSize 60, angle -45, color rgba(0,0,0,0.1)', () => {
+    const doc = parseIn(`<forme-watermark props='${attr({ text: 'CONFIDENTIAL' })}'></forme-watermark>`);
+    const node = doc.children[0];
+    expect(node.kind).toEqual({ type: 'Watermark', text: 'CONFIDENTIAL', font_size: 60, angle: -45 });
+    expect(node.style.color).toEqual({ r: 0, g: 0, b: 0, a: 1 });
+    expect(node.style.opacity).toBeCloseTo(0.1);
+    expect(node.style.fontSize).toBe(60);
+  });
+
+  it('multiplies the color alpha with an explicit style opacity', () => {
+    const doc = parseIn(
+      `<forme-watermark props='${attr({
+        text: 'X',
+        color: 'rgba(0,0,0,0.5)',
+        style: { opacity: 0.5 },
+      })}'></forme-watermark>`
+    );
+    expect(doc.children[0].style.opacity).toBeCloseTo(0.25);
+  });
+});
+
+describe('page break', () => {
+  it('parses to a bare PageBreak node', () => {
+    const doc = parseIn('<forme-page-break></forme-page-break>');
+    expect(doc.children).toEqual([{ kind: { type: 'PageBreak' }, style: {}, children: [] }]);
+  });
+});
+
 describe('errors', () => {
   it('rejects a Page nested outside Document', () => {
     expect(() =>

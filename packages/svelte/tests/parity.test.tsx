@@ -12,6 +12,7 @@ import TextRunsReact from './fixtures/text-runs';
 import FixedPageNumbersReact from './fixtures/fixed-page-numbers';
 import TableReact from './fixtures/table';
 import MediaReact from './fixtures/media';
+import VectorExtrasReact from './fixtures/vector-extras';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -24,6 +25,8 @@ import FixedPageNumbersSvelte from './fixtures/fixed-page-numbers.svelte';
 import TableSvelte from './fixtures/table.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import MediaSvelte from './fixtures/media.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import VectorExtrasSvelte from './fixtures/vector-extras.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -66,6 +69,19 @@ describe('cross-adapter parity', () => {
   it('media with default props', async () => {
     const svelteDoc = await serialize(MediaSvelte);
     const reactDoc = serializeReact(<MediaReact />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('vector-extras: Canvas draw recording, Watermark rgba/defaults, PageBreak', async () => {
+    const props = { accent: [239, 68, 68] as [number, number, number] };
+    const svelteDoc = await serialize(VectorExtrasSvelte, { props });
+    const reactDoc = serializeReact(<VectorExtrasReact {...props} />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('vector-extras with default props', async () => {
+    const svelteDoc = await serialize(VectorExtrasSvelte);
+    const reactDoc = serializeReact(<VectorExtrasReact />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 

@@ -15,6 +15,8 @@ import FixedPageNumbers from './fixtures/fixed-page-numbers.svelte';
 import TableFixture from './fixtures/table.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import MediaFixture from './fixtures/media.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import VectorExtras from './fixtures/vector-extras.svelte';
 
 /**
  * Concatenate every stream object in the PDF, inflating the
@@ -89,6 +91,27 @@ describe('WASM smoke', () => {
     const rectOps = (text.match(/\bre\b/g) ?? []).length;
     expect(rectOps).toBeGreaterThan(100);
     expect(text).toMatch(/\/Im\d+ Do/);
+  });
+
+  it('renders Canvas, Watermark, and an explicit PageBreak to a two-page PDF', async () => {
+    const json = await render(VectorExtras);
+    const pdf = await renderPdf(json);
+
+    const header = new TextDecoder().decode(pdf.slice(0, 5));
+    expect(header).toBe('%PDF-');
+    // The explicit <PageBreak /> splits the document into exactly two
+    // pages (the page-tree root is /Type /Pages).
+    const raw = Buffer.from(pdf).toString('latin1');
+    const pageCount = (raw.match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    expect(pageCount).toBe(2);
+    // The watermark text repeats on both pages (drawn as hex strings:
+    // "DRAFT" and "CONFIDENTIAL"); canvas ops land in the first page's
+    // content stream as vector path commands (bezier `c` operators).
+    const text = decompressedStreams(pdf);
+    expect((text.match(/<4452414654> Tj/g) ?? []).length).toBe(2);
+    expect((text.match(/<434F4E464944454E5449414C> Tj/g) ?? []).length).toBe(2);
+    expect(text).toContain(' c\n');
+    expect(text).toContain('(Second page)');
   });
 
   it('substitutes PAGE_NUMBER / TOTAL_PAGES in a multi-page footer', async () => {
