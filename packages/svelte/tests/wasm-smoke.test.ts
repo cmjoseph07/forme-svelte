@@ -1,6 +1,6 @@
 /**
  * WASM smoke test: the serialized document model renders to real PDF
- * bytes through @formepdf/core (devDependency — the adapter itself
+ * bytes through @formepdf/core (devDependency - the adapter itself
  * never depends on WASM).
  */
 import { inflateSync } from 'node:zlib';
@@ -19,6 +19,8 @@ import MediaFixture from './fixtures/media.svelte';
 import VectorExtras from './fixtures/vector-extras.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import ChartsFixture from './fixtures/charts.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import FormFieldsFixture from './fixtures/form-fields.svelte';
 
 /**
  * Concatenate every stream object in the PDF, inflating the
@@ -87,7 +89,7 @@ describe('WASM smoke', () => {
     const header = new TextDecoder().decode(pdf.slice(0, 5));
     expect(header).toBe('%PDF-');
     // QR modules and barcode bars are drawn as rectangle ops (`re`) in
-    // the content stream — a media-free page has nowhere near this
+    // the content stream - a media-free page has nowhere near this
     // many. The data-URI image becomes an XObject (`/Im0 Do`).
     const text = decompressedStreams(pdf);
     const rectOps = (text.match(/\bre\b/g) ?? []).length;
@@ -137,6 +139,31 @@ describe('WASM smoke', () => {
     // sectors as bezier curves.
     expect((text.match(/\bre\b/g) ?? []).length).toBeGreaterThan(5);
     expect(text).toContain(' c\n');
+  });
+
+  it('renders a registration form with AcroForm fields', async () => {
+    const json = await render(FormFieldsFixture);
+    const pdf = await renderPdf(json);
+
+    const header = new TextDecoder().decode(pdf.slice(0, 5));
+    expect(header).toBe('%PDF-');
+    // AcroForm widgets are plain (uncompressed) annotation dictionaries:
+    // the catalog carries /AcroForm, each field a /T (name) entry with
+    // its field type (/FT /Tx text, /Btn button, /Ch choice).
+    const raw = Buffer.from(pdf).toString('latin1');
+    expect(raw).toContain('/AcroForm');
+    for (const name of ['full_name', 'bio', 'access_code', 'agree_terms', 'newsletter', 'country', 'plan_type']) {
+      expect(raw).toContain(`/T (${name})`);
+    }
+    expect(raw).toContain('/FT /Tx');
+    expect(raw).toContain('/FT /Btn');
+    expect(raw).toContain('/FT /Ch');
+    // The radio group serializes as one field with three kid widgets
+    // exporting /free, /pro, and /team states.
+    expect(raw).toContain('/T (plan)');
+    expect(raw).toContain('/free');
+    expect(raw).toContain('/pro');
+    expect(raw).toContain('/team');
   });
 
   it('substitutes PAGE_NUMBER / TOTAL_PAGES in a multi-page footer', async () => {

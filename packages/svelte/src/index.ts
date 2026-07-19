@@ -19,6 +19,10 @@ export { default as LineChart } from './components/LineChart.svelte';
 export { default as PieChart } from './components/PieChart.svelte';
 export { default as AreaChart } from './components/AreaChart.svelte';
 export { default as DotPlot } from './components/DotPlot.svelte';
+export { default as TextField } from './components/TextField.svelte';
+export { default as Checkbox } from './components/Checkbox.svelte';
+export { default as Dropdown } from './components/Dropdown.svelte';
+export { default as RadioButton } from './components/RadioButton.svelte';
 
 // Page-number placeholders
 export { PAGE_NUMBER, TOTAL_PAGES } from './constants.js';

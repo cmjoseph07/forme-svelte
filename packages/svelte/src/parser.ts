@@ -4,7 +4,7 @@
  * The Forme Svelte components render namespaced placeholder tags
  * (`<forme-document>`, `<forme-page>`, `<forme-view>`, `<forme-text>`)
  * with a single `props` attribute holding the JSON-encoded component
- * props. This module parses that markup — the emitting components and
+ * props. This module parses that markup - the emitting components and
  * this parser are a matched pair inside this package. The placeholder
  * tag/attribute vocabulary is an INTERNAL contract, not a public
  * format: it may change in any release without notice.
@@ -16,7 +16,7 @@
  * Svelte compiler trims fragment edges and collapses inter-element
  * whitespace before we ever see the markup, so the remaining rules
  * are applied here (see `cleanJsxText`). Known divergences from JSX,
- * where the compiler destroys the distinction before serialization —
+ * where the compiler destroys the distinction before serialization -
  * each matches how Svelte itself renders the template to the DOM:
  *
  * - Same-line leading/trailing spaces inside `<Text>` are trimmed
@@ -228,6 +228,14 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseChart(element, 'AreaChart', buildAreaChartKind);
     case 'forme-dot-plot':
       return parseChart(element, 'DotPlot', buildDotPlotKind);
+    case 'forme-text-field':
+      return parseTextField(element);
+    case 'forme-checkbox':
+      return parseCheckbox(element);
+    case 'forme-dropdown':
+      return parseDropdown(element);
+    case 'forme-radio-button':
+      return parseRadioButton(element);
     case 'forme-page-break':
       return { kind: { type: 'PageBreak' }, style: {}, children: [] };
     case 'forme-page':
@@ -394,7 +402,7 @@ function parseText(element: P5Element): FormeNode {
  * `<Text>` (returns null otherwise). Plain text chunks become unstyled
  * runs; each nested `<Text>` becomes one run carrying its own
  * style/href with all its descendant text merged (deeper nesting
- * flattens — a run has exactly one style). Elements other than
+ * flattens - a run has exactly one style). Elements other than
  * `<Text>` are skipped but still split the surrounding text into
  * separate runs, as react's per-child loop does.
  */
@@ -680,6 +688,124 @@ function parseWatermark(element: P5Element): FormeNode {
   };
 }
 
+// ─── Form fields ─────────────────────────────────────────────────────
+
+interface TextFieldProps {
+  name: string;
+  value?: string;
+  placeholder?: string;
+  width: number;
+  height?: number;
+  multiline?: boolean;
+  password?: boolean;
+  readOnly?: boolean;
+  maxLength?: number;
+  fontSize?: number;
+  style?: Style;
+}
+
+function parseTextField(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'TextField') as TextFieldProps;
+
+  const kind: FormeNodeKind = {
+    type: 'TextField',
+    name: props.name,
+    width: props.width,
+    height: props.height ?? 24,
+    multiline: props.multiline ?? false,
+    password: props.password ?? false,
+    read_only: props.readOnly ?? false,
+    font_size: props.fontSize ?? 12,
+  };
+  if (props.value !== undefined) kind.value = props.value;
+  if (props.placeholder !== undefined) kind.placeholder = props.placeholder;
+  if (props.maxLength !== undefined) kind.max_length = props.maxLength;
+
+  return { kind, style: mapStyle(props.style), children: [] };
+}
+
+interface CheckboxProps {
+  name: string;
+  checked?: boolean;
+  width?: number;
+  height?: number;
+  readOnly?: boolean;
+  style?: Style;
+}
+
+function parseCheckbox(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Checkbox') as CheckboxProps;
+
+  return {
+    kind: {
+      type: 'Checkbox',
+      name: props.name,
+      checked: props.checked ?? false,
+      width: props.width ?? 14,
+      height: props.height ?? 14,
+      read_only: props.readOnly ?? false,
+    },
+    style: mapStyle(props.style),
+    children: [],
+  };
+}
+
+interface DropdownProps {
+  name: string;
+  options: string[];
+  value?: string;
+  width: number;
+  height?: number;
+  readOnly?: boolean;
+  fontSize?: number;
+  style?: Style;
+}
+
+function parseDropdown(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Dropdown') as DropdownProps;
+
+  const kind: FormeNodeKind = {
+    type: 'Dropdown',
+    name: props.name,
+    options: props.options,
+    width: props.width,
+    height: props.height ?? 24,
+    read_only: props.readOnly ?? false,
+    font_size: props.fontSize ?? 12,
+  };
+  if (props.value !== undefined) kind.value = props.value;
+
+  return { kind, style: mapStyle(props.style), children: [] };
+}
+
+interface RadioButtonProps {
+  name: string;
+  value: string;
+  checked?: boolean;
+  width?: number;
+  height?: number;
+  readOnly?: boolean;
+  style?: Style;
+}
+
+function parseRadioButton(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'RadioButton') as RadioButtonProps;
+
+  return {
+    kind: {
+      type: 'RadioButton',
+      name: props.name,
+      value: props.value,
+      checked: props.checked ?? false,
+      width: props.width ?? 14,
+      height: props.height ?? 14,
+      read_only: props.readOnly ?? false,
+    },
+    style: mapStyle(props.style),
+    children: [],
+  };
+}
+
 // ─── Charts ──────────────────────────────────────────────────────────
 
 /**
@@ -705,7 +831,7 @@ function parseChart<P extends ChartPlaceholderProps>(
 // ─── Whitespace normalization ────────────────────────────────────────
 
 /**
- * Normalize template text to JSX-equivalent semantics — the same
+ * Normalize template text to JSX-equivalent semantics - the same
  * algorithm Babel, TypeScript, and esbuild apply to JSX text literals:
  *
  * - lines are trimmed (leading whitespace on all but the first line,
