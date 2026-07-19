@@ -4,7 +4,7 @@
  * The engine substitutes `{{pageNumber}}` and `{{totalPages}}` in text
  * content when it serializes each page. In JSX the braces can be typed
  * as a string literal (`{'{{pageNumber}}'}`), but in a Svelte template
- * `{{pageNumber}}` parses as an object-literal expression — so the
+ * `{{pageNumber}}` parses as an object-literal expression - so the
  * documented way to emit the placeholders is interpolating these
  * constants:
  *

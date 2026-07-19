@@ -5,11 +5,11 @@
  * (`render` from `svelte/server`, a public, stable API) and parses the
  * placeholder markup the Forme components emit (see `parser.ts`).
  * `{#each}`, `{#if}`, snippets, and text interpolation are evaluated
- * by Svelte itself — nothing is reimplemented here.
+ * by Svelte itself - nothing is reimplemented here.
  *
  * All functions are async-first: Svelte's render is synchronous today,
  * but the experimental async SSR can be adopted later without a
- * breaking change. Adapters serialize; only the engine renders PDFs —
+ * breaking change. Adapters serialize; only the engine renders PDFs -
  * the `render` export name mirrors the react adapter's historical API
  * and returns a JSON string, not PDF bytes.
  */
