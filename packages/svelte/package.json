@@ -24,7 +24,13 @@
     "parse5": "^7.2.1"
   },
   "peerDependencies": {
+    "@formepdf/core": "^0.10.4",
     "svelte": "^5.30.0"
+  },
+  "peerDependenciesMeta": {
+    "@formepdf/core": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@formepdf/core": "0.10.4",
