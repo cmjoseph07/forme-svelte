@@ -10,6 +10,7 @@ import HelloWorldReact from './fixtures/hello-world';
 import KitchenSinkReact from './fixtures/kitchen-sink';
 import TextRunsReact from './fixtures/text-runs';
 import FixedPageNumbersReact from './fixtures/fixed-page-numbers';
+import TableReact from './fixtures/table';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -18,6 +19,8 @@ import KitchenSinkSvelte from './fixtures/kitchen-sink.svelte';
 import TextRunsSvelte from './fixtures/text-runs.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import FixedPageNumbersSvelte from './fixtures/fixed-page-numbers.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import TableSvelte from './fixtures/table.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -42,6 +45,12 @@ describe('cross-adapter parity', () => {
   it('text-runs: nested spans, run styles, boundary whitespace', async () => {
     const svelteDoc = await serialize(TextRunsSvelte, { props: { price: 42 } });
     const reactDoc = serializeReact(<TextRunsReact price={42} />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('table: 50-row #each, header row, column widths, spans, view cells', async () => {
+    const svelteDoc = await serialize(TableSvelte);
+    const reactDoc = serializeReact(<TableReact />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 

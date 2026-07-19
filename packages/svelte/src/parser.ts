@@ -29,10 +29,12 @@
 
 import { parseFragment } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
-import { expandEdges, mapStyle } from '@formepdf/shared';
+import { expandEdges, mapColumnWidth, mapStyle } from '@formepdf/shared';
 import type {
   CertificationConfig,
+  ColumnDef,
   Edges,
+  FormeColumnDef,
   FormeDocument,
   FormeEdges,
   FormeNode,
@@ -174,6 +176,14 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseView(element);
     case 'forme-text':
       return parseText(element);
+    case 'forme-table':
+      return parseTable(element);
+    case 'forme-row':
+      validateNesting('Row', parent);
+      return parseRow(element);
+    case 'forme-cell':
+      validateNesting('Cell', parent);
+      return parseCell(element);
     case 'forme-fixed':
       return parseFixed(element);
     case 'forme-page':
@@ -190,6 +200,14 @@ const VALID_PARENTS: Record<string, { allowed: ParentContext[]; suggestion: stri
   Page: {
     allowed: ['Document'],
     suggestion: '<Page> must be a direct child of <Document>.',
+  },
+  Row: {
+    allowed: ['Table'],
+    suggestion: '<Row> must be inside a <Table>. Wrap it: <Table><Row>...</Row></Table>',
+  },
+  Cell: {
+    allowed: ['Row'],
+    suggestion: '<Cell> must be inside a <Row>. Wrap it: <Row><Cell>...</Cell></Row>',
   },
 };
 
@@ -388,6 +406,57 @@ function rawTextOf(nodes: P5Node[]): string {
     else if (isElement(node)) merged += rawTextOf(node.childNodes);
   }
   return merged;
+}
+
+// ─── Table ───────────────────────────────────────────────────────────
+
+interface TableProps {
+  columns?: ColumnDef[];
+  style?: Style;
+}
+
+function parseTable(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Table') as TableProps;
+  const columns: FormeColumnDef[] = (props.columns ?? []).map(col => ({
+    width: mapColumnWidth(col.width),
+  }));
+
+  return {
+    kind: { type: 'Table', columns },
+    style: mapStyle(props.style),
+    children: parseChildren(element.childNodes, 'Table'),
+  };
+}
+
+interface RowProps {
+  header?: boolean;
+  style?: Style;
+}
+
+function parseRow(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Row') as RowProps;
+
+  return {
+    kind: { type: 'TableRow', is_header: props.header ?? false },
+    style: mapStyle(props.style),
+    children: parseChildren(element.childNodes, 'Row'),
+  };
+}
+
+interface CellProps {
+  colSpan?: number;
+  rowSpan?: number;
+  style?: Style;
+}
+
+function parseCell(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Cell') as CellProps;
+
+  return {
+    kind: { type: 'TableCell', col_span: props.colSpan ?? 1, row_span: props.rowSpan ?? 1 },
+    style: mapStyle(props.style),
+    children: parseChildren(element.childNodes, 'Cell'),
+  };
 }
 
 // ─── Fixed ───────────────────────────────────────────────────────────

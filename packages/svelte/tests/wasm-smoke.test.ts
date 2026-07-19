@@ -11,6 +11,8 @@ import { render } from '../src/index.js';
 import HelloWorld from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import FixedPageNumbers from './fixtures/fixed-page-numbers.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import TableFixture from './fixtures/table.svelte';
 
 /**
  * Concatenate every stream object in the PDF, inflating the
@@ -52,6 +54,23 @@ describe('WASM smoke', () => {
     expect(pdf.length).toBeGreaterThan(500);
     const header = new TextDecoder().decode(pdf.slice(0, 5));
     expect(header).toBe('%PDF-');
+  });
+
+  it('renders a 50-row table with a header row to a multi-page PDF', async () => {
+    const json = await render(TableFixture);
+    const pdf = await renderPdf(json);
+
+    const header = new TextDecoder().decode(pdf.slice(0, 5));
+    expect(header).toBe('%PDF-');
+    // One /Type /Page per page (the page-tree root is /Type /Pages).
+    const raw = Buffer.from(pdf).toString('latin1');
+    const pageCount = (raw.match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    expect(pageCount).toBeGreaterThan(1);
+    // The header row repeats on continuation pages: "SKU" is drawn
+    // once per page in the content streams.
+    const text = decompressedStreams(pdf);
+    const headerDraws = (text.match(/\(SKU\)/g) ?? []).length;
+    expect(headerDraws).toBe(pageCount);
   });
 
   it('substitutes PAGE_NUMBER / TOTAL_PAGES in a multi-page footer', async () => {
