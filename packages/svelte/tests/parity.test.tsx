@@ -11,6 +11,7 @@ import KitchenSinkReact from './fixtures/kitchen-sink';
 import TextRunsReact from './fixtures/text-runs';
 import FixedPageNumbersReact from './fixtures/fixed-page-numbers';
 import TableReact from './fixtures/table';
+import MediaReact from './fixtures/media';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import HelloWorldSvelte from './fixtures/hello-world.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
@@ -21,6 +22,8 @@ import TextRunsSvelte from './fixtures/text-runs.svelte';
 import FixedPageNumbersSvelte from './fixtures/fixed-page-numbers.svelte';
 // @ts-expect-error .svelte fixtures have no type declarations in tests
 import TableSvelte from './fixtures/table.svelte';
+// @ts-expect-error .svelte fixtures have no type declarations in tests
+import MediaSvelte from './fixtures/media.svelte';
 
 describe('cross-adapter parity', () => {
   it('hello-world: interpolation, #each/#if vs map/&&', async () => {
@@ -51,6 +54,18 @@ describe('cross-adapter parity', () => {
   it('table: 50-row #each, header row, column widths, spans, view cells', async () => {
     const svelteDoc = await serialize(TableSvelte);
     const reactDoc = serializeReact(<TableReact />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('media: Image src pass-through, Svg content, QrCode, Barcode defaults', async () => {
+    const svelteDoc = await serialize(MediaSvelte, { props: { ticketId: 'TKT-7777' } });
+    const reactDoc = serializeReact(<MediaReact ticketId="TKT-7777" />);
+    expect(svelteDoc).toEqual(reactDoc);
+  });
+
+  it('media with default props', async () => {
+    const svelteDoc = await serialize(MediaSvelte);
+    const reactDoc = serializeReact(<MediaReact />);
     expect(svelteDoc).toEqual(reactDoc);
   });
 

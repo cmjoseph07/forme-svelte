@@ -15,7 +15,7 @@
  * and circular structures throw an error naming the component and
  * the offending prop.
  */
-export function encodeProps(component: string, props: Record<string, unknown>): string {
+export function encodeProps(component: string, props: object): string {
   const parts: string[] = [];
   for (const [key, value] of Object.entries(props)) {
     if (value === undefined) continue;

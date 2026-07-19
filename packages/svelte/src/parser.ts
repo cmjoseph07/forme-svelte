@@ -29,8 +29,9 @@
 
 import { parseFragment } from 'parse5';
 import type { DefaultTreeAdapterMap } from 'parse5';
-import { expandEdges, mapColumnWidth, mapStyle } from '@formepdf/shared';
+import { expandEdges, mapColumnWidth, mapStyle, parseColor } from '@formepdf/shared';
 import type {
+  BarcodeFormat,
   CertificationConfig,
   ColumnDef,
   Edges,
@@ -38,6 +39,7 @@ import type {
   FormeDocument,
   FormeEdges,
   FormeNode,
+  FormeNodeKind,
   FormePageConfig,
   FormePageSize,
   Style,
@@ -186,6 +188,14 @@ function parseElement(element: P5Element, parent: ParentContext): FormeNode | nu
       return parseCell(element);
     case 'forme-fixed':
       return parseFixed(element);
+    case 'forme-image':
+      return parseImage(element);
+    case 'forme-svg':
+      return parseSvg(element);
+    case 'forme-qrcode':
+      return parseQrCode(element);
+    case 'forme-barcode':
+      return parseBarcode(element);
     case 'forme-page':
       validateNesting('Page', parent);
       return parsePage(element);
@@ -482,6 +492,110 @@ function parseFixed(element: P5Element): FormeNode {
   return node;
 }
 
+// ─── Media leaves ────────────────────────────────────────────────────
+
+interface ImageProps {
+  src: string;
+  width?: number;
+  height?: number;
+  style?: Style;
+  href?: string;
+  alt?: string;
+}
+
+function parseImage(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Image') as ImageProps;
+
+  const kind: FormeNodeKind = { type: 'Image', src: props.src };
+  if (props.width !== undefined) kind.width = props.width;
+  if (props.height !== undefined) kind.height = props.height;
+
+  const node: FormeNode = {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+  };
+  if (props.href) node.href = props.href;
+  if (props.alt) node.alt = props.alt;
+  return node;
+}
+
+interface SvgProps {
+  width: number;
+  height: number;
+  viewBox?: string;
+  content?: string;
+  style?: Style;
+  href?: string;
+  alt?: string;
+}
+
+function parseSvg(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Svg') as SvgProps;
+
+  const kind: FormeNodeKind = {
+    type: 'Svg',
+    width: props.width,
+    height: props.height,
+    content: props.content ?? '',
+  };
+  if (props.viewBox) kind.view_box = props.viewBox;
+
+  const node: FormeNode = {
+    kind,
+    style: mapStyle(props.style),
+    children: [],
+  };
+  if (props.href) node.href = props.href;
+  if (props.alt) node.alt = props.alt;
+  return node;
+}
+
+interface QrCodeProps {
+  data: string;
+  size?: number;
+  color?: string;
+  style?: Style;
+}
+
+function parseQrCode(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'QrCode') as QrCodeProps;
+
+  const kind: FormeNodeKind = { type: 'QrCode', data: props.data };
+  if (props.size !== undefined) kind.size = props.size;
+
+  const style = mapStyle(props.style);
+  if (props.color) style.color = parseColor(props.color);
+
+  return { kind, style, children: [] };
+}
+
+interface BarcodeProps {
+  data: string;
+  format?: BarcodeFormat;
+  width?: number;
+  height?: number;
+  color?: string;
+  style?: Style;
+}
+
+function parseBarcode(element: P5Element): FormeNode {
+  const props = decodeProps(element, 'Barcode') as BarcodeProps;
+
+  const kind: FormeNodeKind = {
+    type: 'Barcode',
+    data: props.data,
+    format: props.format ?? 'Code128',
+    height: props.height ?? 60,
+  };
+  if (props.width !== undefined) kind.width = props.width;
+
+  const style = mapStyle(props.style);
+  if (props.color) style.color = parseColor(props.color);
+
+  return { kind, style, children: [] };
+}
+
 // ─── Whitespace normalization ────────────────────────────────────────
 
 /**
@@ -529,11 +643,11 @@ function findDocumentRoot(nodes: P5Node[]): P5Element {
 }
 
 /** Decode the JSON `props` attribute of a placeholder element. */
-function decodeProps(element: P5Element, component: string): Record<string, unknown> {
+function decodeProps(element: P5Element, component: string): unknown {
   const attr = element.attrs.find(a => a.name === 'props');
   if (attr === undefined) return {};
   try {
-    return JSON.parse(attr.value) as Record<string, unknown>;
+    return JSON.parse(attr.value) as unknown;
   } catch (err) {
     throw new Error(
       `[Forme] <${component}>: failed to decode props attribute: ${err instanceof Error ? err.message : String(err)}`
